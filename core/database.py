@@ -513,6 +513,7 @@ def init_db(db_path):
         total_ventes REAL DEFAULT 0,
         total_encaisse REAL DEFAULT 0,
         total_credit REAL DEFAULT 0,
+        depenses_caisse REAL DEFAULT 0,
         observations TEXT,
         statut TEXT DEFAULT 'brouillon',
         saisi_par TEXT,

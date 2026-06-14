@@ -2,14 +2,254 @@
 
 {% block sidebar %}
 <button class="nav-item active" onclick="nav('caisse-dashboard')" data-nav="caisse-dashboard">🏠 Tableau de bord</button>
+<button class="nav-item" onclick="nav('caisse-saisie')" data-nav="caisse-saisie">✏️ Saisir Rapport</button>
+<button class="nav-item" onclick="nav('caisse-historique')" data-nav="caisse-historique">📋 Historique</button>
+<button class="nav-item" onclick="nav('caisse-analyse')" data-nav="caisse-analyse">📊 Recap Journalier</button>
 {% endblock %}
 
 {% block content %}
+
+<!-- ════════════ TABLEAU DE BORD ════════════ -->
 <div id="s-caisse-dashboard" class="section active">
-  <div class="section-title">🏪 Caisse — Tableau de bord</div>
+  <div class="section-title">🏠 Caisse — Tableau de bord</div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card k-green">
+      <div class="kico">🏪</div>
+      <div class="kval" id="kpi-solde-jour">—</div>
+      <div class="klabel">Solde caisse du jour</div>
+    </div>
+    <div class="kpi-card k-blue">
+      <div class="kico">💰</div>
+      <div class="kval" id="kpi-encaisse-jour">—</div>
+      <div class="klabel">Encaisse du jour</div>
+    </div>
+    <div class="kpi-card k-red">
+      <div class="kico">💸</div>
+      <div class="kval" id="kpi-depenses-jour">—</div>
+      <div class="klabel">Depenses du jour</div>
+    </div>
+    <div class="kpi-card k-gold">
+      <div class="kico">📋</div>
+      <div class="kval" id="kpi-rapports-jour">—</div>
+      <div class="klabel">Rapports du jour</div>
+    </div>
+    <div class="kpi-card k-warn">
+      <div class="kico">⏳</div>
+      <div class="kval" id="kpi-rapports-attente">—</div>
+      <div class="klabel">Rapports en attente de validation</div>
+    </div>
+  </div>
+
   <div class="card">
-    <div class="card-title">Module en construction</div>
-    <p>Ce module sera complete dans une prochaine iteration.</p>
+    <div class="card-title">Comparaisons</div>
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Solde semaine en cours</label>
+        <div id="cmp-semaine">—</div>
+      </div>
+      <div class="fgroup">
+        <label>Solde semaine precedente</label>
+        <div id="cmp-semaine-prec">—</div>
+      </div>
+      <div class="fgroup">
+        <label>Solde mois en cours</label>
+        <div id="cmp-mois">—</div>
+      </div>
+      <div class="fgroup">
+        <label>Solde mois precedent</label>
+        <div id="cmp-mois-prec">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Acces rapides</div>
+    <div class="shortcut-grid">
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=caisse-saisie]').click()">
+        <div class="ico">✏️</div>
+        Saisir un rapport
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=caisse-historique]').click()">
+        <div class="ico">📋</div>
+        Historique
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=caisse-analyse]').click()">
+        <div class="ico">📊</div>
+        Recap Journalier
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- ════════════ SAISIR RAPPORT ════════════ -->
+<div id="s-caisse-saisie" class="section">
+  <div class="section-title">✏️ Saisir un Rapport de Caisse</div>
+
+  <div class="card">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Date</label>
+        <input type="date" id="cs-date">
+      </div>
+      <div class="fgroup">
+        <label>Commercial</label>
+        <input type="text" id="cs-commercial" placeholder="Nom du commercial">
+      </div>
+      <div class="fgroup">
+        <label>Agence</label>
+        <input type="text" id="cs-agence" value="BERTOUA">
+      </div>
+      <div class="fgroup">
+        <label>Total Ventes (FCFA)</label>
+        <input type="number" id="cs-total-ventes" step="0.01" value="0">
+      </div>
+      <div class="fgroup">
+        <label>Total Encaisse (FCFA)</label>
+        <input type="number" id="cs-total-encaisse" step="0.01" value="0">
+      </div>
+      <div class="fgroup">
+        <label>Total Credit (FCFA)</label>
+        <input type="number" id="cs-total-credit" step="0.01" value="0">
+      </div>
+      <div class="fgroup">
+        <label>Depenses caisse (FCFA)</label>
+        <input type="number" id="cs-depenses" step="0.01" value="0">
+      </div>
+      <div class="fgroup" style="flex:1">
+        <label>Observations</label>
+        <input type="text" id="cs-observations" placeholder="Optionnel">
+      </div>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr>
+            <th>No Facture</th><th>Code Client</th><th>Client</th>
+            <th style="width:120px">Mt. Facture</th><th style="width:120px">Mt. Encaisse</th>
+            <th style="width:130px">Mode</th><th>Observations</th><th style="width:50px"></th>
+          </tr>
+        </thead>
+        <tbody id="csn-lignes-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="frow" style="justify-content:space-between;margin-top:12px">
+      <button class="btn btn-outline" onclick="cseAjouterLigne('csn-lignes-tbody')">➕ Ajouter une ligne</button>
+      <button class="btn btn-navy" onclick="cseSoumettreRapport()">💾 Enregistrer (brouillon)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ HISTORIQUE ════════════ -->
+<div id="s-caisse-historique" class="section">
+  <div class="section-title">📋 Historique des Rapports de Caisse</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Statut</label>
+        <select id="cse-filtre-statut" onchange="cseChargerHistorique()">
+          <option value="">Tous</option>
+          <option value="brouillon">Brouillon</option>
+          <option value="soumis">Soumis</option>
+          <option value="valide">Valide</option>
+          <option value="rejete">Rejete</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Date debut</label>
+        <input type="date" id="cse-filtre-date-debut" onchange="cseChargerHistorique()">
+      </div>
+      <div class="fgroup">
+        <label>Date fin</label>
+        <input type="date" id="cse-filtre-date-fin" onchange="cseChargerHistorique()">
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Commercial</th><th>Agence</th><th>Ventes</th>
+            <th>Encaisse</th><th>Credit</th><th>Depenses</th><th>Solde</th>
+            <th>Lignes</th><th>Statut</th><th style="width:90px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="cse-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ RECAP JOURNALIER ════════════ -->
+<div id="s-caisse-analyse" class="section">
+  <div class="section-title">📊 Recap Journalier — Evolution du Solde</div>
+  <div class="alert alert-info">Courbe du solde de caisse (encaisse - depenses) jour par jour, avec solde cumule et identification des jours forts / faibles.</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Periode</label>
+        <select id="cse-evo-jours" onchange="cseChargerEvolution()">
+          <option value="30">30 jours</option>
+          <option value="60">60 jours</option>
+          <option value="90">90 jours</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="kpi-grid" style="margin-top:12px">
+      <div class="kpi-card k-green">
+        <div class="kico">📈</div>
+        <div class="kval" id="evo-jour-fort">—</div>
+        <div class="klabel">Meilleur jour</div>
+      </div>
+      <div class="kpi-card k-red">
+        <div class="kico">📉</div>
+        <div class="kval" id="evo-jour-faible">—</div>
+        <div class="klabel">Jour le plus faible</div>
+      </div>
+      <div class="kpi-card k-blue">
+        <div class="kico">🏪</div>
+        <div class="kval" id="evo-cumul-final">—</div>
+        <div class="klabel">Solde cumule sur la periode</div>
+      </div>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Encaisse</th><th>Depenses</th><th>Solde</th><th>Cumul</th></tr>
+        </thead>
+        <tbody id="cse-evo-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ MODAL DETAIL RAPPORT ════════════ -->
+<div id="modal-caisse-detail" class="modal">
+  <div class="modal-box modal-lg">
+    <div class="card-title" id="csd-titre">Detail rapport de caisse</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>No Facture</th><th>Code Client</th><th>Client</th>
+            <th>Mt. Facture</th><th>Mt. Encaisse</th><th>Mode</th><th>Observations</th>
+          </tr>
+        </thead>
+        <tbody id="csd-tbody"></tbody>
+      </table>
+    </div>
+    <input type="hidden" id="csd-id">
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-outline" onclick="fermerModal('modal-caisse-detail')">Fermer</button>
+      <button class="btn btn-outline" id="csd-rejeter-btn" onclick="cseChangerStatut('rejete')">❌ Rejeter</button>
+      <button class="btn btn-navy" id="csd-action-btn" onclick="cseChangerStatutPrincipal()">➡️ Soumettre</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
