@@ -130,6 +130,7 @@ def register_main_routes(app):
                 session["user_id"] = user["id"]
                 session["username"] = user["username"]
                 session["nom"] = ("%s %s" % (user["prenom"] or "", user["nom"])).strip()
+                session["agence"] = user["agence"]
                 session["is_master"] = (user["username"] == _NEXORA_MASTER)
                 audit(user["username"], "AUTH", "LOGIN", "Connexion", request.remote_addr or "")
                 return redirect(url_for("accueil"))
