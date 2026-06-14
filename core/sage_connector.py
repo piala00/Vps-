@@ -396,3 +396,58 @@ def get_creances_clients() -> List[Dict]:
     except Exception as e:
         log.error("Erreur creances: %s" % e)
         return []
+
+
+# ── Grand livre client ─────────────────────────────────────────────────────────
+def get_grand_livre_client(code_client: str, date_debut: str = "", date_fin: str = "") -> List[Dict]:
+    try:
+        sql = """
+            SELECT E.EC_Date AS date_ecriture, E.JO_Num AS journal,
+                   E.EC_Piece AS piece, E.EC_Libelle AS libelle,
+                   E.EC_Montant AS montant,
+                   CASE WHEN E.EC_Sens=0 THEN E.EC_Montant ELSE 0 END AS debit,
+                   CASE WHEN E.EC_Sens=1 THEN E.EC_Montant ELSE 0 END AS credit
+            FROM F_ECRITUREC E
+            WHERE E.CT_Num=?
+        """
+        params = [code_client]
+        if date_debut:
+            sql += " AND E.EC_Date>=?"
+            params.append(date_debut)
+        if date_fin:
+            sql += " AND E.EC_Date<=?"
+            params.append(date_fin)
+        sql += " ORDER BY E.EC_Date"
+        return sage_query(sql, tuple(params))
+    except Exception as e:
+        log.error("Erreur GL client: %s" % e)
+        return []
+
+
+# ── Reglements clients (F_DOCREGL) ───────────────────────────────────────────────
+def get_paiements_clients(code_client: str = "", date_debut: str = "", date_fin: str = "") -> List[Dict]:
+    try:
+        sql = """
+            SELECT R.RG_Date AS date_paiement, R.CT_Num AS code_client,
+                   ISNULL(C.CT_Intitule,'') AS client_nom,
+                   R.RG_Montant AS montant, R.RG_Mode AS mode_paiement,
+                   R.RG_Ref AS reference, R.DO_Piece AS piece
+            FROM F_DOCREGL R
+            LEFT JOIN F_COMPTET C ON C.CT_Num=R.CT_Num
+            WHERE R.CT_Num IS NOT NULL AND R.CT_Num <> ''
+        """
+        params = []
+        if code_client:
+            sql += " AND R.CT_Num=?"
+            params.append(code_client)
+        if date_debut:
+            sql += " AND R.RG_Date>=?"
+            params.append(date_debut)
+        if date_fin:
+            sql += " AND R.RG_Date<=?"
+            params.append(date_fin)
+        sql += " ORDER BY R.RG_Date DESC"
+        return sage_query(sql, tuple(params))
+    except Exception as e:
+        log.error("Erreur paiements clients: %s" % e)
+        return []

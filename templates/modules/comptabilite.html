@@ -2,14 +2,325 @@
 
 {% block sidebar %}
 <button class="nav-item active" onclick="nav('comptabilite-dashboard')" data-nav="comptabilite-dashboard">🏠 Tableau de bord</button>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>📊</span> Creances <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'balance-agee')" data-nav="balance-agee">📊 Balance Agee</button>
+    <button class="nav-item-sub" onclick="navSub(this,'grand-livre-clients')" data-nav="grand-livre-clients">📒 Grand Livre Clients</button>
+    <button class="nav-item-sub" onclick="navSub(this,'paiements')" data-nav="paiements">💳 Paiements</button>
+    <button class="nav-item-sub" onclick="navSub(this,'evolution-creances')" data-nav="evolution-creances">📈 Evolution Creances</button>
+  </div>
+</div>
+
+<button class="nav-item" onclick="nav('rapport-caisse')" data-nav="rapport-caisse">🏪 Rapport de Caisse</button>
 {% endblock %}
 
 {% block content %}
+
+<!-- ════════════ TABLEAU DE BORD ════════════ -->
 <div id="s-comptabilite-dashboard" class="section active">
-  <div class="section-title">💰 Comptabilite — Tableau de bord</div>
+  <div class="section-title">🏠 Comptabilite — Tableau de bord</div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card k-red">
+      <div class="kico">💰</div>
+      <div class="kval" id="kpi-creances-totales">—</div>
+      <div class="klabel">Creances totales</div>
+    </div>
+    <div class="kpi-card k-blue">
+      <div class="kico">👥</div>
+      <div class="kval" id="kpi-nb-debiteurs">—</div>
+      <div class="klabel">Clients debiteurs</div>
+    </div>
+    <div class="kpi-card k-red">
+      <div class="kico">🔥</div>
+      <div class="kval" id="kpi-creances-critiques">—</div>
+      <div class="klabel">Creances critiques (&gt;500K)</div>
+    </div>
+    <div class="kpi-card k-warn">
+      <div class="kico">⚠️</div>
+      <div class="kval" id="kpi-creances-elevees">—</div>
+      <div class="klabel">Creances elevees (&gt;200K)</div>
+    </div>
+    <div class="kpi-card k-green">
+      <div class="kico">💵</div>
+      <div class="kval" id="kpi-encaisse-mois">—</div>
+      <div class="klabel">Encaisse ce mois (rapports)</div>
+    </div>
+    <div class="kpi-card k-gold">
+      <div class="kico">🏪</div>
+      <div class="kval" id="kpi-rapports-brouillon">—</div>
+      <div class="klabel">Rapports de caisse en brouillon</div>
+    </div>
+  </div>
+
   <div class="card">
-    <div class="card-title">Module en construction</div>
-    <p>Ce module sera complete dans une prochaine iteration.</p>
+    <div class="card-title">Tendance des creances</div>
+    <p>Evolution par rapport a hier : <span id="cpta-tendance">—</span></p>
+    <p style="color:var(--muted);font-size:13px">Si la courbe monte, attention : ventes a credit non encaissees. Si elle descend, les clients paient.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Acces rapides</div>
+    <div class="shortcut-grid">
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=balance-agee]').click()">
+        <div class="ico">📊</div>
+        Balance Agee
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=grand-livre-clients]').click()">
+        <div class="ico">📒</div>
+        Grand Livre Clients
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=paiements]').click()">
+        <div class="ico">💳</div>
+        Paiements
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=evolution-creances]').click()">
+        <div class="ico">📈</div>
+        Evolution Creances
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=rapport-caisse]').click()">
+        <div class="ico">🏪</div>
+        Rapport de Caisse
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- ════════════ BALANCE AGEE ════════════ -->
+<div id="s-balance-agee" class="section">
+  <div class="section-title">📊 Balance Agee des Creances Clients</div>
+  <div class="alert alert-info">Solde des comptes clients depuis Sage, classes par niveau de risque : CRITIQUE (&gt;500K), ELEVE (&gt;200K), MOYEN (&gt;50K), FAIBLE.</div>
+
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Code Client</th><th>Nom</th><th>Telephone</th>
+            <th>Total Debit</th><th>Total Credit</th><th>Solde</th><th>Risque</th>
+          </tr>
+        </thead>
+        <tbody id="bal-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ GRAND LIVRE CLIENTS ════════════ -->
+<div id="s-grand-livre-clients" class="section">
+  <div class="section-title">📒 Grand Livre Clients (Sage)</div>
+
+  <div class="card">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Client</label>
+        <select id="gl-client"></select>
+      </div>
+      <div class="fgroup">
+        <label>Date debut</label>
+        <input type="date" id="gl-date-debut">
+      </div>
+      <div class="fgroup">
+        <label>Date fin</label>
+        <input type="date" id="gl-date-fin">
+      </div>
+      <div class="fgroup" style="flex-direction:row;align-items:flex-end">
+        <button class="btn btn-navy" onclick="cptaChargerGrandLivre()">🔍 Afficher</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Journal</th><th>Piece</th><th>Libelle</th><th>Debit</th><th>Credit</th></tr>
+        </thead>
+        <tbody id="gl-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ PAIEMENTS ════════════ -->
+<div id="s-paiements" class="section">
+  <div class="section-title">💳 Suivi des Paiements (Sage F_DOCREGL)</div>
+
+  <div class="card">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Client</label>
+        <select id="pai-client"><option value="">— Tous les clients —</option></select>
+      </div>
+      <div class="fgroup">
+        <label>Date debut</label>
+        <input type="date" id="pai-date-debut">
+      </div>
+      <div class="fgroup">
+        <label>Date fin</label>
+        <input type="date" id="pai-date-fin">
+      </div>
+      <div class="fgroup" style="flex-direction:row;align-items:flex-end">
+        <button class="btn btn-navy" onclick="cptaChargerPaiements()">🔍 Afficher</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Code Client</th><th>Client</th><th>Montant</th><th>Mode</th><th>Reference</th><th>Piece</th></tr>
+        </thead>
+        <tbody id="pai-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ EVOLUTION CREANCES ════════════ -->
+<div id="s-evolution-creances" class="section">
+  <div class="section-title">📈 Evolution des Creances</div>
+  <div class="alert alert-info">Courbe de la creance globale ou d'un client donne, jour par jour. Une hausse signale des ventes a credit non encaissees.</div>
+
+  <div class="card">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Client (vide = global)</label>
+        <select id="evo-client"><option value="">— Toutes les creances —</option></select>
+      </div>
+      <div class="fgroup">
+        <label>Periode</label>
+        <select id="evo-jours">
+          <option value="30">30 jours</option>
+          <option value="60">60 jours</option>
+          <option value="90">90 jours</option>
+          <option value="180">180 jours</option>
+        </select>
+      </div>
+      <div class="fgroup" style="flex-direction:row;align-items:flex-end">
+        <button class="btn btn-navy" onclick="cptaChargerEvolution()">🔍 Afficher</button>
+      </div>
+    </div>
+
+    <div class="kpi-grid" style="margin-top:12px">
+      <div class="kpi-card k-blue">
+        <div class="kico">📅</div>
+        <div class="kval" id="evo-valeur-debut">—</div>
+        <div class="klabel">Valeur en debut de periode</div>
+      </div>
+      <div class="kpi-card k-gold">
+        <div class="kico">📍</div>
+        <div class="kval" id="evo-valeur-fin">—</div>
+        <div class="klabel">Valeur actuelle</div>
+      </div>
+      <div class="kpi-card k-warn">
+        <div class="kico">⚖️</div>
+        <div class="kval" id="evo-variation">—</div>
+        <div class="klabel">Variation</div>
+      </div>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Date</th><th>Valeur</th></tr></thead>
+        <tbody id="evo-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ RAPPORT DE CAISSE ════════════ -->
+<div id="s-rapport-caisse" class="section">
+  <div class="section-title">🏪 Rapport de Caisse</div>
+
+  <div class="card">
+    <div class="card-title">Nouveau rapport journalier</div>
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Date</label>
+        <input type="date" id="rc-date">
+      </div>
+      <div class="fgroup">
+        <label>Commercial</label>
+        <input type="text" id="rc-commercial" placeholder="Nom du commercial">
+      </div>
+      <div class="fgroup">
+        <label>Agence</label>
+        <input type="text" id="rc-agence" value="BERTOUA">
+      </div>
+      <div class="fgroup">
+        <label>Total Ventes (FCFA)</label>
+        <input type="number" id="rc-total-ventes" step="0.01" value="0">
+      </div>
+      <div class="fgroup">
+        <label>Total Encaisse (FCFA)</label>
+        <input type="number" id="rc-total-encaisse" step="0.01" value="0">
+      </div>
+      <div class="fgroup">
+        <label>Total Credit (FCFA)</label>
+        <input type="number" id="rc-total-credit" step="0.01" value="0">
+      </div>
+      <div class="fgroup" style="flex:1">
+        <label>Observations</label>
+        <input type="text" id="rc-observations" placeholder="Optionnel">
+      </div>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr>
+            <th>No Facture</th><th>Code Client</th><th>Client</th>
+            <th style="width:120px">Mt. Facture</th><th style="width:120px">Mt. Encaisse</th>
+            <th style="width:130px">Mode</th><th>Observations</th><th style="width:50px"></th>
+          </tr>
+        </thead>
+        <tbody id="rcn-lignes-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="frow" style="justify-content:space-between;margin-top:12px">
+      <button class="btn btn-outline" onclick="cptaAjouterLigneCaisse('rcn-lignes-tbody')">➕ Ajouter une ligne</button>
+      <button class="btn btn-navy" onclick="cptaSoumettreRapportCaisse()">💾 Enregistrer le rapport</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Historique des rapports</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Commercial</th><th>Agence</th><th>Ventes</th>
+            <th>Encaisse</th><th>Credit</th><th>Lignes</th><th>Statut</th><th style="width:90px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rch-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ MODAL DETAIL RAPPORT ════════════ -->
+<div id="modal-rapport-detail" class="modal">
+  <div class="modal-box modal-lg">
+    <div class="card-title" id="rcd-titre">Detail rapport de caisse</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>No Facture</th><th>Code Client</th><th>Client</th>
+            <th>Mt. Facture</th><th>Mt. Encaisse</th><th>Mode</th><th>Observations</th>
+          </tr>
+        </thead>
+        <tbody id="rcd-tbody"></tbody>
+      </table>
+    </div>
+    <input type="hidden" id="rcd-id">
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-outline" onclick="fermerModal('modal-rapport-detail')">Fermer</button>
+      <button class="btn btn-navy" id="rcd-valider-btn" onclick="cptaValiderRapportCaisse()">✅ Valider</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
