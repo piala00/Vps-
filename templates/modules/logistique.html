@@ -2,14 +2,568 @@
 
 {% block sidebar %}
 <button class="nav-item active" onclick="nav('logistique-dashboard')" data-nav="logistique-dashboard">🏠 Tableau de bord</button>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>🚛</span> Flotte <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'camions')" data-nav="camions">🚛 Camions</button>
+    <button class="nav-item-sub" onclick="navSub(this,'chauffeurs')" data-nav="chauffeurs">👤 Chauffeurs</button>
+  </div>
+</div>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>📅</span> Operations <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'voyages')" data-nav="voyages">📅 Voyages</button>
+    <button class="nav-item-sub" onclick="navSub(this,'entretiens')" data-nav="entretiens">🔧 Entretiens</button>
+  </div>
+</div>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>💰</span> Comptabilite <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'transactions')" data-nav="transactions">💰 Recettes &amp; Depenses</button>
+    <button class="nav-item-sub" onclick="navSub(this,'grand-livre')" data-nav="grand-livre">📒 Grand Livre</button>
+    <button class="nav-item-sub" onclick="navSub(this,'rapprochement')" data-nav="rapprochement">🔄 Rapprochement</button>
+  </div>
+</div>
 {% endblock %}
 
 {% block content %}
+
+<!-- ════════════ TABLEAU DE BORD ════════════ -->
 <div id="s-logistique-dashboard" class="section active">
-  <div class="section-title">🚚 Logistique — Tableau de bord</div>
+  <div class="section-title">🏠 Logistique — Tableau de bord</div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card k-blue">
+      <div class="kico">🚛</div>
+      <div class="kval" id="kpi-camions-actifs">—</div>
+      <div class="klabel">Camions actifs</div>
+    </div>
+    <div class="kpi-card k-gold">
+      <div class="kico">📅</div>
+      <div class="kval" id="kpi-voyages-jour">—</div>
+      <div class="klabel">Voyages aujourd'hui</div>
+    </div>
+    <div class="kpi-card k-warn">
+      <div class="kico">🛣️</div>
+      <div class="kval" id="kpi-voyages-cours">—</div>
+      <div class="klabel">Voyages en cours</div>
+    </div>
+    <div class="kpi-card k-red">
+      <div class="kico">🔧</div>
+      <div class="kval" id="kpi-entretiens-alerte">—</div>
+      <div class="klabel">Entretiens a prevoir (30j)</div>
+    </div>
+    <div class="kpi-card k-green">
+      <div class="kico">💰</div>
+      <div class="kval" id="kpi-recettes-mois">—</div>
+      <div class="klabel">Recettes du mois</div>
+    </div>
+    <div class="kpi-card k-red">
+      <div class="kico">💸</div>
+      <div class="kval" id="kpi-depenses-mois">—</div>
+      <div class="klabel">Depenses du mois</div>
+    </div>
+  </div>
+
   <div class="card">
-    <div class="card-title">Module en construction</div>
-    <p>Ce module sera complete dans une prochaine iteration.</p>
+    <div class="card-title">Acces rapides</div>
+    <div class="shortcut-grid">
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=camions]').click()">
+        <div class="ico">🚛</div>
+        Camions
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=voyages]').click()">
+        <div class="ico">📅</div>
+        Voyages
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=entretiens]').click()">
+        <div class="ico">🔧</div>
+        Entretiens
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=transactions]').click()">
+        <div class="ico">💰</div>
+        Recettes &amp; Depenses
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- ════════════ CAMIONS ════════════ -->
+<div id="s-camions" class="section">
+  <div class="section-title">🚛 Gestion de la flotte</div>
+
+  <div class="card">
+    <div class="frow" style="justify-content:space-between">
+      <div class="card-title" style="margin:0">Camions</div>
+      <button class="btn btn-navy" onclick="logOuvrirCamion(null)">➕ Nouveau camion</button>
+    </div>
+    <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr>
+            <th>Immatriculation</th><th>Marque / Modele</th><th>Type</th>
+            <th>Capacite (t)</th><th>Proprietaire</th><th>Compte Sage</th>
+            <th>Statut</th><th style="width:90px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="cam-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal camion -->
+<div class="modal" id="modal-camion">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="mc-titre">Nouveau camion</span>
+      <button class="modal-close" onclick="fermerModal('modal-camion')">✕</button>
+    </div>
+    <input type="hidden" id="mc-id">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Immatriculation</label>
+        <input type="text" id="mc-immat" placeholder="Ex: CE-1234-AB">
+      </div>
+      <div class="fgroup">
+        <label>Marque</label>
+        <input type="text" id="mc-marque">
+      </div>
+      <div class="fgroup">
+        <label>Modele</label>
+        <input type="text" id="mc-modele">
+      </div>
+      <div class="fgroup">
+        <label>Type de flotte</label>
+        <select id="mc-type-flotte">
+          <option value="MAISON">Maison</option>
+          <option value="LOCATION">Location</option>
+          <option value="AFFRETEMENT">Affretement</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Capacite (tonnes)</label>
+        <input type="number" id="mc-capacite" step="0.1">
+      </div>
+      <div class="fgroup">
+        <label>Annee mise en service</label>
+        <input type="number" id="mc-annee">
+      </div>
+      <div class="fgroup">
+        <label>Proprietaire</label>
+        <input type="text" id="mc-proprietaire" placeholder="Optionnel (location/affretement)">
+      </div>
+      <div class="fgroup">
+        <label>Compte Sage</label>
+        <input type="text" id="mc-compte-sage" placeholder="Ex: 60611000">
+      </div>
+      <div class="fgroup" style="flex:1">
+        <label>Observations</label>
+        <input type="text" id="mc-observations">
+      </div>
+      <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px;margin-top:24px">
+        <input type="checkbox" id="mc-actif" style="width:auto" checked>
+        <label for="mc-actif" style="margin:0">Camion actif</label>
+      </div>
+    </div>
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-outline" onclick="fermerModal('modal-camion')">Annuler</button>
+      <button class="btn btn-navy" onclick="logSauverCamion()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ CHAUFFEURS ════════════ -->
+<div id="s-chauffeurs" class="section">
+  <div class="section-title">👤 Chauffeurs &amp; Convoyeurs</div>
+
+  <div class="card">
+    <div class="frow" style="justify-content:space-between">
+      <div class="card-title" style="margin:0">Personnel logistique</div>
+      <button class="btn btn-navy" onclick="logOuvrirPersonnel(null)">➕ Nouveau personnel</button>
+    </div>
+    <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr>
+            <th>Nom</th><th>Prenom</th><th>Role</th><th>Telephone</th>
+            <th>Permis</th><th>Camion affecte</th><th>Statut</th><th style="width:90px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="pers-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal personnel -->
+<div class="modal" id="modal-personnel">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="mp-titre">Nouveau personnel</span>
+      <button class="modal-close" onclick="fermerModal('modal-personnel')">✕</button>
+    </div>
+    <input type="hidden" id="mp-id">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Nom</label>
+        <input type="text" id="mp-nom">
+      </div>
+      <div class="fgroup">
+        <label>Prenom</label>
+        <input type="text" id="mp-prenom">
+      </div>
+      <div class="fgroup">
+        <label>Role</label>
+        <select id="mp-role">
+          <option value="CHAUFFEUR">Chauffeur</option>
+          <option value="CONVOYEUR">Convoyeur</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Telephone</label>
+        <input type="text" id="mp-telephone">
+      </div>
+      <div class="fgroup">
+        <label>N° Permis</label>
+        <input type="text" id="mp-permis">
+      </div>
+      <div class="fgroup">
+        <label>Camion affecte</label>
+        <select id="mp-camion"></select>
+      </div>
+      <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px;margin-top:24px">
+        <input type="checkbox" id="mp-actif" style="width:auto" checked>
+        <label for="mp-actif" style="margin:0">Personnel actif</label>
+      </div>
+    </div>
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-outline" onclick="fermerModal('modal-personnel')">Annuler</button>
+      <button class="btn btn-navy" onclick="logSauverPersonnel()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ VOYAGES ════════════ -->
+<div id="s-voyages" class="section">
+  <div class="section-title">📅 Programmation des voyages</div>
+
+  <div class="card">
+    <div class="frow" style="justify-content:space-between">
+      <div class="fgroup">
+        <label>Statut</label>
+        <select id="voy-filtre-statut" onchange="logChargerVoyages()">
+          <option value="">Tous</option>
+          <option value="planifie">Planifie</option>
+          <option value="en_cours">En cours</option>
+          <option value="termine">Termine</option>
+          <option value="annule">Annule</option>
+        </select>
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="logOuvrirVoyage(null)">➕ Nouveau voyage</button>
+    </div>
+    <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr>
+            <th>N°</th><th>Camion</th><th>Chauffeur</th><th>Origine</th><th>Destination</th>
+            <th>Depart</th><th>Retour</th><th>Statut</th><th style="width:90px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="voy-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal voyage -->
+<div class="modal" id="modal-voyage">
+  <div class="modal-box modal-lg">
+    <div class="modal-title">
+      <span id="mv-titre">Nouveau voyage</span>
+      <button class="modal-close" onclick="fermerModal('modal-voyage')">✕</button>
+    </div>
+    <input type="hidden" id="mv-id">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Camion</label>
+        <select id="mv-camion"></select>
+      </div>
+      <div class="fgroup">
+        <label>Chauffeur</label>
+        <select id="mv-chauffeur"></select>
+      </div>
+      <div class="fgroup">
+        <label>Convoyeur</label>
+        <select id="mv-convoyeur"></select>
+      </div>
+      <div class="fgroup">
+        <label>Statut</label>
+        <select id="mv-statut">
+          <option value="planifie">Planifie</option>
+          <option value="en_cours">En cours</option>
+          <option value="termine">Termine</option>
+          <option value="annule">Annule</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Origine</label>
+        <input type="text" id="mv-origine">
+      </div>
+      <div class="fgroup">
+        <label>Destination</label>
+        <input type="text" id="mv-destination">
+      </div>
+      <div class="fgroup">
+        <label>Date de depart</label>
+        <input type="date" id="mv-date-depart">
+      </div>
+      <div class="fgroup">
+        <label>Date de retour</label>
+        <input type="date" id="mv-date-retour">
+      </div>
+      <div class="fgroup">
+        <label>Client / Fournisseur</label>
+        <input type="text" id="mv-client" placeholder="Optionnel">
+      </div>
+      <div class="fgroup" style="flex:1">
+        <label>Marchandises</label>
+        <input type="text" id="mv-marchandises" placeholder="Optionnel">
+      </div>
+      <div class="fgroup" style="flex:1">
+        <label>Observations</label>
+        <input type="text" id="mv-observations" placeholder="Optionnel">
+      </div>
+    </div>
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-outline" onclick="fermerModal('modal-voyage')">Annuler</button>
+      <button class="btn btn-navy" onclick="logSauverVoyage()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ ENTRETIENS ════════════ -->
+<div id="s-entretiens" class="section">
+  <div class="section-title">🔧 Entretiens &amp; Maintenance</div>
+
+  <div class="card">
+    <div class="card-title">Nouvel entretien</div>
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Camion</label>
+        <select id="ent-camion"></select>
+      </div>
+      <div class="fgroup">
+        <label>Type d'entretien</label>
+        <select id="ent-type">
+          <option value="VIDANGE">Vidange</option>
+          <option value="PNEUS">Pneus</option>
+          <option value="FREINS">Freins</option>
+          <option value="REVISION">Revision</option>
+          <option value="REPARATION">Reparation</option>
+          <option value="AUTRE">Autre</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Date</label>
+        <input type="date" id="ent-date">
+      </div>
+      <div class="fgroup">
+        <label>Kilometrage</label>
+        <input type="number" id="ent-km">
+      </div>
+      <div class="fgroup">
+        <label>Cout (FCFA)</label>
+        <input type="number" id="ent-cout" step="0.01">
+      </div>
+      <div class="fgroup">
+        <label>Prestataire</label>
+        <input type="text" id="ent-prestataire" placeholder="Optionnel">
+      </div>
+      <div class="fgroup">
+        <label>Prochaine revision</label>
+        <input type="date" id="ent-prochaine">
+      </div>
+      <div class="fgroup" style="flex:1">
+        <label>Description</label>
+        <input type="text" id="ent-description" placeholder="Optionnel">
+      </div>
+    </div>
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-navy" onclick="logSauverEntretien()">💾 Enregistrer</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Historique des entretiens</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Camion</th><th>Type</th><th>Km</th><th>Cout</th>
+            <th>Prestataire</th><th>Prochaine revision</th>
+          </tr>
+        </thead>
+        <tbody id="ent-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ RECETTES & DEPENSES ════════════ -->
+<div id="s-transactions" class="section">
+  <div class="section-title">💰 Recettes &amp; Depenses par camion</div>
+
+  <div class="card">
+    <div class="card-title">Nouvelle transaction</div>
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Camion</label>
+        <select id="tr-camion"></select>
+      </div>
+      <div class="fgroup">
+        <label>Voyage</label>
+        <select id="tr-voyage"></select>
+      </div>
+      <div class="fgroup">
+        <label>Type</label>
+        <select id="tr-type">
+          <option value="DEPENSE">Depense</option>
+          <option value="RECETTE">Recette</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Categorie</label>
+        <select id="tr-categorie">
+          <option value="CARBURANT">Carburant</option>
+          <option value="PEAGE">Peage</option>
+          <option value="REPARATION">Reparation</option>
+          <option value="SALAIRE">Salaire</option>
+          <option value="PRIME">Prime</option>
+          <option value="AUTRE">Autre</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Date</label>
+        <input type="date" id="tr-date">
+      </div>
+      <div class="fgroup">
+        <label>Montant (FCFA)</label>
+        <input type="number" id="tr-montant" step="0.01">
+      </div>
+      <div class="fgroup">
+        <label>Reference Sage</label>
+        <input type="text" id="tr-reference" placeholder="Optionnel">
+      </div>
+      <div class="fgroup" style="flex:1">
+        <label>Libelle</label>
+        <input type="text" id="tr-libelle" placeholder="Optionnel">
+      </div>
+    </div>
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-navy" onclick="logSauverTransaction()">💾 Enregistrer</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="frow" style="justify-content:space-between">
+      <div class="card-title" style="margin:0">Historique des transactions</div>
+      <div class="fgroup" style="margin:0">
+        <select id="trh-filtre-camion" onchange="logChargerTransactions()"></select>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Camion</th><th>Voyage</th><th>Type</th><th>Categorie</th>
+            <th>Montant</th><th>Libelle</th><th>Reference Sage</th>
+          </tr>
+        </thead>
+        <tbody id="tr-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ GRAND LIVRE ════════════ -->
+<div id="s-grand-livre" class="section">
+  <div class="section-title">📒 Grand Livre Camion (local + Sage)</div>
+  <div class="alert alert-info">Fusionne les transactions saisies dans NEXORA avec le grand livre Sage du compte associe au camion.</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup" style="flex:1">
+        <label>Camion</label>
+        <select id="gl-camion" onchange="logChargerGrandLivre()"></select>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Source</th><th>Type</th><th>Categorie</th><th>Montant</th><th>Libelle</th><th>Reference</th></tr>
+        </thead>
+        <tbody id="gl-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ RAPPROCHEMENT ════════════ -->
+<div id="s-rapprochement" class="section">
+  <div class="section-title">🔄 Rapprochement Logistique / Sage</div>
+  <div class="alert alert-info">Compare le total des recettes/depenses saisies localement avec les debits/credits du compte Sage du camion.</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup" style="flex:1">
+        <label>Camion</label>
+        <select id="rap-camion" onchange="logChargerRapprochement()"></select>
+      </div>
+    </div>
+
+    <div class="kpi-grid" style="margin-top:12px">
+      <div class="kpi-card k-green">
+        <div class="kico">💰</div>
+        <div class="kval" id="rap-local-recettes">—</div>
+        <div class="klabel">Recettes locales</div>
+      </div>
+      <div class="kpi-card k-red">
+        <div class="kico">💸</div>
+        <div class="kval" id="rap-local-depenses">—</div>
+        <div class="klabel">Depenses locales</div>
+      </div>
+      <div class="kpi-card k-blue">
+        <div class="kico">📒</div>
+        <div class="kval" id="rap-sage-credit">—</div>
+        <div class="klabel">Credit Sage</div>
+      </div>
+      <div class="kpi-card k-blue">
+        <div class="kico">📒</div>
+        <div class="kval" id="rap-sage-debit">—</div>
+        <div class="klabel">Debit Sage</div>
+      </div>
+      <div class="kpi-card k-gold">
+        <div class="kico">⚖️</div>
+        <div class="kval" id="rap-ecart-recettes">—</div>
+        <div class="klabel">Ecart recettes</div>
+      </div>
+      <div class="kpi-card k-gold">
+        <div class="kico">⚖️</div>
+        <div class="kval" id="rap-ecart-depenses">—</div>
+        <div class="klabel">Ecart depenses</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
