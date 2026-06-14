@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXORA — Accueil</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/nexora.css') }}">
+</head>
+<body>
+<div class="layout">
+
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">NEXORA</div>
+      <div class="sub">v2.0 — {{ societe_nom }}</div>
+    </div>
+
+    <button class="nav-item active" data-nav="accueil">🏠 Accueil</button>
+    {% for m in modules %}
+    <button class="nav-item" onclick="window.location.href='{{ m.url }}'">{{ m.icon }} {{ m.label.split(' ',1)[1] if ' ' in m.label else m.label }}</button>
+    {% endfor %}
+
+    <button class="nav-item" onclick="window.location.href='{{ url_for('logout') }}'">🚪 Deconnexion</button>
+  </div>
+
+  <div id="content">
+    <div class="section active">
+      <div class="section-title">🏠 Bienvenue sur NEXORA</div>
+
+      {% if demo %}
+      <div class="alert alert-warn">
+        Mode demonstration actif — {{ jours_demo }} jour(s) restant(s). Activez une licence dans Parametres.
+      </div>
+      {% elif not licence.valide %}
+      <div class="alert alert-err">
+        Aucune licence active — {{ licence.erreur }}
+      </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="card-title">Modules disponibles</div>
+        <div class="shortcut-grid">
+          {% for m in modules %}
+          <div class="shortcut-btn" onclick="window.location.href='{{ m.url }}'">
+            <div class="ico">{{ m.icon }}</div>
+            {{ m.label.split(' ',1)[1] if ' ' in m.label else m.label }}
+          </div>
+          {% endfor %}
+          {% if not modules %}
+          <div class="tbl-empty">Aucun module accessible — contactez l'administrateur.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="sbar">
+  <span id="sbar-txt">NEXORA v2.0 — Pret</span>
+  <span style="margin-left:auto">{{ session.get('nom','') }} — {{ societe_nom }}</span>
+</div>
+
+<script src="{{ url_for('static', filename='js/nexora-core.js') }}"></script>
+</body>
+</html>

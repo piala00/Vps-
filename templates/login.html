@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXORA — Connexion</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/nexora.css') }}">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="title">NEXORA</div>
+      <div class="sub">v2.0 — GTC Bertoua</div>
+    </div>
+
+    {% if erreur %}
+    <div class="alert alert-err">{{ erreur }}</div>
+    {% endif %}
+
+    {% if mode_conception %}
+    <div class="alert alert-info">Mode conception actif — connexion sans mot de passe</div>
+    {% if users %}
+    <div class="user-pick-grid">
+      {% for u in users %}
+      <div class="user-pick" onclick="document.getElementById('username').value='{{ u.username }}';document.getElementById('loginform').submit();">
+        <div class="av">{{ (u.prenom or u.nom)[0]|upper }}</div>
+        {{ u.prenom }} {{ u.nom }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <form method="post" id="loginform">
+      <div class="fgroup" style="margin-bottom:12px">
+        <label>Identifiant</label>
+        <input type="text" id="username" name="username" autocomplete="username" required>
+      </div>
+      <div class="fgroup" style="margin-bottom:16px">
+        <label>Mot de passe {% if mode_conception %}(facultatif){% endif %}</label>
+        <input type="password" name="password" autocomplete="current-password" {% if not mode_conception %}required{% endif %}>
+      </div>
+      <button type="submit" class="btn btn-navy" style="width:100%;justify-content:center">Se connecter</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXORA — {{ module_label }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/nexora.css') }}">
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="layout">
+
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">NEXORA</div>
+      <div class="sub">v2.0 — {{ module_label }}</div>
+    </div>
+
+    <button class="nav-item" onclick="window.location.href='{{ url_for('accueil') }}'">🏠 Accueil</button>
+
+    {% block sidebar %}{% endblock %}
+
+    <button class="nav-item" onclick="window.location.href='{{ url_for('logout') }}'">🚪 Deconnexion</button>
+  </div>
+
+  <div id="content">
+    {% block content %}{% endblock %}
+  </div>
+
+</div>
+
+<div id="sbar">
+  <span id="sbar-txt">NEXORA v2.0 — Pret</span>
+  <span style="margin-left:auto">{{ session.get('nom','') }} — {{ societe_nom }}</span>
+</div>
+
+<script src="{{ url_for('static', filename='js/nexora-core.js') }}"></script>
+{% if module %}
+<script src="{{ url_for('static', filename='js/modules/' + module + '.js') }}"></script>
+{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

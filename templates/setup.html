@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXORA — Configuration initiale</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/nexora.css') }}">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-box auth-wide">
+    <div class="auth-logo">
+      <div class="title">NEXORA</div>
+      <div class="sub">v2.0 — Assistant de configuration</div>
+    </div>
+
+    <div class="wizard-steps">
+      <div class="wizard-step active" id="wst-1">1. Societe</div>
+      <div class="wizard-step" id="wst-2">2. Agence</div>
+      <div class="wizard-step" id="wst-3">3. Sage</div>
+      <div class="wizard-step" id="wst-4">4. Administrateur</div>
+      <div class="wizard-step" id="wst-5">5. Recapitulatif</div>
+    </div>
+
+    <form method="post" id="setupform">
+
+      <div class="wizard-pane active" id="wp-1">
+        <div class="form-grid">
+          <div class="fgroup">
+            <label>Nom de la societe</label>
+            <input type="text" name="societe_nom" placeholder="GTC Bertoua" required>
+          </div>
+          <div class="fgroup">
+            <label>Ville</label>
+            <input type="text" name="societe_ville" placeholder="Bertoua">
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-pane" id="wp-2">
+        <div class="form-grid">
+          <div class="fgroup">
+            <label>Agence locale (ce poste)</label>
+            <select name="agence_locale">
+              {% for a in agences %}
+              <option value="{{ a.code }}">{{ a.nom }} ({{ a.ville }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="fgroup">
+            <label>N° depot Sage associe</label>
+            <input type="number" name="depot_sage_no" placeholder="7">
+          </div>
+        </div>
+        <div class="alert alert-info">Le depot Sage correspond au numero F_DEPOT (ex : 7 = Bertoua).</div>
+      </div>
+
+      <div class="wizard-pane" id="wp-3">
+        <div class="alert alert-info">Connexion a Sage 100 (facultative — peut etre configuree plus tard dans Parametres).</div>
+        <div class="form-grid">
+          <div class="fgroup">
+            <label>Serveur SQL Server</label>
+            <input type="text" name="sage_server" placeholder="SERVEUR\\SAGE100">
+          </div>
+          <div class="fgroup">
+            <label>Base de donnees</label>
+            <input type="text" name="sage_database" placeholder="GTC 2026">
+          </div>
+          <div class="fgroup">
+            <label>Identifiant SQL</label>
+            <input type="text" name="sage_login" placeholder="sa">
+          </div>
+          <div class="fgroup">
+            <label>Mot de passe SQL</label>
+            <input type="password" name="sage_password">
+          </div>
+        </div>
+        <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px">
+          <input type="checkbox" name="sage_trusted" id="sage_trusted" style="width:auto" checked>
+          <label for="sage_trusted" style="margin:0">Authentification Windows (Trusted Connection)</label>
+        </div>
+      </div>
+
+      <div class="wizard-pane" id="wp-4">
+        <div class="form-grid">
+          <div class="fgroup">
+            <label>Identifiant administrateur</label>
+            <input type="text" name="admin_username" value="admin" required>
+          </div>
+          <div class="fgroup">
+            <label>Nom complet</label>
+            <input type="text" name="admin_nom" value="Administrateur">
+          </div>
+          <div class="fgroup">
+            <label>Mot de passe</label>
+            <input type="password" name="admin_password" placeholder="Facultatif en mode conception">
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-pane" id="wp-5">
+        <div class="alert alert-ok">Tout est pret. Cliquez sur "Terminer" pour finaliser l'installation.</div>
+        <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px">
+          <input type="checkbox" name="mode_conception" id="mode_conception" style="width:auto" checked>
+          <label for="mode_conception" style="margin:0">Activer le mode conception (connexion sans mot de passe)</label>
+        </div>
+      </div>
+
+      <div class="frow" style="justify-content:space-between;margin-top:18px">
+        <button type="button" class="btn btn-outline" id="btn-prev" onclick="wizardPrev()" disabled>Precedent</button>
+        <button type="button" class="btn btn-navy" id="btn-next" onclick="wizardNext()">Suivant</button>
+        <button type="submit" class="btn btn-gold" id="btn-finish" style="display:none">Terminer</button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<script>
+var wizardStep = 1;
+var wizardTotal = 5;
+
+function wizardShow(n) {
+    for (var i = 1; i <= wizardTotal; i++) {
+        document.getElementById('wp-' + i).classList.remove('active');
+        document.getElementById('wst-' + i).classList.remove('active');
+    }
+    document.getElementById('wp-' + n).classList.add('active');
+    document.getElementById('wst-' + n).classList.add('active');
+    document.getElementById('btn-prev').disabled = (n === 1);
+    document.getElementById('btn-next').style.display = (n === wizardTotal) ? 'none' : '';
+    document.getElementById('btn-finish').style.display = (n === wizardTotal) ? '' : 'none';
+    wizardStep = n;
+}
+
+function wizardNext() {
+    if (wizardStep < wizardTotal) wizardShow(wizardStep + 1);
+}
+
+function wizardPrev() {
+    if (wizardStep > 1) wizardShow(wizardStep - 1);
+}
+</script>
+</body>
+</html>
