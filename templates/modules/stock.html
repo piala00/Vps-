@@ -2,14 +2,691 @@
 
 {% block sidebar %}
 <button class="nav-item active" onclick="nav('stock-dashboard')" data-nav="stock-dashboard">🏠 Tableau de bord</button>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>📋</span> Mouvements <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'fiche-bl')" data-nav="fiche-bl">📤 BL Sage</button>
+    <button class="nav-item-sub" onclick="navSub(this,'fiche-manuel')" data-nav="fiche-manuel">📝 Bordereau manuel</button>
+    <button class="nav-item-sub" onclick="navSub(this,'fiche-reception')" data-nav="fiche-reception">📥 Reception</button>
+    <button class="nav-item-sub" onclick="navSub(this,'fiche-transfert')" data-nav="fiche-transfert">🔄 Transfert</button>
+  </div>
+</div>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>🔍</span> Controle <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'rapprochement')" data-nav="rapprochement">🔍 Rapprochement</button>
+    <button class="nav-item-sub" onclick="navSub(this,'non-regularises')" data-nav="non-regularises">⚠️ Non regularises</button>
+    <button class="nav-item-sub" onclick="navSub(this,'equilibre')" data-nav="equilibre">⚖️ Equilibre</button>
+  </div>
+</div>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>📊</span> Analyses <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'analyses-dashboard')" data-nav="analyses-dashboard">📊 Tableau de bord BI</button>
+    <button class="nav-item-sub" onclick="navSub(this,'top-articles')" data-nav="top-articles">🏆 Top sorties</button>
+    <button class="nav-item-sub" onclick="navSub(this,'dormants')" data-nav="dormants">💤 Stocks dormants</button>
+    <button class="nav-item-sub" onclick="navSub(this,'reappro')" data-nav="reappro">📦 Reapprovisionnement</button>
+    <button class="nav-item-sub" onclick="navSub(this,'clients')" data-nav="clients">👥 Clients / Article</button>
+    <button class="nav-item-sub" onclick="navSub(this,'comparative')" data-nav="comparative">📐 Comparative</button>
+  </div>
+</div>
 {% endblock %}
 
 {% block content %}
+
+<!-- ════════════ TABLEAU DE BORD ════════════ -->
 <div id="s-stock-dashboard" class="section active">
-  <div class="section-title">📦 Stock — Tableau de bord</div>
+  <div class="section-title">🏠 Stock — Tableau de bord</div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card k-red">
+      <div class="kico">🚨</div>
+      <div class="kval" id="kpi-ruptures">—</div>
+      <div class="klabel">Ruptures de stock</div>
+    </div>
+    <div class="kpi-card k-warn">
+      <div class="kico">⚠️</div>
+      <div class="kval" id="kpi-critiques">—</div>
+      <div class="klabel">Stocks critiques</div>
+    </div>
+    <div class="kpi-card k-blue">
+      <div class="kico">📋</div>
+      <div class="kval" id="kpi-mvts-jour">—</div>
+      <div class="klabel">Mouvements du jour</div>
+    </div>
+    <div class="kpi-card k-gold">
+      <div class="kico">💰</div>
+      <div class="kval" id="kpi-valeur-stock">—</div>
+      <div class="klabel">Valeur du stock</div>
+    </div>
+    <div class="kpi-card k-green">
+      <div class="kico">💤</div>
+      <div class="kval" id="kpi-dormants">—</div>
+      <div class="klabel">Stocks dormants</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kico">📝</div>
+      <div class="kval" id="kpi-non-reg">—</div>
+      <div class="klabel">Docs non regularises</div>
+    </div>
+  </div>
+
   <div class="card">
-    <div class="card-title">Module en construction</div>
-    <p>Ce module sera complete dans une prochaine iteration.</p>
+    <div class="card-title">Acces rapides</div>
+    <div class="shortcut-grid">
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=fiche-bl]').click()">
+        <div class="ico">📤</div>
+        BL Sage
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=fiche-manuel]').click()">
+        <div class="ico">📝</div>
+        Bordereau manuel
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=fiche-reception]').click()">
+        <div class="ico">📥</div>
+        Reception
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=fiche-transfert]').click()">
+        <div class="ico">🔄</div>
+        Transfert
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=non-regularises]').click()">
+        <div class="ico">⚠️</div>
+        Non regularises
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=analyses-dashboard]').click()">
+        <div class="ico">📊</div>
+        Analyses BI
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- ════════════ BL SAGE ════════════ -->
+<div id="s-fiche-bl" class="section">
+  <div class="section-title">📤 Fiche de Stock — BL Sage</div>
+  <div class="alert alert-info">Reconstitue les lignes d'un Bon de Livraison depuis Sage, puis compare aux quantites reellement sorties.</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup" style="flex:1">
+        <label>Numero de BL</label>
+        <input type="text" id="bl-numero" placeholder="BLCB000123">
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="stockChargerBL()">🔎 Charger depuis Sage</button>
+    </div>
+    <div id="bl-info" style="margin-top:8px"></div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Code article</th><th>Designation</th><th style="width:110px">Qte Sage</th><th style="width:130px">Qte saisie</th><th style="width:90px">Ecart</th></tr>
+        </thead>
+        <tbody id="bl-lignes-tbody"><tr><td colspan="5" class="tbl-empty">Aucun BL charge</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-gold" onclick="stockValiderBL()">✅ Valider le BL</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ BORDEREAU MANUEL ════════════ -->
+<div id="s-fiche-manuel" class="section">
+  <div class="section-title">📝 Fiche de Stock — Bordereau Manuel</div>
+  <div class="alert alert-warn">A utiliser quand la marchandise est livree avant l'edition du BL Sage. Le bordereau devra ensuite etre regularise dans l'onglet "Non regularises".</div>
+
+  <div class="card">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>N° bordereau</label>
+        <input type="text" id="fm-no-manuel" placeholder="BM-2026-0001">
+      </div>
+      <div class="fgroup">
+        <label>Type de mouvement</label>
+        <select id="fm-type">
+          <option value="SORTIE_MANUEL">Sortie</option>
+          <option value="ENTREE_MANUEL">Entree</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Date</label>
+        <input type="date" id="fm-date">
+      </div>
+      <div class="fgroup">
+        <label>Code client</label>
+        <input type="text" id="fm-code-client" placeholder="Optionnel">
+      </div>
+      <div class="fgroup">
+        <label>Nom client</label>
+        <input type="text" id="fm-client-nom" placeholder="Optionnel">
+      </div>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Code article</th><th>Designation</th><th style="width:130px">Quantite</th><th style="width:50px"></th></tr>
+        </thead>
+        <tbody id="fm-lignes-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="frow" style="justify-content:space-between;margin-top:12px">
+      <button class="btn btn-outline" onclick="stockAjouterLigne('fm-lignes-tbody')">➕ Ajouter une ligne</button>
+      <button class="btn btn-navy" onclick="stockSaisirManuel()">💾 Enregistrer le bordereau</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ RECEPTION ════════════ -->
+<div id="s-fiche-reception" class="section">
+  <div class="section-title">📥 Fiche de Stock — Reception</div>
+  <div class="alert alert-info">Saisie d'une entree de stock en provenance d'un fournisseur.</div>
+
+  <div class="card">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>N° bon de reception</label>
+        <input type="text" id="fr-no-reception" placeholder="REC-2026-0001">
+      </div>
+      <div class="fgroup">
+        <label>Date</label>
+        <input type="date" id="fr-date">
+      </div>
+      <div class="fgroup">
+        <label>Code fournisseur</label>
+        <input type="text" id="fr-code-fournisseur" placeholder="Optionnel">
+      </div>
+      <div class="fgroup">
+        <label>Nom fournisseur</label>
+        <input type="text" id="fr-fournisseur-nom" placeholder="Optionnel">
+      </div>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Code article</th><th>Designation</th><th style="width:130px">Quantite</th><th style="width:50px"></th></tr>
+        </thead>
+        <tbody id="fr-lignes-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="frow" style="justify-content:space-between;margin-top:12px">
+      <button class="btn btn-outline" onclick="stockAjouterLigne('fr-lignes-tbody')">➕ Ajouter une ligne</button>
+      <button class="btn btn-navy" onclick="stockSaisirReception()">💾 Enregistrer la reception</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ TRANSFERT ════════════ -->
+<div id="s-fiche-transfert" class="section">
+  <div class="section-title">🔄 Fiche de Stock — Transfert</div>
+  <div class="alert alert-info">Transfert de marchandises entre deux depots / agences.</div>
+
+  <div class="card">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>N° bordereau de transfert</label>
+        <input type="text" id="ft-no-transfert" placeholder="TR-2026-0001">
+      </div>
+      <div class="fgroup">
+        <label>Date</label>
+        <input type="date" id="ft-date">
+      </div>
+      <div class="fgroup">
+        <label>Depot source</label>
+        <select id="ft-depot">
+          <option value="BERTOUA">Bertoua (Siege)</option>
+          <option value="DOUALA">Douala</option>
+          <option value="YAOUNDE">Yaounde</option>
+          <option value="GAROUA_BOULAI">Garoua-Boulai</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Depot destination</label>
+        <select id="ft-depot-dest">
+          <option value="BERTOUA">Bertoua (Siege)</option>
+          <option value="DOUALA">Douala</option>
+          <option value="YAOUNDE">Yaounde</option>
+          <option value="GAROUA_BOULAI">Garoua-Boulai</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Code article</th><th>Designation</th><th style="width:130px">Quantite</th><th style="width:50px"></th></tr>
+        </thead>
+        <tbody id="ft-lignes-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="frow" style="justify-content:space-between;margin-top:12px">
+      <button class="btn btn-outline" onclick="stockAjouterLigne('ft-lignes-tbody')">➕ Ajouter une ligne</button>
+      <button class="btn btn-navy" onclick="stockSaisirTransfert()">💾 Enregistrer le transfert</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ RAPPROCHEMENT ════════════ -->
+<div id="s-rapprochement" class="section">
+  <div class="section-title">🔍 Rapprochement</div>
+  <div class="alert alert-info">Compare les quantites saisies dans NEXORA avec les documents Sage, groupees par document.</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Type de document</label>
+        <select id="rap-type">
+          <option value="SORTIE_BL">BL Sage (sorties)</option>
+          <option value="SORTIE_MANUEL">Bordereau manuel - sorties</option>
+          <option value="ENTREE_MANUEL">Bordereau manuel - entrees</option>
+          <option value="ENTREE_RECEPTION">Receptions</option>
+          <option value="TRANSFERT">Transferts</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Date debut</label>
+        <input type="date" id="rap-date-debut">
+      </div>
+      <div class="fgroup">
+        <label>Date fin</label>
+        <input type="date" id="rap-date-fin">
+      </div>
+      <div class="fgroup">
+        <label>Statut</label>
+        <select id="rap-statut">
+          <option value="">Tous</option>
+          <option value="valide">Valide</option>
+          <option value="ecart">Ecart</option>
+          <option value="en_attente">En attente</option>
+        </select>
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="stockChargerRapprochement()">🔎 Filtrer</button>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr>
+            <th>N° Sage</th><th>N° manuel</th><th>Date</th><th>Client</th>
+            <th>Articles</th><th>Total Sage</th><th>Total saisi</th><th>Ecarts</th>
+            <th>Statut</th><th style="width:80px">Detail</th>
+          </tr>
+        </thead>
+        <tbody id="rap-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal detail rapprochement -->
+<div class="modal" id="modal-rapp-detail">
+  <div class="modal-box modal-lg">
+    <div class="modal-title">
+      <span>Detail du document</span>
+      <button class="modal-close" onclick="fermerModal('modal-rapp-detail')">✕</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Code article</th><th>Designation</th><th>Qte Sage</th><th>Qte saisie</th><th>Ecart</th><th>Statut</th></tr>
+        </thead>
+        <tbody id="rapd-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ NON REGULARISES ════════════ -->
+<div id="s-non-regularises" class="section">
+  <div class="section-title">⚠️ Documents non regularises</div>
+  <div class="alert alert-warn">Bordereaux manuels n'ayant pas encore ete lies a un BL Sage.</div>
+
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>N° bordereau</th><th>Type</th><th>Date</th><th>Articles</th>
+            <th>Saisi par</th><th>Jours d'attente</th><th style="width:140px">Action</th>
+          </tr>
+        </thead>
+        <tbody id="nr-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal regularisation -->
+<div class="modal" id="modal-regulariser">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>Regulariser le bordereau</span>
+      <button class="modal-close" onclick="fermerModal('modal-regulariser')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>N° bordereau manuel</label>
+        <input type="text" id="reg-no-manuel" readonly>
+      </div>
+      <div class="fgroup">
+        <label>N° BL Sage correspondant</label>
+        <input type="text" id="reg-no-sage" placeholder="BLCB000123">
+      </div>
+    </div>
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-outline" onclick="fermerModal('modal-regulariser')">Annuler</button>
+      <button class="btn btn-navy" onclick="stockRegulariser()">✅ Regulariser</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ EQUILIBRE ════════════ -->
+<div id="s-equilibre" class="section">
+  <div class="section-title">⚖️ Equilibre Inter-magasins</div>
+  <div class="alert alert-info">Compare le stock et la rotation d'un meme article entre les differents depots.</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Periode</label>
+        <select id="eq-periode">
+          <option value="mois">1 mois</option>
+          <option value="3mois" selected>3 mois</option>
+          <option value="6mois">6 mois</option>
+          <option value="12mois">12 mois</option>
+        </select>
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="stockChargerEquilibre()">🔎 Analyser</button>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Code article</th><th>Designation</th><th>Depots</th><th>Manques</th><th>Surplus</th><th>Transfert conseille</th></tr>
+        </thead>
+        <tbody id="eq-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ ANALYSES — TABLEAU DE BORD BI ════════════ -->
+<div id="s-analyses-dashboard" class="section">
+  <div class="section-title">📊 Analyses — Tableau de bord BI</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Periode</label>
+        <select id="an-periode">
+          <option value="mois">1 mois</option>
+          <option value="3mois" selected>3 mois</option>
+          <option value="6mois">6 mois</option>
+          <option value="12mois">12 mois</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Granularite</label>
+        <select id="an-granularite">
+          <option value="jour">Jour</option>
+          <option value="semaine">Semaine</option>
+          <option value="mois" selected>Mois</option>
+          <option value="trimestre">Trimestre</option>
+        </select>
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="stockChargerAnalysesDashboard()">🔎 Analyser</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card k-blue">
+      <div class="kico">📥</div>
+      <div class="kval" id="an-kpi-entrees">—</div>
+      <div class="klabel">Total entrees</div>
+    </div>
+    <div class="kpi-card k-navy">
+      <div class="kico">📤</div>
+      <div class="kval" id="an-kpi-sorties">—</div>
+      <div class="klabel">Total sorties</div>
+    </div>
+    <div class="kpi-card k-gold">
+      <div class="kico">💰</div>
+      <div class="kval" id="an-kpi-montant">—</div>
+      <div class="klabel">Montant HT</div>
+    </div>
+    <div class="kpi-card k-green">
+      <div class="kico">📦</div>
+      <div class="kval" id="an-kpi-articles">—</div>
+      <div class="klabel">Articles mouvementes</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kico">👥</div>
+      <div class="kval" id="an-kpi-clients">—</div>
+      <div class="klabel">Clients</div>
+    </div>
+    <div class="kpi-card k-red">
+      <div class="kico">💤</div>
+      <div class="kval" id="an-kpi-dormants">—</div>
+      <div class="klabel">Articles dormants</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Evolution des sorties</div>
+    <div id="an-evolution"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Repartition par famille (sorties)</div>
+    <div id="an-familles"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Top 10 articles sortis</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Code article</th><th>Designation</th><th>Famille</th><th>Volume sorti</th><th>Montant HT</th></tr></thead>
+        <tbody id="an-top-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ TOP ARTICLES ════════════ -->
+<div id="s-top-articles" class="section">
+  <div class="section-title">🏆 Top sorties</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Periode</label>
+        <select id="ta-periode">
+          <option value="mois">1 mois</option>
+          <option value="3mois" selected>3 mois</option>
+          <option value="6mois">6 mois</option>
+          <option value="12mois">12 mois</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Limite</label>
+        <input type="number" id="ta-limit" value="20" min="1" max="100">
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="stockChargerTopArticles()">🔎 Analyser</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Classement par volume sorti</div>
+    <div id="ta-chart"></div>
+  </div>
+
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Code article</th><th>Designation</th><th>Famille</th><th>Volume sorti</th><th>Volume entre</th><th>Montant HT</th><th>Clients</th><th>Derniere sortie</th></tr>
+        </thead>
+        <tbody id="ta-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ STOCKS DORMANTS ════════════ -->
+<div id="s-dormants" class="section">
+  <div class="section-title">💤 Stocks dormants</div>
+  <div class="alert alert-info">Articles en stock positif sans sortie depuis le nombre de jours indique.</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Periode d'analyse</label>
+        <select id="do-periode">
+          <option value="3mois">3 mois</option>
+          <option value="6mois">6 mois</option>
+          <option value="12mois" selected>12 mois</option>
+          <option value="24mois">24 mois</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Seuil (jours sans sortie)</label>
+        <select id="do-jours">
+          <option value="3">3 jours</option>
+          <option value="7">7 jours</option>
+          <option value="15">15 jours</option>
+          <option value="30">30 jours</option>
+          <option value="60" selected>60 jours</option>
+        </select>
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="stockChargerDormants()">🔎 Analyser</button>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Code article</th><th>Designation</th><th>Famille</th><th>Stock actuel</th><th>Jours sans sortie</th><th>Statut</th><th>Cause</th><th>Action conseillee</th></tr>
+        </thead>
+        <tbody id="do-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ REAPPROVISIONNEMENT ════════════ -->
+<div id="s-reappro" class="section">
+  <div class="section-title">📦 Besoins de reapprovisionnement</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Periode de reference</label>
+        <select id="re-periode">
+          <option value="mois">1 mois</option>
+          <option value="3mois" selected>3 mois</option>
+          <option value="6mois">6 mois</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Semaines de reference</label>
+        <input type="number" id="re-semaines" value="4" min="1" max="52">
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="stockChargerReappro()">🔎 Analyser</button>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Code article</th><th>Designation</th><th>Famille</th><th>Stock actuel</th><th>Vol. sortie ref.</th><th>Besoin</th><th>Couverture (sem.)</th><th>Priorite</th></tr>
+        </thead>
+        <tbody id="re-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ CLIENTS / ARTICLE ════════════ -->
+<div id="s-clients" class="section">
+  <div class="section-title">👥 Consommation Clients / Article</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Periode</label>
+        <select id="cl-periode">
+          <option value="3mois">3 mois</option>
+          <option value="6mois">6 mois</option>
+          <option value="12mois" selected>12 mois</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Code article (optionnel)</label>
+        <input type="text" id="cl-code" placeholder="Filtrer sur un article">
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="stockChargerClients()">🔎 Analyser</button>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Client</th><th>Article</th><th>Qte totale</th><th>Montant HT</th><th>Commandes</th><th>Frequence (j)</th><th>Prochaine cmd estimee</th></tr>
+        </thead>
+        <tbody id="cl-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ COMPARATIVE ════════════ -->
+<div id="s-comparative" class="section">
+  <div class="section-title">📐 Analyse comparative</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Periode 1</label>
+        <select id="cp-periode1">
+          <option value="mois">1 mois</option>
+          <option value="3mois" selected>3 mois</option>
+          <option value="6mois">6 mois</option>
+          <option value="12mois">12 mois</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Periode 2</label>
+        <select id="cp-periode2">
+          <option value="3mois">3 mois</option>
+          <option value="6mois" selected>6 mois</option>
+          <option value="12mois">12 mois</option>
+          <option value="24mois">24 mois</option>
+        </select>
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="stockChargerComparative()">🔎 Comparer</button>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Code article</th><th>Designation</th><th id="cp-th1">Sortie P1</th><th id="cp-th2">Sortie P2</th><th>Evolution</th><th>Tendance</th></tr>
+        </thead>
+        <tbody id="cp-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
