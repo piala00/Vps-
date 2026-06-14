@@ -135,6 +135,10 @@ _NEXORA_MASTER_NOM = "Youssouf HAMADOU"
 
 
 # ── Connexion DB ────────────────────────────────────────────────────────────
+def get_db_path():
+    return _DB_PATH
+
+
 def get_db():
     conn = sqlite3.connect(_DB_PATH, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row

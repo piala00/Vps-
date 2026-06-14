@@ -169,6 +169,27 @@ function apiPost(url, data, callback, errCallback) {
     });
 }
 
+function apiPut(url, data, callback, errCallback) {
+    fetch(url, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.ok) {
+            callback(d);
+        } else {
+            if (errCallback) errCallback(d.msg || d.error || 'Erreur');
+            else status('⚠ ' + (d.msg || 'Erreur'));
+        }
+    })
+    .catch(function(e) {
+        if (errCallback) errCallback(e.message);
+        else status('⚠ Connexion impossible');
+    });
+}
+
 // -- Tableau vide -------------------------------------------------------------------
 function emptyTable(tbody, cols, msg) {
     msg = msg || 'Aucune donnee';

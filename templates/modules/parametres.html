@@ -2,14 +2,422 @@
 
 {% block sidebar %}
 <button class="nav-item active" onclick="nav('parametres-dashboard')" data-nav="parametres-dashboard">🏠 Tableau de bord</button>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>🔌</span> Connexions <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'config-sage')" data-nav="config-sage">🔌 Connexion Sage</button>
+    <button class="nav-item-sub" onclick="navSub(this,'base-donnees')" data-nav="base-donnees">ℹ️ Etat de la base</button>
+  </div>
+</div>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>🔐</span> Acces &amp; Securite <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'ip-whitelist')" data-nav="ip-whitelist">🛡️ Controle IP</button>
+    <button class="nav-item-sub" onclick="navSub(this,'audit')" data-nav="audit">📋 Journal d'audit</button>
+  </div>
+</div>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>👤</span> Utilisateurs <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'utilisateurs')" data-nav="utilisateurs">👤 Comptes</button>
+    <button class="nav-item-sub" onclick="navSub(this,'droits')" data-nav="droits">🔑 Droits d'acces</button>
+  </div>
+</div>
+
+<button class="nav-item" onclick="nav('config-generale')" data-nav="config-generale">⚙️ Configuration generale</button>
+<button class="nav-item" onclick="nav('licence')" data-nav="licence">🪪 Licence</button>
+<button class="nav-item" onclick="nav('mon-compte')" data-nav="mon-compte">🔒 Mon compte</button>
 {% endblock %}
 
 {% block content %}
+
+<!-- ════════════ TABLEAU DE BORD ════════════ -->
 <div id="s-parametres-dashboard" class="section active">
-  <div class="section-title">⚙️ Parametres — Tableau de bord</div>
+  <div class="section-title">🏠 Parametres — Tableau de bord</div>
+
+  <div class="kpi-grid" id="par-dash-kpis">
+    <div class="kpi-card">
+      <div class="kico">🏢</div>
+      <div class="kval" id="kpi-societe">—</div>
+      <div class="klabel">Societe</div>
+    </div>
+    <div class="kpi-card k-blue">
+      <div class="kico">📍</div>
+      <div class="kval" id="kpi-agence">—</div>
+      <div class="klabel">Agence locale</div>
+    </div>
+    <div class="kpi-card k-green">
+      <div class="kico">👤</div>
+      <div class="kval" id="kpi-utilisateurs">—</div>
+      <div class="klabel">Utilisateurs actifs</div>
+    </div>
+    <div class="kpi-card k-gold">
+      <div class="kico">🪪</div>
+      <div class="kval" id="kpi-licence">—</div>
+      <div class="klabel">Licence</div>
+    </div>
+  </div>
+
   <div class="card">
-    <div class="card-title">Module en construction</div>
-    <p>Ce module sera complete dans une prochaine iteration.</p>
+    <div class="card-title">Acces rapides</div>
+    <div class="shortcut-grid">
+      <div class="shortcut-btn" onclick="nav('config-generale')">
+        <div class="ico">⚙️</div>
+        Configuration generale
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=config-sage]').click()">
+        <div class="ico">🔌</div>
+        Connexion Sage
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=utilisateurs]').click()">
+        <div class="ico">👤</div>
+        Utilisateurs
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=droits]').click()">
+        <div class="ico">🔑</div>
+        Droits d'acces
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=ip-whitelist]').click()">
+        <div class="ico">🛡️</div>
+        Controle IP
+      </div>
+      <div class="shortcut-btn" onclick="nav('licence')">
+        <div class="ico">🪪</div>
+        Licence
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- ════════════ CONFIGURATION GENERALE ════════════ -->
+<div id="s-config-generale" class="section">
+  <div class="section-title">⚙️ Configuration generale</div>
+  <div class="card">
+    <div class="card-title">Identite de l'entreprise</div>
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Nom de la societe</label>
+        <input type="text" id="cg-societe-nom" placeholder="GTC Bertoua">
+      </div>
+      <div class="fgroup">
+        <label>Ville</label>
+        <input type="text" id="cg-societe-ville" placeholder="Bertoua">
+      </div>
+      <div class="fgroup">
+        <label>Agence locale (ce poste)</label>
+        <select id="cg-agence-locale">
+          <option value="BERTOUA">Bertoua (Siege)</option>
+          <option value="DOUALA">Douala</option>
+          <option value="YAOUNDE">Yaounde</option>
+          <option value="GAROUA_BOULAI">Garoua-Boulai</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Depot Sage par defaut (F_DEPOT)</label>
+        <input type="number" id="cg-depot-defaut" placeholder="7">
+      </div>
+    </div>
+    <div class="frow" style="margin-top:12px">
+      <button class="btn btn-navy" onclick="parametresSaveConfigGenerale()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ CONNEXION SAGE ════════════ -->
+<div id="s-config-sage" class="section">
+  <div class="section-title">🔌 Connexion Sage 100</div>
+  <div class="alert alert-info">Connexion en LECTURE SEULE. Aucune ecriture n'est jamais effectuee sur Sage.</div>
+
+  <div class="card">
+    <div class="card-title">Parametres de connexion</div>
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Serveur SQL Server</label>
+        <input type="text" id="sg-server" placeholder="SERVEUR\SAGE100">
+      </div>
+      <div class="fgroup">
+        <label>Base de donnees</label>
+        <input type="text" id="sg-database" placeholder="GTC 2026">
+      </div>
+      <div class="fgroup">
+        <label>Identifiant SQL</label>
+        <input type="text" id="sg-login" placeholder="sa">
+      </div>
+      <div class="fgroup">
+        <label>Mot de passe SQL</label>
+        <input type="password" id="sg-password" placeholder="Laisser vide pour ne pas modifier">
+      </div>
+    </div>
+    <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px">
+      <input type="checkbox" id="sg-trusted" style="width:auto">
+      <label for="sg-trusted" style="margin:0">Authentification Windows (Trusted Connection)</label>
+    </div>
+
+    <div class="frow" style="margin-top:8px">
+      <span id="sg-driver-info" class="badge b-muted">Pilote ODBC : —</span>
+    </div>
+
+    <div class="frow" style="margin-top:12px">
+      <button class="btn btn-outline" onclick="parametresTestSage()">🔍 Tester la connexion</button>
+      <button class="btn btn-navy" onclick="parametresSaveSage()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ ETAT DE LA BASE ════════════ -->
+<div id="s-base-donnees" class="section">
+  <div class="section-title">ℹ️ Etat de la base de donnees</div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kico">💾</div>
+      <div class="kval" id="bd-taille">—</div>
+      <div class="klabel">Taille</div>
+    </div>
+    <div class="kpi-card k-blue">
+      <div class="kico">📋</div>
+      <div class="kval" id="bd-tables">—</div>
+      <div class="klabel">Tables</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">SQLite locale</div>
+    <p style="color:var(--muted);font-size:13px;word-break:break-all" id="bd-chemin">—</p>
+    <div class="frow" style="margin-top:8px">
+      <button class="btn btn-outline" onclick="parametresBackupDb()">💾 Sauvegarder maintenant</button>
+      <button class="btn btn-outline" onclick="parametresVacuumDb()">🧹 Optimiser (VACUUM)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ CONTROLE IP ════════════ -->
+<div id="s-ip-whitelist" class="section">
+  <div class="section-title">🛡️ Controle d'acces par IP</div>
+  <div class="alert alert-info">Les adresses locales (127.0.0.1, ::1) sont toujours autorisees.</div>
+
+  <div class="card">
+    <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px">
+      <input type="checkbox" id="ip-active" style="width:auto" onchange="parametresSaveIpActive()">
+      <label for="ip-active" style="margin:0">Activer la liste blanche IP</label>
+    </div>
+
+    <div class="frow" style="margin-top:12px">
+      <div class="fgroup" style="flex:1">
+        <label>Adresse IP ou plage CIDR</label>
+        <input type="text" id="ip-nouvelle" placeholder="192.168.1.10 ou 192.168.1.0/24">
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="parametresAjouterIp()">➕ Ajouter</button>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Adresse IP / Plage</th><th style="width:90px">Actions</th></tr></thead>
+        <tbody id="ip-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ JOURNAL D'AUDIT ════════════ -->
+<div id="s-audit" class="section">
+  <div class="section-title">📋 Journal d'audit</div>
+  <div class="card">
+    <div class="card-title">100 dernieres operations</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Utilisateur</th><th>Module</th><th>Action</th><th>Detail</th><th>IP</th></tr>
+        </thead>
+        <tbody id="audit-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ UTILISATEURS ════════════ -->
+<div id="s-utilisateurs" class="section">
+  <div class="section-title">👤 Utilisateurs</div>
+
+  <div class="card">
+    <div class="frow" style="justify-content:space-between">
+      <div class="card-title" style="margin:0">Comptes</div>
+      <button class="btn btn-navy" onclick="parametresOuvrirUtilisateur(null)">➕ Nouvel utilisateur</button>
+    </div>
+    <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr>
+            <th>Identifiant</th><th>Nom</th><th>Prenom</th><th>Email</th>
+            <th>Telephone</th><th>Agence</th><th>Statut</th><th style="width:170px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal utilisateur -->
+<div class="modal" id="modal-utilisateur">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="mu-titre">Nouvel utilisateur</span>
+      <button class="modal-close" onclick="fermerModal('modal-utilisateur')">✕</button>
+    </div>
+    <input type="hidden" id="mu-id">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Identifiant</label>
+        <input type="text" id="mu-username">
+      </div>
+      <div class="fgroup">
+        <label>Nom</label>
+        <input type="text" id="mu-nom">
+      </div>
+      <div class="fgroup">
+        <label>Prenom</label>
+        <input type="text" id="mu-prenom">
+      </div>
+      <div class="fgroup">
+        <label>Email</label>
+        <input type="email" id="mu-email">
+      </div>
+      <div class="fgroup">
+        <label>Telephone</label>
+        <input type="text" id="mu-telephone">
+      </div>
+      <div class="fgroup">
+        <label>Agence</label>
+        <select id="mu-agence">
+          <option value="BERTOUA">Bertoua (Siege)</option>
+          <option value="DOUALA">Douala</option>
+          <option value="YAOUNDE">Yaounde</option>
+          <option value="GAROUA_BOULAI">Garoua-Boulai</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Mot de passe</label>
+        <input type="password" id="mu-password" placeholder="Laisser vide pour ne pas modifier">
+      </div>
+      <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px;margin-top:24px">
+        <input type="checkbox" id="mu-actif" style="width:auto" checked>
+        <label for="mu-actif" style="margin:0">Compte actif</label>
+      </div>
+    </div>
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-outline" onclick="fermerModal('modal-utilisateur')">Annuler</button>
+      <button class="btn btn-navy" onclick="parametresSauverUtilisateur()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ DROITS D'ACCES ════════════ -->
+<div id="s-droits" class="section">
+  <div class="section-title">🔑 Droits d'acces</div>
+
+  <div class="card">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Utilisateur</label>
+        <select id="dr-utilisateur" onchange="parametresChargerDroits()"></select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="frow" style="justify-content:space-between">
+      <div class="card-title" style="margin:0">Matrice des permissions</div>
+      <div class="frow">
+        <button class="btn btn-outline btn-sm" onclick="parametresDroitsTout(true)">✅ Tout autoriser</button>
+        <button class="btn btn-outline btn-sm" onclick="parametresDroitsTout(false)">⛔ Tout revoquer</button>
+        <button class="btn btn-gold btn-sm" onclick="parametresAppliquerDroits()">💾 Appliquer &amp; Sauvegarder</button>
+      </div>
+    </div>
+    <div id="dr-matrice" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- ════════════ LICENCE ════════════ -->
+<div id="s-licence" class="section">
+  <div class="section-title">🪪 Licence NEXORA</div>
+
+  <div class="kpi-grid" id="lic-kpis">
+    <div class="kpi-card">
+      <div class="kico">🪪</div>
+      <div class="kval" id="lic-statut">—</div>
+      <div class="klabel">Statut</div>
+    </div>
+    <div class="kpi-card k-blue">
+      <div class="kico">🏢</div>
+      <div class="kval" id="lic-societe">—</div>
+      <div class="klabel">Societe</div>
+    </div>
+    <div class="kpi-card k-gold">
+      <div class="kico">📅</div>
+      <div class="kval" id="lic-expiration">—</div>
+      <div class="klabel">Expiration</div>
+    </div>
+    <div class="kpi-card k-green">
+      <div class="kico">🖥️</div>
+      <div class="kval" id="lic-postes">—</div>
+      <div class="klabel">Postes autorises</div>
+    </div>
+  </div>
+
+  <div class="card" id="lic-demo-card" style="display:none">
+    <div class="alert alert-warn">Mode demonstration actif — <span id="lic-demo-jours">30</span> jour(s) restant(s).</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Activer une licence</div>
+    <div class="frow">
+      <div class="fgroup" style="flex:1">
+        <label>Numero de serie</label>
+        <input type="text" id="lic-numero" placeholder="NXR1-XXXX-XXXX-XXXX-XXXX">
+      </div>
+    </div>
+    <div class="frow" style="margin-top:8px">
+      <button class="btn btn-outline" onclick="parametresVerifierLicence()">🔍 Verifier</button>
+      <button class="btn btn-navy" onclick="parametresActiverLicence()">✅ Activer</button>
+      <button class="btn btn-danger" onclick="parametresDesactiverLicence()">🗑️ Desactiver la licence</button>
+    </div>
+    <div id="lic-modules" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- ════════════ MON COMPTE ════════════ -->
+<div id="s-mon-compte" class="section">
+  <div class="section-title">🔒 Mon compte</div>
+  <div class="card">
+    <div class="card-title">Changer mon mot de passe</div>
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Ancien mot de passe</label>
+        <input type="password" id="mc-ancien">
+      </div>
+      <div class="fgroup">
+        <label>Nouveau mot de passe</label>
+        <input type="password" id="mc-nouveau">
+      </div>
+      <div class="fgroup">
+        <label>Confirmer le nouveau mot de passe</label>
+        <input type="password" id="mc-confirmation">
+      </div>
+    </div>
+    <div class="frow" style="margin-top:12px">
+      <button class="btn btn-navy" onclick="parametresChangerPassword()">💾 Changer le mot de passe</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
