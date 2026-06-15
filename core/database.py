@@ -576,6 +576,7 @@ def init_db(db_path):
         poste TEXT,
         departement TEXT,
         date_embauche TEXT,
+        date_depart TEXT,
         salaire_base REAL DEFAULT 0,
         telephone TEXT,
         email TEXT,
