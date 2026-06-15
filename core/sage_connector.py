@@ -453,6 +453,31 @@ def get_paiements_clients(code_client: str = "", date_debut: str = "", date_fin:
         return []
 
 
+# ── CA par depot (consolidation reseau) ──────────────────────────────────────
+def get_ca_par_depot(date_debut: str = "", date_fin: str = "") -> List[Dict]:
+    try:
+        sql = """
+            SELECT DL.DE_No AS depot_no, ISNULL(DEP.DE_Intitule,'') AS depot,
+                   SUM(DL.DL_MontantHT) AS ca_ht
+            FROM F_DOCLIGNE DL
+            INNER JOIN F_DOCENTETE DH ON DH.DO_Piece=DL.DO_Piece AND DH.DO_Type=DL.DO_Type
+            LEFT JOIN F_DEPOT DEP ON DEP.DE_No=DL.DE_No
+            WHERE DH.DO_Type=6
+        """
+        params = []
+        if date_debut:
+            sql += " AND DH.DO_Date>=?"
+            params.append(date_debut)
+        if date_fin:
+            sql += " AND DH.DO_Date<=?"
+            params.append(date_fin)
+        sql += " GROUP BY DL.DE_No, DEP.DE_Intitule"
+        return sage_query(sql, tuple(params))
+    except Exception as e:
+        log.error("Erreur CA par depot: %s" % e)
+        return []
+
+
 # ── Ventes clients (factures, F_DOCENTETE DO_Type=6) ─────────────────────────────
 def get_ventes(date_debut: str = "", date_fin: str = "", code_client: str = "") -> List[Dict]:
     try:

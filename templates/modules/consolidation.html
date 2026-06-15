@@ -1,15 +1,61 @@
 {% extends "base.html" %}
 
 {% block sidebar %}
-<button class="nav-item active" onclick="nav('consolidation-dashboard')" data-nav="consolidation-dashboard">🏠 Tableau de bord</button>
+<button class="nav-item active" onclick="nav('consolidation-dashboard')" data-nav="consolidation-dashboard">🏆 Vue Globale Reseau</button>
 {% endblock %}
 
 {% block content %}
+
+<!-- ════════════ VUE GLOBALE RESEAU ════════════ -->
 <div id="s-consolidation-dashboard" class="section active">
-  <div class="section-title">🧮 Consolidation — Tableau de bord</div>
+  <div class="section-title">🏆 Consolidation — Vue Globale Reseau</div>
+
   <div class="card">
-    <div class="card-title">Module en construction</div>
-    <p>Ce module sera complete dans une prochaine iteration.</p>
+    <div class="frow">
+      <div class="fgroup">
+        <label>Periode</label>
+        <select id="con-granularite" onchange="conChargerDashboard()">
+          <option value="jour">Aujourd'hui</option>
+          <option value="semaine">Cette semaine</option>
+          <option value="mois" selected>Ce mois</option>
+          <option value="mois_precedent">Mois precedent</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card k-gold">
+      <div class="kico">💰</div>
+      <div class="kval" id="kpi-ca-total">—</div>
+      <div class="klabel">CA consolide reseau</div>
+    </div>
+    <div class="kpi-card k-blue">
+      <div class="kico">📅</div>
+      <div class="kval" id="kpi-ca-total-n1">—</div>
+      <div class="klabel">CA periode N-1</div>
+    </div>
+    <div class="kpi-card k-green">
+      <div class="kico">📈</div>
+      <div class="kval" id="kpi-variation">—</div>
+      <div class="klabel">Variation vs N-1</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Contribution par agence</div>
+    <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr>
+            <th>Agence</th><th>Ville</th><th>Type</th><th>CA periode</th>
+            <th>CA N-1</th><th>Variation</th><th>% Contribution</th>
+          </tr>
+        </thead>
+        <tbody id="con-tbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
+
 {% endblock %}
