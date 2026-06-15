@@ -451,3 +451,31 @@ def get_paiements_clients(code_client: str = "", date_debut: str = "", date_fin:
     except Exception as e:
         log.error("Erreur paiements clients: %s" % e)
         return []
+
+
+# ── Ventes clients (factures, F_DOCENTETE DO_Type=6) ─────────────────────────────
+def get_ventes(date_debut: str = "", date_fin: str = "", code_client: str = "") -> List[Dict]:
+    try:
+        sql = """
+            SELECT DH.DO_Piece AS no_facture, CONVERT(DATE, DH.DO_Date) AS date_facture,
+                   DH.DO_Tiers AS code_client, ISNULL(CT.CT_Intitule,'') AS client_nom,
+                   DH.DO_TTC AS montant_ttc
+            FROM F_DOCENTETE DH
+            LEFT JOIN F_COMPTET CT ON CT.CT_Num=DH.DO_Tiers
+            WHERE DH.DO_Type=6
+        """
+        params = []
+        if code_client:
+            sql += " AND DH.DO_Tiers=?"
+            params.append(code_client)
+        if date_debut:
+            sql += " AND DH.DO_Date>=?"
+            params.append(date_debut)
+        if date_fin:
+            sql += " AND DH.DO_Date<=?"
+            params.append(date_fin)
+        sql += " ORDER BY DH.DO_Date DESC"
+        return sage_query(sql, tuple(params))
+    except Exception as e:
+        log.error("Erreur ventes: %s" % e)
+        return []

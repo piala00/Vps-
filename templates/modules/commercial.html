@@ -2,14 +2,356 @@
 
 {% block sidebar %}
 <button class="nav-item active" onclick="nav('commercial-dashboard')" data-nav="commercial-dashboard">🏠 Tableau de bord</button>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>👥</span> Clients <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'fiches-clients')" data-nav="fiches-clients">👥 Fiches Clients</button>
+    <button class="nav-item-sub" onclick="navSub(this,'objectifs-commerciaux')" data-nav="objectifs-commerciaux">🎯 Objectifs</button>
+  </div>
+</div>
+
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+    <span>📈</span> Ventes &amp; Analyses <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub" onclick="navSub(this,'suivi-ventes')" data-nav="suivi-ventes">📈 Suivi des Ventes</button>
+    <button class="nav-item-sub" onclick="navSub(this,'previsions-commandes')" data-nav="previsions-commandes">🔮 Previsions</button>
+    <button class="nav-item-sub" onclick="navSub(this,'analyse-ca')" data-nav="analyse-ca">💰 Analyse CA</button>
+  </div>
+</div>
 {% endblock %}
 
 {% block content %}
+
+<!-- ════════════ TABLEAU DE BORD ════════════ -->
 <div id="s-commercial-dashboard" class="section active">
-  <div class="section-title">📊 Commercial — Tableau de bord</div>
+  <div class="section-title">🏠 Commercial — Tableau de bord</div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card k-green">
+      <div class="kico">💰</div>
+      <div class="kval" id="kpi-ca-jour">—</div>
+      <div class="klabel">CA du jour</div>
+    </div>
+    <div class="kpi-card k-blue">
+      <div class="kico">📅</div>
+      <div class="kval" id="kpi-ca-mois">—</div>
+      <div class="klabel">CA du mois</div>
+    </div>
+    <div class="kpi-card k-gold">
+      <div class="kico">👥</div>
+      <div class="kval" id="kpi-clients-actifs">—</div>
+      <div class="klabel">Clients actifs</div>
+    </div>
+    <div class="kpi-card k-red">
+      <div class="kico">⚠️</div>
+      <div class="kval" id="kpi-creances-depassement">—</div>
+      <div class="klabel">Creances en depassement de plafond</div>
+    </div>
+  </div>
+
   <div class="card">
-    <div class="card-title">Module en construction</div>
-    <p>Ce module sera complete dans une prochaine iteration.</p>
+    <div class="card-title">Acces rapides</div>
+    <div class="shortcut-grid">
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=fiches-clients]').click()">
+        <div class="ico">👥</div>
+        Fiches Clients
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=suivi-ventes]').click()">
+        <div class="ico">📈</div>
+        Suivi des Ventes
+      </div>
+      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=analyse-ca]').click()">
+        <div class="ico">💰</div>
+        Analyse CA
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- ════════════ FICHES CLIENTS ════════════ -->
+<div id="s-fiches-clients" class="section">
+  <div class="section-title">👥 Fiches Clients</div>
+
+  <div class="card">
+    <div class="frow" style="justify-content:space-between">
+      <div class="fgroup" style="flex:1">
+        <label>Recherche</label>
+        <input type="text" id="fc-recherche" placeholder="Code, nom ou telephone" oninput="cmRechercheClients()">
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="cmOuvrirClient(null)">➕ Nouveau client</button>
+    </div>
+    <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th><th>Nom</th><th>Telephone</th><th>Ville</th>
+            <th>Commercial attitre</th><th>Plafond credit</th><th>Delai paiement</th>
+            <th>Statut</th><th style="width:60px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="fc-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal fiche client -->
+<div class="modal" id="modal-client">
+  <div class="modal-box modal-lg">
+    <div class="modal-title">
+      <span id="fc-titre">Nouveau client</span>
+      <button class="modal-close" onclick="fermerModal('modal-client')">✕</button>
+    </div>
+    <input type="hidden" id="fc-id">
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Code client</label>
+        <input type="text" id="fc-code" placeholder="Ex: CL010">
+      </div>
+      <div class="fgroup">
+        <label>Nom</label>
+        <input type="text" id="fc-nom">
+      </div>
+      <div class="fgroup">
+        <label>Prenom</label>
+        <input type="text" id="fc-prenom">
+      </div>
+      <div class="fgroup">
+        <label>Telephone</label>
+        <input type="text" id="fc-telephone">
+      </div>
+      <div class="fgroup">
+        <label>Telephone 2</label>
+        <input type="text" id="fc-telephone2">
+      </div>
+      <div class="fgroup">
+        <label>Email</label>
+        <input type="text" id="fc-email">
+      </div>
+      <div class="fgroup">
+        <label>Adresse</label>
+        <input type="text" id="fc-adresse">
+      </div>
+      <div class="fgroup">
+        <label>Ville</label>
+        <input type="text" id="fc-ville">
+      </div>
+      <div class="fgroup">
+        <label>Quartier</label>
+        <input type="text" id="fc-quartier">
+      </div>
+      <div class="fgroup">
+        <label>Activite</label>
+        <input type="text" id="fc-activite">
+      </div>
+      <div class="fgroup">
+        <label>Secteur</label>
+        <input type="text" id="fc-secteur">
+      </div>
+      <div class="fgroup">
+        <label>Commercial attitre</label>
+        <input type="text" id="fc-commercial">
+      </div>
+      <div class="fgroup">
+        <label>Plafond credit (FCFA)</label>
+        <input type="number" id="fc-plafond" step="0.01" value="0">
+      </div>
+      <div class="fgroup">
+        <label>Delai de paiement (jours)</label>
+        <input type="number" id="fc-delai" value="30">
+      </div>
+      <div class="fgroup" style="flex:1">
+        <label>Observations</label>
+        <input type="text" id="fc-observations">
+      </div>
+      <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px;margin-top:24px">
+        <input type="checkbox" id="fc-actif" style="width:auto" checked>
+        <label for="fc-actif" style="margin:0">Client actif</label>
+      </div>
+    </div>
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-outline" onclick="fermerModal('modal-client')">Annuler</button>
+      <button class="btn btn-navy" onclick="cmSauverClient()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ OBJECTIFS COMMERCIAUX ════════════ -->
+<div id="s-objectifs-commerciaux" class="section">
+  <div class="section-title">🎯 Objectifs Commerciaux</div>
+
+  <div class="card">
+    <div class="card-title">Definir un objectif</div>
+    <div class="form-grid">
+      <div class="fgroup">
+        <label>Commercial</label>
+        <input type="text" id="obj-commercial" placeholder="Nom du commercial">
+      </div>
+      <div class="fgroup">
+        <label>Periode (AAAA-MM ou AAAA)</label>
+        <input type="text" id="obj-periode" placeholder="Ex: 2026-06">
+      </div>
+      <div class="fgroup">
+        <label>Objectif CA (FCFA)</label>
+        <input type="number" id="obj-ca" step="0.01" value="0">
+      </div>
+      <div class="fgroup">
+        <label>Objectif recouvrement (FCFA)</label>
+        <input type="number" id="obj-recouvrement" step="0.01" value="0">
+      </div>
+      <div class="fgroup">
+        <label>Objectif nb. clients</label>
+        <input type="number" id="obj-nb-clients" value="0">
+      </div>
+    </div>
+    <div class="frow" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-navy" onclick="cmSauverObjectif()">💾 Enregistrer</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Objectifs enregistres</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Periode</th><th>Commercial</th><th>Objectif CA</th>
+            <th>Objectif recouvrement</th><th>Objectif nb. clients</th>
+          </tr>
+        </thead>
+        <tbody id="obj-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ SUIVI DES VENTES ════════════ -->
+<div id="s-suivi-ventes" class="section">
+  <div class="section-title">📈 Suivi des Ventes</div>
+  <div class="alert alert-info">Donnees issues de Sage (factures de vente, F_DOCENTETE DO_Type=6).</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Code client</label>
+        <input type="text" id="sv-client" placeholder="Optionnel">
+      </div>
+      <div class="fgroup">
+        <label>Date debut</label>
+        <input type="date" id="sv-date-debut">
+      </div>
+      <div class="fgroup">
+        <label>Date fin</label>
+        <input type="date" id="sv-date-fin">
+      </div>
+      <button class="btn btn-navy" style="align-self:flex-end" onclick="cmChargerVentes()">🔍 Rechercher</button>
+    </div>
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>No Facture</th><th>Code Client</th><th>Client</th><th>Montant TTC</th></tr>
+        </thead>
+        <tbody id="sv-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ PREVISIONS COMMANDES ════════════ -->
+<div id="s-previsions-commandes" class="section">
+  <div class="section-title">🔮 Previsions de Commandes</div>
+  <div class="alert alert-info">Estimation basee sur la frequence moyenne des commandes de chaque client (minimum 2 commandes sur les 12 derniers mois). Triees par echeance la plus proche.</div>
+
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Code Client</th><th>Client</th><th>Nb. commandes</th>
+            <th>Frequence (jours)</th><th>Derniere commande</th><th>Jours restants</th>
+          </tr>
+        </thead>
+        <tbody id="prev-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ ANALYSE CA ════════════ -->
+<div id="s-analyse-ca" class="section">
+  <div class="section-title">💰 Analyse du Chiffre d'Affaires</div>
+  <div class="alert alert-info">Comparaison de la periode en cours avec la meme periode de l'annee precedente (N-1).</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Granularite</label>
+        <select id="aca-granularite" onchange="cmChargerAnalyseCA()">
+          <option value="jour">Quotidien (30 jours)</option>
+          <option value="semaine">Hebdomadaire (12 semaines)</option>
+          <option value="mois">Mensuel (12 mois)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="kpi-grid" style="margin-top:12px">
+      <div class="kpi-card k-green">
+        <div class="kico">💰</div>
+        <div class="kval" id="aca-ca-total">—</div>
+        <div class="klabel">CA periode actuelle</div>
+      </div>
+      <div class="kpi-card k-blue">
+        <div class="kico">📅</div>
+        <div class="kval" id="aca-ca-total-n1">—</div>
+        <div class="klabel">CA periode N-1</div>
+      </div>
+      <div class="kpi-card k-gold">
+        <div class="kico">📊</div>
+        <div class="kval" id="aca-variation">—</div>
+        <div class="klabel">Variation vs N-1</div>
+      </div>
+      <div class="kpi-card k-warn">
+        <div class="kico">🏆</div>
+        <div class="kval" id="aca-top10-progression">—</div>
+        <div class="klabel">Progression Top 10 clients</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Evolution du CA — periode actuelle</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Periode</th><th>CA</th></tr></thead>
+        <tbody id="aca-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Evolution du CA — periode N-1</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Periode</th><th>CA</th></tr></thead>
+        <tbody id="aca-n1-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Top 10 clients (periode actuelle)</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Code Client</th><th>Client</th><th>Total achats</th></tr></thead>
+        <tbody id="aca-top-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
