@@ -1,0 +1,50 @@
+name: NEXORA Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-js:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test JavaScript
+        run: node tests/test_js.js
+
+  test-python:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Test Python syntax
+        run: python -c "import run; print('OK')"
+      - name: Test imports
+        run: |
+          python -c "from core.database import init_db; print('DB OK')"
+          python -c "from core.nexora_licence import NexoraLicenceVerifier; print('Licence OK')"
+
+  build:
+    runs-on: windows-latest
+    needs: [test-js, test-python]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Build EXE
+        run: pyinstaller NEXORA.spec --clean --noconfirm
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXORA-EXE
+          path: dist/NEXORA.exe
