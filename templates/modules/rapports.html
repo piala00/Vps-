@@ -1,15 +1,124 @@
 {% extends "base.html" %}
 
 {% block sidebar %}
-<button class="nav-item active" onclick="nav('rapports-dashboard')" data-nav="rapports-dashboard">🏠 Tableau de bord</button>
+<button class="nav-item active" onclick="nav('rpt-stock')" data-nav="rpt-stock">📦 Rapport Stock</button>
+<button class="nav-item" onclick="nav('rpt-commercial')" data-nav="rpt-commercial">💼 Rapport Commercial</button>
+<button class="nav-item" onclick="nav('rpt-comptable')" data-nav="rpt-comptable">🧾 Rapport Comptable</button>
+<button class="nav-item" onclick="nav('rpt-logistique')" data-nav="rpt-logistique">🚚 Rapport Logistique</button>
 {% endblock %}
 
 {% block content %}
-<div id="s-rapports-dashboard" class="section active">
-  <div class="section-title">📋 Rapports — Tableau de bord</div>
+
+<!-- ════════════ RAPPORT STOCK ════════════ -->
+<div id="s-rpt-stock" class="section active">
+  <div class="section-title">📦 Rapport Stock</div>
   <div class="card">
-    <div class="card-title">Module en construction</div>
-    <p>Ce module sera complete dans une prochaine iteration.</p>
+    <div class="frow" style="justify-content:space-between">
+      <div></div>
+      <div class="frow">
+        <button class="btn btn-outline" id="rpt-stock-excel" onclick="rpExporter('stock','excel')">📊 Export Excel</button>
+        <button class="btn btn-outline" id="rpt-stock-pdf" onclick="rpExporter('stock','pdf')">📄 Export PDF</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr>
+            <th>Depot</th><th>Code article</th><th>Designation</th><th>Famille</th>
+            <th>Stock actuel</th><th>Stock mini</th><th>Stock maxi</th><th>Valeur stock</th>
+          </tr>
+        </thead>
+        <tbody id="rpt-stock-tbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
+
+<!-- ════════════ RAPPORT COMMERCIAL ════════════ -->
+<div id="s-rpt-commercial" class="section">
+  <div class="section-title">💼 Rapport Commercial — Ventes</div>
+  <div class="card">
+    <div class="frow" style="justify-content:space-between">
+      <div class="frow">
+        <div class="fgroup">
+          <label>Date debut</label>
+          <input type="date" id="rpt-com-date-debut" onchange="rpChargerCommercial()">
+        </div>
+        <div class="fgroup">
+          <label>Date fin</label>
+          <input type="date" id="rpt-com-date-fin" onchange="rpChargerCommercial()">
+        </div>
+      </div>
+      <div class="frow">
+        <button class="btn btn-outline" id="rpt-commercial-excel" onclick="rpExporter('commercial','excel')">📊 Export Excel</button>
+        <button class="btn btn-outline" id="rpt-commercial-pdf" onclick="rpExporter('commercial','pdf')">📄 Export PDF</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr><th>Date facture</th><th>No facture</th><th>Code client</th><th>Client</th><th>Montant TTC</th></tr>
+        </thead>
+        <tbody id="rpt-commercial-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ RAPPORT COMPTABLE ════════════ -->
+<div id="s-rpt-comptable" class="section">
+  <div class="section-title">🧾 Rapport Comptable — Balance agee des creances</div>
+  <div class="card">
+    <div class="frow" style="justify-content:space-between">
+      <div></div>
+      <div class="frow">
+        <button class="btn btn-outline" id="rpt-comptable-excel" onclick="rpExporter('comptable','excel')">📊 Export Excel</button>
+        <button class="btn btn-outline" id="rpt-comptable-pdf" onclick="rpExporter('comptable','pdf')">📄 Export PDF</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr><th>Code client</th><th>Client</th><th>Solde</th><th>Niveau de risque</th></tr>
+        </thead>
+        <tbody id="rpt-comptable-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ RAPPORT LOGISTIQUE ════════════ -->
+<div id="s-rpt-logistique" class="section">
+  <div class="section-title">🚚 Rapport Logistique — Voyages</div>
+  <div class="card">
+    <div class="frow" style="justify-content:space-between">
+      <div class="frow">
+        <div class="fgroup">
+          <label>Date debut</label>
+          <input type="date" id="rpt-log-date-debut" onchange="rpChargerLogistique()">
+        </div>
+        <div class="fgroup">
+          <label>Date fin</label>
+          <input type="date" id="rpt-log-date-fin" onchange="rpChargerLogistique()">
+        </div>
+      </div>
+      <div class="frow">
+        <button class="btn btn-outline" id="rpt-logistique-excel" onclick="rpExporter('logistique','excel')">📊 Export Excel</button>
+        <button class="btn btn-outline" id="rpt-logistique-pdf" onclick="rpExporter('logistique','pdf')">📄 Export PDF</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr>
+            <th>No voyage</th><th>Camion</th><th>Chauffeur</th><th>Origine</th><th>Destination</th>
+            <th>Date depart</th><th>Date retour</th><th>Statut</th>
+          </tr>
+        </thead>
+        <tbody id="rpt-logistique-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
