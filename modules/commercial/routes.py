@@ -1,307 +1,420 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-modules/commercial/routes.py
-NEXORA v2.0 — Module Commercial : fiches clients, objectifs commerciaux,
-suivi des ventes, previsions de commandes et analyse du chiffre d'affaires.
+NEXORA v2.0 — Module Commercial & Ventes
+Toutes les regles metier de GTC ERP PILOT V3.
+Source SQL/Excel respectee, cache 24h, filtre periode, roles.
 """
-from datetime import date, timedelta
-
-from flask import render_template, session, redirect, url_for, request, jsonify
-
+from flask import render_template, jsonify, session, request
 from . import bp
-from core.database import db_all, db_one, db_exec, db_scalar, has_permission, audit
-from core.nexora_security import login_required
-from core.sage_connector import get_ventes, get_creances_clients
+from core.auth import login_required, get_user
+from core.database import get_config, PERMISSIONS_TREE, db_all, db_exec, db_one
+import logging
+from datetime import date as _date, datetime
+
+log = logging.getLogger('NEXORA.Commercial')
 
 
-def _peut(uid, sous_module, action='lire'):
-    return session.get('is_master') or has_permission(uid, 'commercial', sous_module, action)
+def _get_user_filter():
+    """Retourne le filtre commercial si l'utilisateur est un commercial."""
+    u = get_user()
+    if u.get('role') == 'commercial' and u.get('commercial_name'):
+        return u['commercial_name']
+    return None
 
 
-def _creances_depassement():
-    creances = get_creances_clients()
-    if not creances:
-        return 0.0
-    plafonds = {f['code_client']: float(f['plafond_credit'] or 0)
-                for f in db_all("SELECT code_client, plafond_credit FROM fiches_clients")}
-    total = 0.0
-    for c in creances:
-        solde = float(c.get('solde') or 0)
-        plafond = plafonds.get(c.get('code_client'), 0)
-        if plafond > 0 and solde > plafond:
-            total += (solde - plafond)
-    return round(total, 2)
+def _get_agence_commerciaux(agence):
+    """Retourne les noms normalises des commerciaux rattaches a une agence (role agence)."""
+    from core.commercial_engine import _norm
+    rows = db_all(
+        "SELECT commercial_name FROM utilisateurs WHERE agence=? AND role='commercial' AND actif=1",
+        (agence,))
+    return {_norm(r['commercial_name']) for r in rows if r['commercial_name']}
 
 
-def _ca_par_periode(ventes, granularite):
-    buckets = {}
-    for v in ventes:
-        d_str = str(v.get('date_facture') or '')[:10]
-        if not d_str:
-            continue
-        try:
-            d = date.fromisoformat(d_str)
-        except ValueError:
-            continue
-        if granularite == 'semaine':
-            iso = d.isocalendar()
-            cle = '%s-S%02d' % (iso[0], iso[1])
-        elif granularite == 'mois':
-            cle = d.strftime('%Y-%m')
-        else:
-            cle = d_str
-        buckets[cle] = buckets.get(cle, 0.0) + float(v.get('montant_ttc') or 0)
-    return [{'periode': k, 'ca': round(v, 2)} for k, v in sorted(buckets.items())]
+def _filter_by_agence_if_needed(rows, key_commercial='commercial'):
+    """Si l'utilisateur a le role 'agence', filtre les lignes sur les commerciaux de son agence."""
+    u = get_user()
+    if u.get('role') != 'agence' or not u.get('agence'):
+        return rows
+    from core.commercial_engine import _norm
+    ag_coms = _get_agence_commerciaux(u['agence'])
+    if not ag_coms:
+        return rows
+    return [r for r in rows if _norm(r.get(key_commercial, '')) in ag_coms]
 
 
-def _top_clients(ventes, n=10):
-    par_client = {}
-    for v in ventes:
-        cc = v.get('code_client')
-        if not cc:
-            continue
-        if cc not in par_client:
-            par_client[cc] = {'code_client': cc, 'client_nom': v.get('client_nom', ''), 'total': 0.0}
-        par_client[cc]['total'] += float(v.get('montant_ttc') or 0)
-    clients = sorted(par_client.values(), key=lambda c: c['total'], reverse=True)
-    for c in clients:
-        c['total'] = round(c['total'], 2)
-    return clients[:n]
+def _periode_from_request():
+    """
+    Lit la periode d'analyse depuis les parametres URL, fidele a la barre
+    globale Annee/Mois/Du-Au de GTC ERP PILOT V3. Supporte annee+mois
+    (dropdowns), du+au (plage exacte) ou debut/fin (alias retrocompatible).
+    Sans defaut explicite, retombe sur le mois en cours.
+    Sans cette resolution centralisee, chaque route choisissait sa propre
+    periode par defaut, rendant CA/Creances/Tendances incomparables entre
+    ecrans et avec l'ancien logiciel.
+    """
+    from core.commercial_engine import resolve_period
+    debut, fin, label = resolve_period(request.args)
+    return debut, fin
+
+
+def _load_data(force=False, period_args=None):
+    """
+    Charge et calcule toutes les donnees commerciales pour la periode
+    resolue depuis period_args (typiquement request.args), fidele a la
+    barre globale Annee/Mois/Du-Au de GTC ERP PILOT V3.
+    Sans cette resolution explicite, le CA/Creances/Tendances seraient
+    calcules sur un cumul depuis le debut de l'annee, faussant toute
+    comparaison avec les chiffres mensuels attendus.
+    Respecte la source (SQL ou Excel) configuree.
+    Retourne le dict data ou None si pas de donnees.
+    """
+    from core.data_source import load_grand_livre_data, get_commerciaux_list
+    from core.commercial_engine import init_commerciaux, compute_all, resolve_period, _latest_date
+    all_rows, ref, coms = load_grand_livre_data(force=force)
+    if not all_rows: return None
+    init_commerciaux(coms)
+    latest = _latest_date(all_rows)
+    debut, fin, label = resolve_period(period_args or {}, latest_date=latest)
+    data  = compute_all(all_rows, ref, start_date=debut, end_date=fin)
+    data['source']        = get_config('source','sql').upper()
+    data['all_rows']      = all_rows  # donnees completes pour tendances
+    data['period_label']  = label
+    data['period_debut']  = str(debut)
+    data['period_fin']    = str(fin)
+    return data
 
 
 @bp.route('/module/commercial')
 @login_required
 def module_commercial():
-    uid = session['user_id']
-    if not _peut(uid, 'fiches_clients', 'lire'):
-        return redirect(url_for('accueil'))
-    return render_template('modules/commercial.html', module='commercial',
-                            module_label='📊 Commercial')
+    user    = get_user()
+    modules = session.get('modules',[])
+    cfg     = {'nom_societe': get_config('nom_societe',''),
+               'devise':      get_config('devise','XAF')}
+    from core.auth import get_allowed_subtabs
+    allowed = get_allowed_subtabs(user.get('role','admin'), 'commercial')
+    return render_template('modules/commercial.html',
+        module='commercial', module_label='Commercial & Ventes',
+        user=user, modules=modules, config=cfg, tree=PERMISSIONS_TREE,
+        allowed_subtabs=allowed)
 
 
-# ── Tableau de bord ──────────────────────────────────────────────────────────
-@bp.route('/api/commercial/dashboard-summary')
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+
+@bp.route('/api/commercial/dashboard')
 @login_required
-def api_dashboard_summary():
-    uid = session['user_id']
-    if not _peut(uid, 'fiches_clients', 'lire'):
-        return jsonify(ok=False, msg='Acces refuse'), 403
-
-    today = date.today().isoformat()
-    debut_mois = date.today().replace(day=1).isoformat()
-
-    ventes_jour = get_ventes(date_debut=today, date_fin=today)
-    ventes_mois = get_ventes(date_debut=debut_mois, date_fin=today)
-    ca_jour = sum(float(v.get('montant_ttc') or 0) for v in ventes_jour)
-    ca_mois = sum(float(v.get('montant_ttc') or 0) for v in ventes_mois)
-
-    clients_actifs = db_scalar("SELECT COUNT(*) FROM fiches_clients WHERE actif=1") or 0
-
-    return jsonify(ok=True, summary={
-        'ca_jour': round(ca_jour, 2),
-        'ca_mois': round(ca_mois, 2),
-        'clients_actifs': clients_actifs,
-        'creances_depassement': _creances_depassement(),
+def api_commercial_dashboard():
+    force       = request.args.get('force','0')=='1'
+    debut, fin  = _periode_from_request()
+    data        = _load_data(force=force, period_args=request.args)
+    if not data:
+        return jsonify({'ok':True,'message':'Sage/Excel non disponible',
+                        'ca_total':0,'rec_total':0,'creances_totales':0,
+                        'nb_clients':0,'nb_commerciaux':0,'nb_retard':0,
+                        'source': get_config('source','sql').upper(),
+                        'periode': {'debut': str(debut), 'fin': str(fin)}})
+    com_f = _get_user_filter()
+    k     = data['kpis']
+    # Alertes
+    alertes = [{'niveau':a['niveau'],'code':a['code'],'nom':a['nom'],
+                 'fns':round(a['fns'],2),'retard':a['retard'],'msg':a['msg']}
+                for a in data['alertes'][:12]]
+    if com_f:
+        alertes = [a for a in alertes if a.get('com')==com_f]
+    return jsonify({
+        'ok':            True,
+        'ca_total':      round(k['ca'],2),
+        'rec_total':     round(k['recouvrement'],2),
+        'taux_rec':      round(k['taux_rec'],1),
+        'creances_totales': round(k['fns'],2),
+        'nb_clients':    k['nb_clients'],
+        'nb_retard':     k['nb_retard'],
+        'nb_commerciaux':len(data['commerciaux']),
+        'alertes':       alertes,
+        'source':        data['source'],
+        'analysis_date': str(data['analysis_date']) if data.get('analysis_date') else '',
+        'period_label':  data.get('period_label',''),
+        'loaded_at':     data.get('loaded_at',''),
+        'periode':       {'debut': str(debut), 'fin': str(fin)},
     })
 
 
-# ── Fiches clients ────────────────────────────────────────────────────────────
-@bp.route('/api/commercial/clients', methods=['GET', 'POST'])
+# ── Classement ────────────────────────────────────────────────────────────────
+
+@bp.route('/api/commercial/classement')
 @login_required
-def api_clients():
-    uid = session['user_id']
-
-    if request.method == 'POST':
-        if not _peut(uid, 'fiches_clients', 'ecrire'):
-            return jsonify(ok=False, msg='Acces refuse'), 403
-        d = request.json or {}
-        if not d.get('code_client') or not d.get('nom'):
-            return jsonify(ok=False, msg='Code client et nom requis')
-        if db_one("SELECT id FROM fiches_clients WHERE code_client=?", (d['code_client'],)):
-            return jsonify(ok=False, msg='Ce code client existe deja')
-        cid = db_exec("""INSERT INTO fiches_clients
-            (code_client,nom,prenom,telephone,telephone2,email,adresse,ville,quartier,
-             activite,secteur,commercial_attitre,plafond_credit,delai_paiement,observations)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (d.get('code_client', ''), d.get('nom', ''), d.get('prenom', ''), d.get('telephone', ''),
-             d.get('telephone2', ''), d.get('email', ''), d.get('adresse', ''), d.get('ville', ''),
-             d.get('quartier', ''), d.get('activite', ''), d.get('secteur', ''),
-             d.get('commercial_attitre', ''), float(d.get('plafond_credit', 0) or 0),
-             int(d.get('delai_paiement', 30) or 30), d.get('observations', '')))
-        audit(session['username'], 'commercial', 'CREER_CLIENT', 'Client=%s' % d.get('code_client', ''))
-        return jsonify(ok=True, msg='Client cree', id=cid)
-
-    if not _peut(uid, 'fiches_clients', 'lire'):
-        return jsonify(ok=False, msg='Acces refuse'), 403
-    q = request.args.get('q', '').strip()
-    sql = "SELECT * FROM fiches_clients WHERE 1=1"
-    params = []
-    if q:
-        like = '%' + q + '%'
-        sql += " AND (code_client LIKE ? OR nom LIKE ? OR telephone LIKE ?)"
-        params += [like, like, like]
-    sql += " ORDER BY nom"
-    return jsonify(ok=True, data=db_all(sql, tuple(params)))
-
-
-@bp.route('/api/commercial/clients/<int:cid>', methods=['PUT'])
-@login_required
-def api_client_detail(cid):
-    uid = session['user_id']
-    if not _peut(uid, 'fiches_clients', 'ecrire'):
-        return jsonify(ok=False, msg='Acces refuse'), 403
-    r = db_one("SELECT id FROM fiches_clients WHERE id=?", (cid,))
-    if not r:
-        return jsonify(ok=False, msg='Client introuvable')
-    d = request.json or {}
-    db_exec("""UPDATE fiches_clients SET nom=?,prenom=?,telephone=?,telephone2=?,email=?,
-        adresse=?,ville=?,quartier=?,activite=?,secteur=?,commercial_attitre=?,
-        plafond_credit=?,delai_paiement=?,observations=?,actif=?,modifie_le=datetime('now')
-        WHERE id=?""",
-        (d.get('nom', ''), d.get('prenom', ''), d.get('telephone', ''), d.get('telephone2', ''),
-         d.get('email', ''), d.get('adresse', ''), d.get('ville', ''), d.get('quartier', ''),
-         d.get('activite', ''), d.get('secteur', ''), d.get('commercial_attitre', ''),
-         float(d.get('plafond_credit', 0) or 0), int(d.get('delai_paiement', 30) or 30),
-         d.get('observations', ''), 1 if d.get('actif', 1) else 0, cid))
-    audit(session['username'], 'commercial', 'MAJ_CLIENT', 'Client id=%s' % cid)
-    return jsonify(ok=True, msg='Client mis a jour')
-
-
-# ── Objectifs commerciaux ─────────────────────────────────────────────────────
-@bp.route('/api/commercial/objectifs', methods=['GET', 'POST'])
-@login_required
-def api_objectifs():
-    uid = session['user_id']
-
-    if request.method == 'POST':
-        if not _peut(uid, 'objectifs', 'ecrire'):
-            return jsonify(ok=False, msg='Acces refuse'), 403
-        d = request.json or {}
-        if not d.get('commercial') or not d.get('periode'):
-            return jsonify(ok=False, msg='Commercial et periode requis')
-        db_exec("""INSERT INTO objectifs_commerciaux
-            (commercial,periode,objectif_ca,objectif_recouvrement,objectif_nb_clients)
-            VALUES(?,?,?,?,?)
-            ON CONFLICT(commercial,periode) DO UPDATE SET
-                objectif_ca=excluded.objectif_ca,
-                objectif_recouvrement=excluded.objectif_recouvrement,
-                objectif_nb_clients=excluded.objectif_nb_clients""",
-            (d.get('commercial', ''), d.get('periode', ''),
-             float(d.get('objectif_ca', 0) or 0), float(d.get('objectif_recouvrement', 0) or 0),
-             int(d.get('objectif_nb_clients', 0) or 0)))
-        audit(session['username'], 'commercial', 'MAJ_OBJECTIF',
-              'Commercial=%s Periode=%s' % (d.get('commercial', ''), d.get('periode', '')))
-        return jsonify(ok=True, msg='Objectif enregistre')
-
-    if not _peut(uid, 'objectifs', 'lire'):
-        return jsonify(ok=False, msg='Acces refuse'), 403
-    return jsonify(ok=True, data=db_all(
-        "SELECT * FROM objectifs_commerciaux ORDER BY periode DESC, commercial"))
-
-
-# ── Suivi des ventes ──────────────────────────────────────────────────────────
-@bp.route('/api/commercial/ventes')
-@login_required
-def api_ventes():
-    uid = session['user_id']
-    if not _peut(uid, 'suivi_ventes', 'lire'):
-        return jsonify(ok=False, msg='Acces refuse'), 403
-    return jsonify(ok=True, data=get_ventes(
-        date_debut=request.args.get('date_debut', ''),
-        date_fin=request.args.get('date_fin', ''),
-        code_client=request.args.get('code_client', '')))
-
-
-# ── Previsions de commandes ────────────────────────────────────────────────────
-@bp.route('/api/commercial/previsions')
-@login_required
-def api_previsions():
-    uid = session['user_id']
-    if not _peut(uid, 'previsions', 'lire'):
-        return jsonify(ok=False, msg='Acces refuse'), 403
-
-    depuis = (date.today() - timedelta(days=365)).isoformat()
-    ventes = get_ventes(date_debut=depuis)
-
-    par_client = {}
-    for v in ventes:
-        cc = v.get('code_client')
-        if not cc:
-            continue
-        d_str = str(v.get('date_facture') or '')[:10]
-        if not d_str:
-            continue
-        par_client.setdefault(cc, {'nom': v.get('client_nom', ''), 'dates': []})
-        par_client[cc]['dates'].append(d_str)
-
-    today = date.today()
-    previsions = []
-    for cc, info in par_client.items():
-        dates = sorted(set(info['dates']))
-        nb_commandes = len(dates)
-        if nb_commandes < 2:
-            continue
-        intervals = []
-        for i in range(1, len(dates)):
-            d1 = date.fromisoformat(dates[i - 1])
-            d2 = date.fromisoformat(dates[i])
-            intervals.append((d2 - d1).days)
-        frequence_jours = round(sum(intervals) / len(intervals))
-        if frequence_jours <= 0:
-            continue
-        derniere = date.fromisoformat(dates[-1])
-        jours_restants = frequence_jours - (today - derniere).days
-        previsions.append({
-            'code_client': cc,
-            'client_nom': info['nom'],
-            'nb_commandes': nb_commandes,
-            'frequence_jours': frequence_jours,
-            'derniere_commande': dates[-1],
-            'jours_restants': jours_restants,
+def api_classement():
+    force = request.args.get('force','0')=='1'
+    debut, fin = _periode_from_request()
+    data  = _load_data(force=force, period_args=request.args)
+    if not data:
+        return jsonify({'ok':True,'classement':[],'message':'Sage/Excel non disponible'})
+    com_f = _get_user_filter()
+    cl    = data['classement']
+    if com_f:
+        cl = [r for r in cl if r['commercial']==com_f]
+    cl = _filter_by_agence_if_needed(cl, 'commercial')
+    # Serialiser
+    out = []
+    for r in cl:
+        out.append({
+            'rang':        r['rang'],
+            'commercial':  r['commercial'],
+            'ca':          round(r['ca'],2),
+            'objectif':    round(r['objectif'],2),
+            'pct_obj':     round(r['pct_obj']*100,1),
+            'recouvrement':round(r['recouvrement'],2),
+            'taux_rec':    round(r['taux_rec']*100,1),
+            'fns':         round(r['fns'],2),
+            'nb_retard':   r['nb_retard'],
+            'score':       round(r['score']*100,1),
+            'risque':      round(r.get('risque',0)*100,1),
         })
+    return jsonify({'ok':True,'classement':out,'nb':len(out),
+                    'source':data.get('source',''),
+                    'period_label': data.get('period_label',''),
+                    'periode': {'debut': str(debut), 'fin': str(fin)}})
 
-    previsions.sort(key=lambda p: p['jours_restants'])
-    return jsonify(ok=True, data=previsions)
+
+# ── Cockpit d'un commercial ───────────────────────────────────────────────────
+
+@bp.route('/api/commercial/cockpit')
+@login_required
+def api_cockpit():
+    com   = request.args.get('commercial','').strip()
+    force = request.args.get('force','0')=='1'
+    debut, fin = _periode_from_request()
+    if not com:
+        return jsonify({'ok':False,'msg':'commercial manquant'})
+    # RBAC: un commercial ne peut voir que son propre cockpit
+    u = get_user()
+    if u.get('role') == 'commercial' and u.get('commercial_name') and com != u['commercial_name']:
+        return jsonify({'ok':False,'msg':'Acces non autorise a ce cockpit'})
+    if u.get('role') == 'agence' and u.get('agence'):
+        from core.commercial_engine import _norm
+        ag_coms = _get_agence_commerciaux(u['agence'])
+        if ag_coms and _norm(com) not in ag_coms:
+            return jsonify({'ok':False,'msg':'Acces non autorise a ce cockpit'})
+    data = _load_data(force=force, period_args=request.args)
+    if not data:
+        return jsonify({'ok':True,'kpis':{},'message':'Sage/Excel non disponible'})
+    from core.commercial_engine import (build_cockpit_com, client_statut,
+                                        _com_cockpit, _is_vt,
+                                        build_copilote_quotidien,
+                                        build_grand_livre_commercial)
+    kd = build_cockpit_com(com, data)
+
+    # ── Copilote quotidien : objectif du MOIS DE LA PERIODE SELECTIONNEE ──
+    # Regle metier : sans la periode explicite, le copilote (objectif mensuel,
+    # progression du jour) et le cockpit principal (CA realise sur la periode)
+    # affichent des chiffres incoherents car calcules sur des fenetres de
+    # temps differentes. Les deux doivent utiliser la meme reference de mois.
+    today_dt    = fin if isinstance(fin, _date) else _date.today()
+    periode_str = today_dt.strftime('%Y-%m')
+    obj_row     = db_one(
+        "SELECT objectif_ca FROM objectifs_commerciaux WHERE commercial=? AND periode=?",
+        (com, periode_str))
+    if obj_row and obj_row.get('objectif_ca'):
+        objectif_mensuel = obj_row['objectif_ca']
+    else:
+        objectif_mensuel = (kd.get('obj', 0) or 0) / 12.0
+    copilote = build_copilote_quotidien(com, data['all_rows'], objectif_mensuel, today=today_dt)
+
+    # Top clients avec statut
+    ref      = data['ref']
+    top_codes= [x['code'] for x in kd['top_clients']]
+    cre_map  = {c['code']:c for c in data['creances'] if _com_cockpit(c.get('commercial',''))==com}
+    top_enrich = []
+    for code in top_codes:
+        c   = cre_map.get(code,{})
+        lbl,col,ico,action = client_statut(c)
+        top_enrich.append({
+            'code':    code,
+            'nom':     ref.get(code,{}).get('nom',code),
+            'zone':    ref.get(code,{}).get('zone',''),
+            'ca':      round(next((x['ca'] for x in kd['top_clients'] if x['code']==code),0),2),
+            'statut':  lbl,
+            'couleur': col,
+            'icone':   ico,
+            'action':  action,
+            'fns':     round(c.get('fns',0),2),
+            'retard':  c.get('retard',0),
+            'solde':   round(c.get('solde',0),2),
+            'telephone': ref.get(code,{}).get('telephone',''),
+        })
+    # Creances de ce commercial
+    creances_com = [c for c in data['creances'] if _com_cockpit(c.get('commercial',''))==com]
+
+    # ── Grand Livre filtre sur le portefeuille du commercial (distinct du ──
+    # Grand Livre general de Comptabilite — meme structure 16 colonnes) ──
+    gl_com = build_grand_livre_commercial(data.get('grand', []), com)
+    gl_out = [{
+        'code': r['code'], 'nom': r['nom'], 'zone': r.get('zone',''),
+        'date': str(r['date']) if r['date'] else '', 'journal': r['journal'],
+        'piece': r['piece'], 'libelle': r['libelle'],
+        'debit': round(r['debit'],2), 'credit': round(r['credit'],2),
+        'solde_d': round(r['solde_d'],2), 'solde_c': round(r['solde_c'],2),
+        'statut': r['statut'], 'ouvert': round(r['ouvert'],2),
+        'echeance': str(r['echeance']) if r['echeance'] else '',
+        'retard': r['retard'], 'type': r['type'], 'is_total': r['is_total'],
+    } for r in gl_com[:500]]
+    return jsonify({
+        'ok':          True,
+        'commercial':  com,
+        'kpis': {
+            'ca':           round(kd['ca'],2),
+            'obj':          round(kd['obj'],2),
+            'pct_obj':      round(kd['pct_obj'],1),
+            'recouvrement': round(kd['recouvrement'],2),
+            'fns':          round(kd['fns'],2),
+            'solde':        round(kd['solde'],2),
+            'nb_retard':    kd['nb_retard'],
+            'nb_clients':   kd['nb_clients'],
+            'mdp':          round(kd['mdp'],2),
+            'taux_rec':     round(kd['taux_rec'],1),
+            'taux_risque':  round(kd['taux_risque'],1),
+            'nb_fac':       kd['nb_fac'],
+            'ca_comptant':  round(kd['ca_comptant'],2),
+            'ca_terme':     round(kd['ca_terme'],2),
+        },
+        'copilote':    copilote,
+        'daily':       copilote['historique_7j'],
+        'top_clients': top_enrich,
+        'creances':    creances_com,
+        'grand_livre': gl_out,
+        'mouvements':  gl_out,
+        'source':      data.get('source',''),
+        'periode':     {'debut': str(debut), 'fin': str(fin)},
+    })
 
 
-# ── Analyse du chiffre d'affaires ───────────────────────────────────────────────
+# ── Tendances ─────────────────────────────────────────────────────────────────
+
+@bp.route('/api/commercial/tendances')
+@login_required
+def api_tendances():
+    gran  = request.args.get('granularite','mensuel')
+    vue   = request.args.get('vue','CA')
+    com   = request.args.get('commercial','')
+    force = request.args.get('force','0')=='1'
+    data  = _load_data(force=force)
+    if not data:
+        return jsonify({'ok':True,'periodes':[],'message':'Sage/Excel non disponible'})
+    from core.commercial_engine import build_tendances, _com_cockpit
+    all_rows = data.get('all_rows', data.get('raw',[]))
+    if com:
+        all_rows = [r for r in all_rows
+                    if r.get('com_vente')==com or _com_cockpit(r.get('commercial',''))==com]
+    result = build_tendances(all_rows, granularite=gran)
+    # Vue demandee
+    if vue == 'CA':
+        periodes = result['ca']
+    elif vue == 'Recouvrement':
+        periodes = result['recouvrement']
+    else:
+        periodes = result['creances']
+    return jsonify({'ok':True,'periodes':periodes,'granularite':gran,'vue':vue,
+                    'source':data.get('source',''),
+                    'all_periodes': result['periodes']})
+
+
+# ── Analyse CA avec periodes (sélecteur universel) ────────────────────────────
+
 @bp.route('/api/commercial/analyse-ca')
 @login_required
 def api_analyse_ca():
-    uid = session['user_id']
-    if not _peut(uid, 'analyse_commerc', 'lire'):
-        return jsonify(ok=False, msg='Acces refuse'), 403
+    debut_s = request.args.get('debut','')
+    fin_s   = request.args.get('fin','')
+    force   = request.args.get('force','0')=='1'
+    # Charger les donnees completes (pas de periode appliquee a la source)
+    # puis filtrer une seule fois sur la vraie periode demandee, pour eviter
+    # le double-filtrage incoherent (periode par defaut de _load_data PUIS
+    # filtre date ici).
+    data  = _load_data(force=force)
+    if not data:
+        return jsonify({'ok':True,'total_ca':0,'nb_factures':0,
+                        'message':'Sage/Excel non disponible'})
+    rows = data.get('all_rows', data['raw'])
+    if debut_s:
+        try:
+            from datetime import datetime as dt
+            d1 = dt.strptime(debut_s,'%Y-%m-%d').date()
+            rows = [r for r in rows if r.get('date') and r['date']>=d1]
+        except Exception: pass
+    if fin_s:
+        try:
+            from datetime import datetime as dt
+            d2 = dt.strptime(fin_s,'%Y-%m-%d').date()
+            rows = [r for r in rows if r.get('date') and r['date']<=d2]
+        except Exception: pass
+    from core.commercial_engine import _annotate
+    _annotate(rows)
+    com_f = _get_user_filter()
+    if com_f:
+        rows = [r for r in rows if r.get('com_vente')==com_f]
+    total_ca = sum(r.get('ca_amount',0) for r in rows)
+    nb_fac   = sum(1 for r in rows if r.get('ca_amount',0)>0)
+    return jsonify({'ok':True,'total_ca':round(total_ca,2),
+                    'nb_factures':nb_fac,'debut':debut_s,'fin':fin_s,
+                    'source':data.get('source','')})
 
-    granularite = request.args.get('granularite', 'jour')
-    if granularite == 'semaine':
-        nb_jours = 84
-    elif granularite == 'mois':
-        nb_jours = 365
-    else:
-        granularite = 'jour'
-        nb_jours = 30
 
-    fin = date.today()
-    debut = fin - timedelta(days=nb_jours - 1)
-    debut_n1 = debut - timedelta(days=365)
-    fin_n1 = fin - timedelta(days=365)
+# ── Annees disponibles ────────────────────────────────────────────────────────
 
-    ventes = get_ventes(date_debut=debut.isoformat(), date_fin=fin.isoformat())
-    ventes_n1 = get_ventes(date_debut=debut_n1.isoformat(), date_fin=fin_n1.isoformat())
+@bp.route('/api/commercial/years')
+@login_required
+def api_years():
+    data = _load_data()
+    if not data: return jsonify({'ok':True,'years':[]})
+    return jsonify({'ok':True,'years':data.get('years',[])})
 
-    data = _ca_par_periode(ventes, granularite)
-    data_n1 = _ca_par_periode(ventes_n1, granularite)
 
-    ca_total = sum(p['ca'] for p in data)
-    ca_total_n1 = sum(p['ca'] for p in data_n1)
+# ── Clients ───────────────────────────────────────────────────────────────────
 
-    top_clients = _top_clients(ventes, 10)
-    top_clients_n1 = _top_clients(ventes_n1, 10)
-    top10_total = sum(c['total'] for c in top_clients)
-    top10_total_n1 = sum(c['total'] for c in top_clients_n1)
+@bp.route('/api/commercial/clients', methods=['GET','POST'])
+@login_required
+def api_clients():
+    if request.method == 'POST':
+        d    = request.get_json() or {}
+        code = d.get('code_client','').strip()
+        nom  = d.get('nom','').strip()
+        if not code or not nom:
+            return jsonify({'ok':False,'msg':'Code et nom obligatoires'})
+        db_exec(
+            "INSERT OR REPLACE INTO fiches_clients(code_client,nom,prenom,telephone,"
+            "telephone2,email,adresse,ville,secteur,commercial_attitree,"
+            "plafond_credit,delai_paiement) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            (code,nom,d.get('prenom',''),d.get('telephone',''),
+             d.get('telephone2',''),d.get('email',''),d.get('adresse',''),
+             d.get('ville',''),d.get('secteur',''),d.get('commercial_attitree',''),
+             float(d.get('plafond_credit',0)),int(d.get('delai_paiement',30))))
+        return jsonify({'ok':True})
+    q   = request.args.get('q','')
+    sql = "SELECT * FROM fiches_clients WHERE actif=1"
+    p   = []
+    if q:
+        sql += " AND (nom LIKE ? OR code_client LIKE ? OR telephone LIKE ?)"
+        p   += ['%'+q+'%','%'+q+'%','%'+q+'%']
+    sql += " ORDER BY nom LIMIT 100"
+    return jsonify({'ok':True,'clients':db_all(sql,p)})
 
-    return jsonify(ok=True, granularite=granularite, data=data, data_n1=data_n1,
-                    ca_total=round(ca_total, 2), ca_total_n1=round(ca_total_n1, 2),
-                    top_clients=top_clients,
-                    top10_progression=round(top10_total - top10_total_n1, 2))
+
+# ── Objectifs ─────────────────────────────────────────────────────────────────
+
+@bp.route('/api/commercial/objectifs', methods=['GET','POST'])
+@login_required
+def api_objectifs():
+    if request.method == 'POST':
+        d = request.get_json() or {}
+        db_exec(
+            "INSERT OR REPLACE INTO objectifs_commerciaux(commercial,periode,"
+            "objectif_ca,objectif_recouvrement,objectif_nb_clients) VALUES(?,?,?,?,?)",
+            (d.get('commercial',''),d.get('periode',''),
+             float(d.get('objectif_ca',0)),float(d.get('objectif_recouvrement',0)),
+             int(d.get('objectif_nb_clients',0))))
+        return jsonify({'ok':True})
+    return jsonify({'ok':True,'objectifs':db_all(
+        "SELECT * FROM objectifs_commerciaux ORDER BY periode DESC")})
+
+# compatibilite ancienne route
+from datetime import date

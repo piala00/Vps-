@@ -1,61 +1,38 @@
 {% extends "base.html" %}
-
 {% block sidebar %}
-<button class="nav-item active" onclick="nav('consolidation-dashboard')" data-nav="consolidation-dashboard">🏆 Vue Globale Reseau</button>
-{% endblock %}
-
-{% block content %}
-
-<!-- ════════════ VUE GLOBALE RESEAU ════════════ -->
-<div id="s-consolidation-dashboard" class="section active">
-  <div class="section-title">🏆 Consolidation — Vue Globale Reseau</div>
-
-  <div class="card">
-    <div class="frow">
-      <div class="fgroup">
-        <label>Periode</label>
-        <select id="con-granularite" onchange="conChargerDashboard()">
-          <option value="jour">Aujourd'hui</option>
-          <option value="semaine">Cette semaine</option>
-          <option value="mois" selected>Ce mois</option>
-          <option value="mois_precedent">Mois precedent</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="kpi-grid">
-    <div class="kpi-card k-gold">
-      <div class="kico">💰</div>
-      <div class="kval" id="kpi-ca-total">—</div>
-      <div class="klabel">CA consolide reseau</div>
-    </div>
-    <div class="kpi-card k-blue">
-      <div class="kico">📅</div>
-      <div class="kval" id="kpi-ca-total-n1">—</div>
-      <div class="klabel">CA periode N-1</div>
-    </div>
-    <div class="kpi-card k-green">
-      <div class="kico">📈</div>
-      <div class="kval" id="kpi-variation">—</div>
-      <div class="klabel">Variation vs N-1</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Contribution par agence</div>
-    <div class="tbl-wrap" style="margin-top:8px">
-      <table>
-        <thead>
-          <tr>
-            <th>Agence</th><th>Ville</th><th>Type</th><th>CA periode</th>
-            <th>CA N-1</th><th>Variation</th><th>% Contribution</th>
-          </tr>
-        </thead>
-        <tbody id="con-tbody"></tbody>
-      </table>
-    </div>
+<div class="nav-group">
+  <button class="nav-group-btn open" onclick="toggleGroup(this)"><span>🏆</span> Consolidation <span class="arrow">▶</span></button>
+  <div class="nav-group-children open">
+    <button class="nav-item-sub active" onclick="navSub(this,'cons-global')" data-nav="cons-global">🏆 Vue Globale</button>
+    <button class="nav-item-sub" onclick="navSub(this,'cons-stock')" data-nav="cons-stock">🌐 Stock Reseau</button>
   </div>
 </div>
-
+{% endblock %}
+{% block content %}
+<div id="s-cons-global" class="section active">
+  <div class="section-title">🏆 Vue Globale Reseau</div>
+  <div class="card"><div class="frow">
+    <div class="fgroup"><label>Periode</label>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-outline btn-sm" data-per="jour" onclick="setPeriode('cons-periode','jour',chargerCons)">Aujourd'hui</button>
+        <button class="btn btn-outline btn-sm" data-per="semaine" onclick="setPeriode('cons-periode','semaine',chargerCons)">Semaine</button>
+        <button class="btn btn-navy btn-sm" data-per="mois" onclick="setPeriode('cons-periode','mois',chargerCons)">Ce mois</button>
+        <button class="btn btn-outline btn-sm" data-per="mois-1" onclick="setPeriode('cons-periode','mois-1',chargerCons)">Mois prec.</button>
+      </div>
+      <input type="hidden" id="cons-periode" value="mois">
+    </div>
+    <button class="btn btn-navy" onclick="chargerCons()">🔄 Actualiser</button>
+  </div></div>
+  <div id="cons-kpis" class="kpi-grid" style="margin:12px 0"></div>
+  <div class="tbl-wrap"><table><thead><tr><th>Agence</th><th>CA Periode</th><th>Nb Factures</th><th>% Reseau</th></tr></thead>
+  <tbody id="cons-tbody"><tr><td colspan="4" class="tbl-empty">Cliquez Actualiser</td></tr></tbody></table></div>
+</div>
+<div id="s-cons-stock" class="section">
+  <div class="section-title">🌐 Stock Reseau</div>
+  <div class="card"><div class="frow">
+    <input type="text" id="cons-stock-q" placeholder="Reference ou designation..." style="width:280px">
+    <button class="btn btn-navy" onclick="rechercherStockReseau()">🔍 Chercher dans tout le reseau</button>
+  </div></div>
+  <div id="cons-stock-result" style="margin-top:12px"></div>
+</div>
 {% endblock %}

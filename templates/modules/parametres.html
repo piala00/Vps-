@@ -1,421 +1,631 @@
 {% extends "base.html" %}
 
 {% block sidebar %}
-<button class="nav-item active" onclick="nav('parametres-dashboard')" data-nav="parametres-dashboard">🏠 Tableau de bord</button>
-
 <div class="nav-group">
   <button class="nav-group-btn open" onclick="toggleGroup(this)">
     <span>🔌</span> Connexions <span class="arrow">▶</span>
   </button>
   <div class="nav-group-children open">
-    <button class="nav-item-sub" onclick="navSub(this,'config-sage')" data-nav="config-sage">🔌 Connexion Sage</button>
-    <button class="nav-item-sub" onclick="navSub(this,'base-donnees')" data-nav="base-donnees">ℹ️ Etat de la base</button>
+    <button class="nav-item-sub active" data-nav="param-sage" onclick="navSub(this,'param-sage')">🔌 Sage SQL Server</button>
+    <button class="nav-item-sub" data-nav="param-config" onclick="navSub(this,'param-config')">⚙️ Source &amp; Config</button>
+    <button class="nav-item-sub" data-nav="param-bases" onclick="navSub(this,'param-bases')">🗄️ Bases de données</button>
   </div>
 </div>
-
 <div class="nav-group">
-  <button class="nav-group-btn open" onclick="toggleGroup(this)">
-    <span>🔐</span> Acces &amp; Securite <span class="arrow">▶</span>
+  <button class="nav-group-btn" onclick="toggleGroup(this)">
+    <span>📋</span> Référentiels <span class="arrow">▶</span>
   </button>
-  <div class="nav-group-children open">
-    <button class="nav-item-sub" onclick="navSub(this,'ip-whitelist')" data-nav="ip-whitelist">🛡️ Controle IP</button>
-    <button class="nav-item-sub" onclick="navSub(this,'audit')" data-nav="audit">📋 Journal d'audit</button>
+  <div class="nav-group-children">
+    <button class="nav-item-sub" data-nav="param-ref-clients" onclick="navSub(this,'param-ref-clients')">👥 Référentiel Clients</button>
+    <button class="nav-item-sub" data-nav="param-commerciaux" onclick="navSub(this,'param-commerciaux')">🏅 Commerciaux</button>
   </div>
 </div>
-
 <div class="nav-group">
-  <button class="nav-group-btn open" onclick="toggleGroup(this)">
+  <button class="nav-group-btn" onclick="toggleGroup(this)">
     <span>👤</span> Utilisateurs <span class="arrow">▶</span>
   </button>
-  <div class="nav-group-children open">
-    <button class="nav-item-sub" onclick="navSub(this,'utilisateurs')" data-nav="utilisateurs">👤 Comptes</button>
-    <button class="nav-item-sub" onclick="navSub(this,'droits')" data-nav="droits">🔑 Droits d'acces</button>
+  <div class="nav-group-children">
+    <button class="nav-item-sub" data-nav="param-users" onclick="navSub(this,'param-users')">👤 Utilisateurs</button>
+    <button class="nav-item-sub" data-nav="param-droits" onclick="navSub(this,'param-droits')">🔑 Droits d'accès</button>
   </div>
 </div>
-
-<button class="nav-item" onclick="nav('config-generale')" data-nav="config-generale">⚙️ Configuration generale</button>
-<button class="nav-item" onclick="nav('licence')" data-nav="licence">🪪 Licence</button>
-<button class="nav-item" onclick="nav('mon-compte')" data-nav="mon-compte">🔒 Mon compte</button>
+<div class="nav-group">
+  <button class="nav-group-btn" onclick="toggleGroup(this)">
+    <span>🔐</span> Accès &amp; Réseau <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children">
+    <button class="nav-item-sub" data-nav="param-reseau" onclick="navSub(this,'param-reseau')">🌐 Accès internet</button>
+    <button class="nav-item-sub" data-nav="param-ip" onclick="navSub(this,'param-ip')">🛡️ Contrôle IP</button>
+    <button class="nav-item-sub" data-nav="param-domaine" onclick="navSub(this,'param-domaine')">🌍 Domaine</button>
+    <button class="nav-item-sub" data-nav="param-vpn" onclick="navSub(this,'param-vpn')">🔐 VPN</button>
+  </div>
+</div>
+<button class="nav-item" data-nav="param-bot" onclick="nav('param-bot')" style="margin-top:4px">
+  <span class="ico">🤖</span> Bot Telegram
+</button>
+<button class="nav-item" data-nav="param-journal" onclick="nav('param-journal')" style="margin-top:4px">
+  <span class="ico">📋</span> Journal processus
+</button>
+<button class="nav-item" data-nav="param-compilation" onclick="nav('param-compilation')" style="margin-top:4px">
+  <span class="ico">📦</span> Compiler .exe
+</button>
+<button class="nav-item" data-nav="param-licence" onclick="nav('param-licence')" style="margin-top:4px">
+  <span class="ico">🪪</span> Licence
+</button>
 {% endblock %}
 
 {% block content %}
 
-<!-- ════════════ TABLEAU DE BORD ════════════ -->
-<div id="s-parametres-dashboard" class="section active">
-  <div class="section-title">🏠 Parametres — Tableau de bord</div>
-
-  <div class="kpi-grid" id="par-dash-kpis">
-    <div class="kpi-card">
-      <div class="kico">🏢</div>
-      <div class="kval" id="kpi-societe">—</div>
-      <div class="klabel">Societe</div>
-    </div>
-    <div class="kpi-card k-blue">
-      <div class="kico">📍</div>
-      <div class="kval" id="kpi-agence">—</div>
-      <div class="klabel">Agence locale</div>
-    </div>
-    <div class="kpi-card k-green">
-      <div class="kico">👤</div>
-      <div class="kval" id="kpi-utilisateurs">—</div>
-      <div class="klabel">Utilisateurs actifs</div>
-    </div>
-    <div class="kpi-card k-gold">
-      <div class="kico">🪪</div>
-      <div class="kval" id="kpi-licence">—</div>
-      <div class="klabel">Licence</div>
-    </div>
+<!-- ═══ SAGE SQL SERVER ══════════════════════════════════════════ -->
+<div id="s-param-sage" class="section active">
+  <div class="section-title">🔌 Connexion Sage SQL Server
+    <small>Lecture seule — Drivers ODBC auto + fallback TCP</small>
   </div>
-
   <div class="card">
-    <div class="card-title">Acces rapides</div>
-    <div class="shortcut-grid">
-      <div class="shortcut-btn" onclick="nav('config-generale')">
-        <div class="ico">⚙️</div>
-        Configuration generale
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=config-sage]').click()">
-        <div class="ico">🔌</div>
-        Connexion Sage
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=utilisateurs]').click()">
-        <div class="ico">👤</div>
-        Utilisateurs
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=droits]').click()">
-        <div class="ico">🔑</div>
-        Droits d'acces
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=ip-whitelist]').click()">
-        <div class="ico">🛡️</div>
-        Controle IP
-      </div>
-      <div class="shortcut-btn" onclick="nav('licence')">
-        <div class="ico">🪪</div>
-        Licence
-      </div>
+    <div class="alert alert-info">NEXORA essaie automatiquement tous les drivers ODBC disponibles et toutes les variantes de connexion. Une seule configuration suffit.</div>
+    <div class="form-grid" style="margin-top:12px">
+      <div class="fgroup"><label>Serveur SQL Server</label>
+        <input type="text" id="sage-srv" placeholder="Ex: GTCSVRDC01\SAGE100"></div>
+      <div class="fgroup"><label>Base de données Sage</label>
+        <input type="text" id="sage-db" placeholder="Ex: GTC 2026"></div>
+      <div class="fgroup"><label>Authentification</label>
+        <select id="sage-auth" onchange="toggleSageAuth()">
+          <option value="sql" selected>SQL Server (Login / Mot de passe)</option>
+          <option value="windows">Windows (Authentification intégrée)</option>
+        </select></div>
+      <div class="fgroup" id="sage-user-zone"><label>Utilisateur SQL</label>
+        <input type="text" id="sage-user" placeholder="sa"></div>
+      <div class="fgroup" id="sage-pwd-zone"><label>Mot de passe SQL</label>
+        <input type="password" id="sage-pwd"></div>
     </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-outline" onclick="testerSageRobuste()">🔍 Tester (diagnostic complet)</button>
+      <button class="btn btn-navy" onclick="sauvegarderSage()">💾 Sauvegarder</button>
+    </div>
+    <div id="sage-msg" style="margin-top:10px;font-size:12px;white-space:pre-line;
+      padding:10px;background:var(--bg);border-radius:8px;display:none;font-family:monospace"></div>
   </div>
 </div>
 
-<!-- ════════════ CONFIGURATION GENERALE ════════════ -->
-<div id="s-config-generale" class="section">
-  <div class="section-title">⚙️ Configuration generale</div>
+<!-- ═══ SOURCE & CONFIG ══════════════════════════════════════════ -->
+<div id="s-param-config" class="section">
+  <div class="section-title">⚙️ Source de données &amp; Configuration</div>
   <div class="card">
-    <div class="card-title">Identite de l'entreprise</div>
+    <div class="card-title">Source de données</div>
+    <div style="display:flex;gap:24px;margin-bottom:14px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+        <input type="radio" name="source" id="src-sql" value="sql" checked onchange="toggleSourceMode()">
+        SQL Server Sage 100 (temps réel)
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+        <input type="radio" name="source" id="src-excel" value="excel" onchange="toggleSourceMode()">
+        Fichier Excel (hors-ligne)
+      </label>
+    </div>
+    <div id="cfg-sql-zone">
+      <div class="alert alert-info">Source SQL Server — Configurez la connexion dans l'onglet "Sage SQL Server".</div>
+    </div>
+    <div id="cfg-excel-zone" style="display:none">
+      <div class="alert alert-info">En mode Excel, le Grand Livre (mouvements, factures) sera lu depuis la feuille IMPORT de ce fichier au lieu de Sage.</div>
+    </div>
+    <div class="fgroup" style="margin-top:14px">
+      <label>📂 Fichier Excel (Référentiel Clients + Commerciaux — et Grand Livre si mode Excel)</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="file" id="cfg-excel-file" accept=".xlsx,.xlsm" style="flex:1">
+        <button class="btn btn-navy" onclick="uploaderEtImporterExcel()">📥 Charger &amp; Importer</button>
+      </div>
+      <small style="color:var(--muted)">Le fichier doit contenir les feuilles REF_CLIENTS et LISTE_COMMERCIEAUX (et IMPORT si mode Excel actif).</small>
+      <div id="cfg-excel-current" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+
+      <button class="btn btn-gold" onclick="sauvegarderConfigGenerale()">💾 Enregistrer la configuration</button>
+    </div>
+    <div id="cfg-msg" style="margin-top:8px;font-size:12px"></div>
+  </div>
+</div>
+
+<!-- ═══ BASES DE DONNÉES ══════════════════════════════════════════ -->
+<div id="s-param-bases" class="section">
+  <div class="section-title">🗄️ Bases de Données</div>
+  <div class="card" style="border-left:4px solid var(--navy);margin-bottom:10px">
+    <h4 style="margin:0 0 6px;color:var(--navy)">🔌 Sage SQL Server <span class="badge b-info">LECTURE SEULE</span></h4>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Données comptables et commerciales GTC 2026</p>
+    <button class="btn btn-outline btn-sm" onclick="navSub(document.querySelector('[data-nav=param-sage]'),'param-sage')">→ Configurer</button>
+  </div>
+  <div class="card" style="border-left:4px solid var(--warn);margin-bottom:10px">
+    <h4 style="margin:0 0 4px;color:#D97706">💾 SQLite Locale <span class="badge b-ok">ACTIVE</span></h4>
+    <div id="sqlite-info-txt" style="font-size:11px;color:var(--muted);margin-bottom:8px">Chargement...</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm" onclick="chargerSQLiteInfo()">🔄</button>
+      <button class="btn btn-outline btn-sm" onclick="backupSQLite()">📁 Sauvegarder</button>
+    </div>
+    <div id="sqlite-msg" style="font-size:11px;margin-top:6px"></div>
+  </div>
+  <div class="card" style="border-left:4px solid #5B9BF0">
+    <h4 style="margin:0 0 6px;color:#5B9BF0">🗄️ Base Applicative — Création &amp; Configuration</h4>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:10px">
+      Base de données applicative NEXORA (SQLite local, réseau ou SQL Server).
+    </p>
     <div class="form-grid">
-      <div class="fgroup">
-        <label>Nom de la societe</label>
-        <input type="text" id="cg-societe-nom" placeholder="GTC Bertoua">
-      </div>
-      <div class="fgroup">
-        <label>Ville</label>
-        <input type="text" id="cg-societe-ville" placeholder="Bertoua">
-      </div>
-      <div class="fgroup">
-        <label>Agence locale (ce poste)</label>
-        <select id="cg-agence-locale">
-          <option value="BERTOUA">Bertoua (Siege)</option>
-          <option value="DOUALA">Douala</option>
-          <option value="YAOUNDE">Yaounde</option>
-          <option value="GAROUA_BOULAI">Garoua-Boulai</option>
-        </select>
-      </div>
-      <div class="fgroup">
-        <label>Depot Sage par defaut (F_DEPOT)</label>
-        <input type="number" id="cg-depot-defaut" placeholder="7">
-      </div>
+      <div class="fgroup"><label>Type</label>
+        <select id="app-db-type" onchange="onDbTypeChange()">
+          <option value="SQLite local">SQLite local (par défaut)</option>
+          <option value="SQLite réseau (chemin UNC)">SQLite réseau (chemin UNC \\...)</option>
+          <option value="SQL Server (pyodbc)">SQL Server (pyodbc)</option>
+        </select></div>
+      <div class="fgroup" id="app-db-path-zone" style="display:none"><label>Chemin / Serveur</label>
+        <input type="text" id="app-db-path" placeholder="Ex: \\SERVEUR\Partage\nexora.db ou localhost\SQLEXPRESS" style="font-family:monospace"></div>
+      <div class="fgroup" id="app-db-name-zone" style="display:none"><label>Nom de la base</label>
+        <input type="text" id="app-db-name" value="NEXORA_APP" placeholder="NEXORA_APP"></div>
     </div>
-    <div class="frow" style="margin-top:12px">
-      <button class="btn btn-navy" onclick="parametresSaveConfigGenerale()">💾 Enregistrer</button>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-outline btn-sm" onclick="testerAppDb()">🔍 Tester</button>
+      <button class="btn btn-navy btn-sm" onclick="creerAppDb()">🗄️ Créer / Initialiser</button>
     </div>
+    <div id="app-db-msg" style="font-size:12px;margin-top:8px;white-space:pre-line"></div>
   </div>
 </div>
 
-<!-- ════════════ CONNEXION SAGE ════════════ -->
-<div id="s-config-sage" class="section">
-  <div class="section-title">🔌 Connexion Sage 100</div>
-  <div class="alert alert-info">Connexion en LECTURE SEULE. Aucune ecriture n'est jamais effectuee sur Sage.</div>
-
+<!-- ═══ RÉFÉRENTIEL CLIENTS ══════════════════════════════════════ -->
+<div id="s-param-ref-clients" class="section">
+  <div class="section-title">👥 Référentiel Clients
+    <small>Zones · Commerciaux attitrés · Plafonds · Délais</small>
+  </div>
   <div class="card">
-    <div class="card-title">Parametres de connexion</div>
-    <div class="form-grid">
-      <div class="fgroup">
-        <label>Serveur SQL Server</label>
-        <input type="text" id="sg-server" placeholder="SERVEUR\SAGE100">
-      </div>
-      <div class="fgroup">
-        <label>Base de donnees</label>
-        <input type="text" id="sg-database" placeholder="GTC 2026">
-      </div>
-      <div class="fgroup">
-        <label>Identifiant SQL</label>
-        <input type="text" id="sg-login" placeholder="sa">
-      </div>
-      <div class="fgroup">
-        <label>Mot de passe SQL</label>
-        <input type="password" id="sg-password" placeholder="Laisser vide pour ne pas modifier">
-      </div>
+    <div class="alert alert-info" style="margin-bottom:10px">
+      Enrichit les données Sage avec les informations locales : zone, commercial attitré, plafond crédit.
     </div>
-    <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px">
-      <input type="checkbox" id="sg-trusted" style="width:auto">
-      <label for="sg-trusted" style="margin:0">Authentification Windows (Trusted Connection)</label>
-    </div>
-
-    <div class="frow" style="margin-top:8px">
-      <span id="sg-driver-info" class="badge b-muted">Pilote ODBC : —</span>
-    </div>
-
-    <div class="frow" style="margin-top:12px">
-      <button class="btn btn-outline" onclick="parametresTestSage()">🔍 Tester la connexion</button>
-      <button class="btn btn-navy" onclick="parametresSaveSage()">💾 Enregistrer</button>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ ETAT DE LA BASE ════════════ -->
-<div id="s-base-donnees" class="section">
-  <div class="section-title">ℹ️ Etat de la base de donnees</div>
-
-  <div class="kpi-grid">
-    <div class="kpi-card">
-      <div class="kico">💾</div>
-      <div class="kval" id="bd-taille">—</div>
-      <div class="klabel">Taille</div>
-    </div>
-    <div class="kpi-card k-blue">
-      <div class="kico">📋</div>
-      <div class="kval" id="bd-tables">—</div>
-      <div class="klabel">Tables</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">SQLite locale</div>
-    <p style="color:var(--muted);font-size:13px;word-break:break-all" id="bd-chemin">—</p>
-    <div class="frow" style="margin-top:8px">
-      <button class="btn btn-outline" onclick="parametresBackupDb()">💾 Sauvegarder maintenant</button>
-      <button class="btn btn-outline" onclick="parametresVacuumDb()">🧹 Optimiser (VACUUM)</button>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ CONTROLE IP ════════════ -->
-<div id="s-ip-whitelist" class="section">
-  <div class="section-title">🛡️ Controle d'acces par IP</div>
-  <div class="alert alert-info">Les adresses locales (127.0.0.1, ::1) sont toujours autorisees.</div>
-
-  <div class="card">
-    <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px">
-      <input type="checkbox" id="ip-active" style="width:auto" onchange="parametresSaveIpActive()">
-      <label for="ip-active" style="margin:0">Activer la liste blanche IP</label>
-    </div>
-
-    <div class="frow" style="margin-top:12px">
-      <div class="fgroup" style="flex:1">
-        <label>Adresse IP ou plage CIDR</label>
-        <input type="text" id="ip-nouvelle" placeholder="192.168.1.10 ou 192.168.1.0/24">
-      </div>
-      <button class="btn btn-navy" style="align-self:flex-end" onclick="parametresAjouterIp()">➕ Ajouter</button>
-    </div>
-
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead><tr><th>Adresse IP / Plage</th><th style="width:90px">Actions</th></tr></thead>
-        <tbody id="ip-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ JOURNAL D'AUDIT ════════════ -->
-<div id="s-audit" class="section">
-  <div class="section-title">📋 Journal d'audit</div>
-  <div class="card">
-    <div class="card-title">100 dernieres operations</div>
-    <div class="tbl-wrap">
-      <table>
-        <thead>
-          <tr><th>Date</th><th>Utilisateur</th><th>Module</th><th>Action</th><th>Detail</th><th>IP</th></tr>
-        </thead>
-        <tbody id="audit-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ UTILISATEURS ════════════ -->
-<div id="s-utilisateurs" class="section">
-  <div class="section-title">👤 Utilisateurs</div>
-
-  <div class="card">
-    <div class="frow" style="justify-content:space-between">
-      <div class="card-title" style="margin:0">Comptes</div>
-      <button class="btn btn-navy" onclick="parametresOuvrirUtilisateur(null)">➕ Nouvel utilisateur</button>
-    </div>
-    <div class="tbl-wrap" style="margin-top:8px">
-      <table>
-        <thead>
-          <tr>
-            <th>Identifiant</th><th>Nom</th><th>Prenom</th><th>Email</th>
-            <th>Telephone</th><th>Agence</th><th>Statut</th><th style="width:170px">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="users-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- Modal utilisateur -->
-<div class="modal" id="modal-utilisateur">
-  <div class="modal-box">
-    <div class="modal-title">
-      <span id="mu-titre">Nouvel utilisateur</span>
-      <button class="modal-close" onclick="fermerModal('modal-utilisateur')">✕</button>
-    </div>
-    <input type="hidden" id="mu-id">
-    <div class="form-grid">
-      <div class="fgroup">
-        <label>Identifiant</label>
-        <input type="text" id="mu-username">
-      </div>
-      <div class="fgroup">
-        <label>Nom</label>
-        <input type="text" id="mu-nom">
-      </div>
-      <div class="fgroup">
-        <label>Prenom</label>
-        <input type="text" id="mu-prenom">
-      </div>
-      <div class="fgroup">
-        <label>Email</label>
-        <input type="email" id="mu-email">
-      </div>
-      <div class="fgroup">
-        <label>Telephone</label>
-        <input type="text" id="mu-telephone">
-      </div>
-      <div class="fgroup">
-        <label>Agence</label>
-        <select id="mu-agence">
-          <option value="BERTOUA">Bertoua (Siege)</option>
-          <option value="DOUALA">Douala</option>
-          <option value="YAOUNDE">Yaounde</option>
-          <option value="GAROUA_BOULAI">Garoua-Boulai</option>
-        </select>
-      </div>
-      <div class="fgroup">
-        <label>Mot de passe</label>
-        <input type="password" id="mu-password" placeholder="Laisser vide pour ne pas modifier">
-      </div>
-      <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px;margin-top:24px">
-        <input type="checkbox" id="mu-actif" style="width:auto" checked>
-        <label for="mu-actif" style="margin:0">Compte actif</label>
-      </div>
-    </div>
-    <div class="frow" style="justify-content:flex-end;margin-top:12px">
-      <button class="btn btn-outline" onclick="fermerModal('modal-utilisateur')">Annuler</button>
-      <button class="btn btn-navy" onclick="parametresSauverUtilisateur()">💾 Enregistrer</button>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ DROITS D'ACCES ════════════ -->
-<div id="s-droits" class="section">
-  <div class="section-title">🔑 Droits d'acces</div>
-
-  <div class="card">
-    <div class="form-grid">
-      <div class="fgroup">
-        <label>Utilisateur</label>
-        <select id="dr-utilisateur" onchange="parametresChargerDroits()"></select>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="frow" style="justify-content:space-between">
-      <div class="card-title" style="margin:0">Matrice des permissions</div>
-      <div class="frow">
-        <button class="btn btn-outline btn-sm" onclick="parametresDroitsTout(true)">✅ Tout autoriser</button>
-        <button class="btn btn-outline btn-sm" onclick="parametresDroitsTout(false)">⛔ Tout revoquer</button>
-        <button class="btn btn-gold btn-sm" onclick="parametresAppliquerDroits()">💾 Appliquer &amp; Sauvegarder</button>
-      </div>
-    </div>
-    <div id="dr-matrice" style="margin-top:12px"></div>
-  </div>
-</div>
-
-<!-- ════════════ LICENCE ════════════ -->
-<div id="s-licence" class="section">
-  <div class="section-title">🪪 Licence NEXORA</div>
-
-  <div class="kpi-grid" id="lic-kpis">
-    <div class="kpi-card">
-      <div class="kico">🪪</div>
-      <div class="kval" id="lic-statut">—</div>
-      <div class="klabel">Statut</div>
-    </div>
-    <div class="kpi-card k-blue">
-      <div class="kico">🏢</div>
-      <div class="kval" id="lic-societe">—</div>
-      <div class="klabel">Societe</div>
-    </div>
-    <div class="kpi-card k-gold">
-      <div class="kico">📅</div>
-      <div class="kval" id="lic-expiration">—</div>
-      <div class="klabel">Expiration</div>
-    </div>
-    <div class="kpi-card k-green">
-      <div class="kico">🖥️</div>
-      <div class="kval" id="lic-postes">—</div>
-      <div class="klabel">Postes autorises</div>
-    </div>
-  </div>
-
-  <div class="card" id="lic-demo-card" style="display:none">
-    <div class="alert alert-warn">Mode demonstration actif — <span id="lic-demo-jours">30</span> jour(s) restant(s).</div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Activer une licence</div>
     <div class="frow">
-      <div class="fgroup" style="flex:1">
-        <label>Numero de serie</label>
-        <input type="text" id="lic-numero" placeholder="NXR1-XXXX-XXXX-XXXX-XXXX">
-      </div>
+      <input type="text" id="ref-search" placeholder="Code ou nom client..." style="width:220px" oninput="chargerRefClients()">
+      <button class="btn btn-gold" onclick="ouvrirNouveauRefClient()">+ Ajouter</button>
+      <button class="btn btn-navy" onclick="chargerRefClients()">🔄</button>
     </div>
-    <div class="frow" style="margin-top:8px">
-      <button class="btn btn-outline" onclick="parametresVerifierLicence()">🔍 Verifier</button>
-      <button class="btn btn-navy" onclick="parametresActiverLicence()">✅ Activer</button>
-      <button class="btn btn-danger" onclick="parametresDesactiverLicence()">🗑️ Desactiver la licence</button>
+    <div class="frow" style="margin-top:10px;align-items:center">
+      <label style="font-size:12px;color:var(--muted);white-space:nowrap">📥 Importer depuis Excel (REF_CLIENTS + LISTE_COMMERCIEAUX) :</label>
+      <input type="file" id="ref-excel-file" accept=".xlsx,.xlsm" style="flex:1;min-width:180px">
+      <button class="btn btn-outline" onclick="uploaderEtImporterExcel('ref-excel-file','ref-import-msg')">Charger &amp; Importer</button>
     </div>
-    <div id="lic-modules" style="margin-top:12px"></div>
+    <div id="ref-import-msg" style="font-size:12px;margin-top:6px"></div>
+  </div>
+  <div class="tbl-wrap">
+    <table><thead><tr><th>Code</th><th>Nom</th><th>Zone</th><th>Commercial</th><th>Plafond</th><th>Délai</th><th>Téléphone</th><th>Actions</th></tr></thead>
+    <tbody id="ref-tbody"><tr><td colspan="8" class="tbl-empty">Chargement...</td></tr></tbody></table>
   </div>
 </div>
 
-<!-- ════════════ MON COMPTE ════════════ -->
-<div id="s-mon-compte" class="section">
-  <div class="section-title">🔒 Mon compte</div>
+<!-- ═══ COMMERCIAUX ══════════════════════════════════════════════ -->
+<div id="s-param-commerciaux" class="section">
+  <div class="section-title">🏅 Commerciaux &amp; Objectifs
+    <small>Noms officiels utilisés dans tout NEXORA</small>
+  </div>
   <div class="card">
-    <div class="card-title">Changer mon mot de passe</div>
+    <div class="alert alert-info" style="margin-bottom:10px">
+      Ces noms sont utilisés dans tous les modules (Commercial, Comptabilité, Consolidation...) pour mapper les données Sage.
+    </div>
+    <div class="frow">
+      <button class="btn btn-gold" onclick="ouvrirModal('modal-commercial')">+ Ajouter</button>
+      <button class="btn btn-navy" onclick="chargerCommerciaux()">🔄</button>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table><thead><tr><th>Nom officiel</th><th>Objectif CA (FCFA)</th><th>Ordre</th><th>Actions</th></tr></thead>
+    <tbody id="com-tbody"><tr><td colspan="4" class="tbl-empty">Chargement...</td></tr></tbody></table>
+  </div>
+</div>
+
+<!-- ═══ UTILISATEURS ══════════════════════════════════════════════ -->
+<div id="s-param-users" class="section">
+  <div class="section-title">👤 Gestion des Utilisateurs</div>
+  <div class="card">
+    <div class="frow">
+      <button class="btn btn-gold" onclick="ouvrirNouvelUser()">+ Nouvel utilisateur</button>
+      <button class="btn btn-navy" onclick="chargerUsers()">🔄 Actualiser</button>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table><thead><tr>
+      <th>Login</th><th>Nom</th><th>Rôle</th><th>Poste</th><th>Agence</th><th>Commercial</th><th>Telegram ID</th><th>Statut</th><th>Actions</th>
+    </tr></thead>
+    <tbody id="users-tbody"><tr><td colspan="9" class="tbl-empty">Chargement...</td></tr></tbody></table>
+  </div>
+</div>
+
+<!-- ═══ DROITS D'ACCÈS ════════════════════════════════════════════ -->
+<div id="s-param-droits" class="section">
+  <div class="section-title">🔑 Droits d'accès par module</div>
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup"><label>Utilisateur</label>
+        <select id="droits-user-sel" style="width:240px" onchange="chargerDroitsUser()">
+          <option value="">-- Choisir --</option>
+        </select></div>
+    </div>
+  </div>
+  <div id="droits-zone" style="display:none">
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <strong id="droits-user-nom">Utilisateur</strong>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" onclick="toutCocher(true)">Tout cocher</button>
+          <button class="btn btn-outline btn-sm" onclick="toutCocher(false)">Tout décocher</button>
+        </div>
+      </div>
+      <div id="droits-modules-list" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;padding:14px;background:rgba(251,192,19,.08);border:2px solid var(--gold);border-radius:10px">
+      <div style="flex:1">
+        <strong style="color:var(--navy)">💾 Appliquer les modifications</strong>
+        <p style="font-size:11px;color:var(--muted);margin:2px 0 0">Les droits ne sont pas sauvegardés tant que vous n'avez pas cliqué sur ce bouton.</p>
+      </div>
+      <button class="btn btn-gold" style="white-space:nowrap;padding:12px 24px" onclick="appliquerDroitsDetail()">✅ Appliquer</button>
+    </div>
+    <div id="droits-msg" style="margin-top:8px;font-size:12px"></div>
+  </div>
+</div>
+
+<!-- ═══ ACCÈS INTERNET ════════════════════════════════════════════ -->
+<div id="s-param-reseau" class="section">
+  <div class="section-title">🌐 Accès Internet</div>
+  <div class="card">
+    <div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px">
+      <h4 style="margin:0 0 4px">☁️ Cloudflare Tunnel <span class="badge b-ok">GRATUIT — Recommandé</span></h4>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:8px">HTTPS sans ouvrir de port</p>
+      <div id="cf-zone" style="display:none">
+        <input type="text" id="cf-token" placeholder="Token Cloudflare..." style="width:100%;font-family:monospace;margin-bottom:8px">
+        <button class="btn btn-navy btn-sm" onclick="demarrerCF()">▶ Activer</button>
+        <button class="btn btn-outline btn-sm" onclick="arreterCF()">⏹ Désactiver</button>
+      </div>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="toggleZone('cf-zone')">⚙ Configurer</button>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:8px;padding:14px">
+      <h4 style="margin:0 0 4px">🚇 ngrok <span class="badge b-warn">FREEMIUM</span></h4>
+      <div id="ngrok-zone" style="display:none">
+        <input type="text" id="ngrok-token" placeholder="Token ngrok..." style="width:100%;font-family:monospace;margin-bottom:8px">
+        <button class="btn btn-navy btn-sm" onclick="demarrerNgrok()">▶ Démarrer</button>
+      </div>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="toggleZone('ngrok-zone')">⚙ Configurer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CONTRÔLE IP ══════════════════════════════════════════════ -->
+<div id="s-param-ip" class="section">
+  <div class="section-title">🛡️ Contrôle IP</div>
+  <div class="card">
+    <div class="alert alert-warn" style="margin-bottom:10px">Activez uniquement pour restreindre l'accès à certaines IPs.</div>
+    <div id="ip-liste" style="margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="ip-nouvelle" placeholder="192.168.1.100" style="width:200px">
+      <button class="btn btn-navy" onclick="ajouterIP()">+ Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DOMAINE ══════════════════════════════════════════════════ -->
+<div id="s-param-domaine" class="section">
+  <div class="section-title">🌍 Nom de Domaine</div>
+  <div class="card">
     <div class="form-grid">
-      <div class="fgroup">
-        <label>Ancien mot de passe</label>
-        <input type="password" id="mc-ancien">
+      <div class="fgroup"><label>Domaine</label><input type="text" id="dom-principal" placeholder="gtcbertoua.com" oninput="previewDomaine()"></div>
+      <div class="fgroup"><label>Sous-domaine</label><input type="text" id="dom-sous" placeholder="erp"></div>
+      <div class="fgroup"><label>Mode</label>
+        <select id="dom-mode">
+          <option value="local">Réseau local (LAN)</option>
+          <option value="tunnel">Cloudflare Tunnel</option>
+          <option value="vpn">Via VPN</option>
+          <option value="direct">IP publique directe</option>
+        </select></div>
+      <div class="fgroup"><label>Port</label><input type="number" id="dom-port" value="5050" style="width:100px"></div>
+    </div>
+    <div id="dom-preview" style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px;font-family:monospace;font-size:12px"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-navy" onclick="testerDomaine()">🔍 Tester</button>
+      <button class="btn btn-gold" onclick="sauvegarderDomaine()">💾 Enregistrer</button>
+    </div>
+    <div id="dom-msg" style="font-size:12px;margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- ═══ VPN ══════════════════════════════════════════════════════ -->
+<div id="s-param-vpn" class="section">
+  <div class="section-title">🔐 VPN</div>
+  <div class="card">
+    <div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px">
+      <h4 style="margin:0 0 4px">⚡ WireGuard <span class="badge b-info">Recommandé</span></h4>
+      <div id="wg-zone" style="display:none">
+        <textarea id="wg-conf" style="width:100%;height:80px;font-family:monospace;font-size:11px;padding:8px;border:2px solid var(--border);border-radius:6px" placeholder="[Interface]&#10;PrivateKey = ..."></textarea>
+        <button class="btn btn-navy btn-sm" style="margin-top:6px" onclick="sauvegarderWG()">💾 Sauvegarder</button>
       </div>
-      <div class="fgroup">
-        <label>Nouveau mot de passe</label>
-        <input type="password" id="mc-nouveau">
+      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="toggleZone('wg-zone')">⚙ Configurer</button>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:8px;padding:14px">
+      <h4 style="margin:0 0 4px">🔒 OpenVPN</h4>
+      <div id="ovpn-zone" style="display:none">
+        <textarea id="ovpn-conf" style="width:100%;height:70px;font-family:monospace;font-size:11px;padding:8px;border:2px solid var(--border);border-radius:6px" placeholder="client&#10;dev tun..."></textarea>
+        <button class="btn btn-navy btn-sm" style="margin-top:6px" onclick="sauvegarderOVPN()">💾 Sauvegarder</button>
       </div>
-      <div class="fgroup">
-        <label>Confirmer le nouveau mot de passe</label>
-        <input type="password" id="mc-confirmation">
+      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="toggleZone('ovpn-zone')">⚙ Configurer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BOT TELEGRAM ══════════════════════════════════════════════ -->
+<div id="s-param-bot" class="section">
+  <div class="section-title">🤖 Bot Telegram
+    <small>Alertes automatiques — tous les modules peuvent envoyer des notifications</small>
+  </div>
+  <div class="card">
+    <div class="alert alert-info" style="margin-bottom:12px">
+      Le bot Telegram est partagé par tous les modules NEXORA.
+      Créez un bot via @BotFather. Liez chaque utilisateur à son Telegram ID dans l'onglet Utilisateurs.
+    </div>
+    <div class="form-grid">
+      <div class="fgroup" style="grid-column:1/-1"><label>Token du Bot (@BotFather)</label>
+        <input type="text" id="bot-token" placeholder="1234567890:AAxxxxxxxxxxxxxxxxxxxxxxx" style="font-family:monospace"></div>
+      <div class="fgroup" style="grid-column:1/-1"><label>IDs Administrateurs Telegram</label>
+        <input type="text" id="bot-admins" placeholder="123456789, 987654321" style="font-family:monospace">
+        <small style="color:var(--muted)">Séparés par virgule. Obtenez votre ID via @userinfobot</small></div>
+      <div class="fgroup"><label>Snapshot automatique toutes les</label>
+        <select id="bot-snap-heure" style="width:140px">
+          <option value="1">1 heure</option>
+          <option value="2">2 heures</option>
+          <option value="6" selected>6 heures</option>
+          <option value="12">12 heures</option>
+          <option value="24">24 heures</option>
+        </select></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-navy" onclick="sauvegarderBotConfig()">💾 Sauvegarder config Bot</button>
+      <button class="btn btn-outline" onclick="testerBot()">📤 Envoyer message test</button>
+      <button class="btn btn-gold" onclick="demarrerBot()">🤖 Démarrer Bot maintenant</button>
+      <button class="btn btn-outline" onclick="arreterBot()">⏹ Arrêter Bot</button>
+      <button class="btn btn-outline" onclick="chargerStatutBot()">🔄 Statut</button>
+      <button class="btn btn-outline" onclick="snapshotBotManuel()">📸 Snapshot manuel (KPIs/Classement/Créances)</button>
+    </div>
+    <div id="bot-msg" style="margin-top:8px;font-size:12px"></div>
+    <div id="bot-statut" style="margin-top:8px;font-size:12px;font-weight:700"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 Commandes disponibles dans le bot</div>
+    <div style="font-family:monospace;font-size:12px;line-height:2.2;color:var(--text);padding:8px;background:var(--bg);border-radius:8px">
+      /start &nbsp;&nbsp;&nbsp;→ Message de bienvenue + menu selon votre rôle<br>
+      /situation → Vue globale CA/Recouvrement/Créances (managers)<br>
+      /classement → Classement des commerciaux (managers)<br>
+      /cockpit &nbsp;→ Tableau de bord adapté à votre rôle (tous)<br>
+      /creances &nbsp;→ Analyse détaillée des créances (managers)<br>
+      /alertes &nbsp;→ Centre d'alertes (managers)<br>
+      /analyse &nbsp;→ Analyse comparative (direction uniquement)<br>
+      /inscription → Demander un accès si non enregistré<br>
+      /aide &nbsp;&nbsp;&nbsp;&nbsp;→ Liste des commandes selon votre rôle
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📥 Demandes d'inscription en attente</div>
+    <div class="frow" style="margin-bottom:8px">
+      <button class="btn btn-outline btn-sm" onclick="chargerInscriptionsBot()">🔄 Actualiser</button>
+    </div>
+    <div class="tbl-wrap">
+      <table><thead><tr><th>Telegram</th><th>Nom</th><th>Poste</th><th>Agence</th><th>Statut</th><th>Actions</th></tr></thead>
+      <tbody id="bot-insc-tbody"><tr><td colspan="6" class="tbl-empty">Chargement...</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📜 Journal d'activité du bot</div>
+    <div id="bot-log" style="font-family:monospace;font-size:11px;line-height:1.8;color:#8BA3CC;
+      background:#0C1526;border-radius:8px;padding:10px;max-height:240px;overflow-y:auto">
+      Cliquez Statut pour charger.
+    </div>
+  </div>
+</div>
+
+<!-- ═══ JOURNAL DE PROCESSUS ══════════════════════════════════════ -->
+<div id="s-param-journal" class="section">
+  <div class="section-title">📋 Journal de Processus
+    <small>Historique des opérations NEXORA en temps réel</small>
+  </div>
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup"><label>Limite</label>
+        <select id="journal-limite" style="width:100px" onchange="chargerJournal()">
+          <option value="50">50</option>
+          <option value="100" selected>100</option>
+          <option value="200">200</option>
+          <option value="500">500</option>
+        </select></div>
+      <button class="btn btn-navy" onclick="chargerJournal()">🔄 Actualiser</button>
+      <button class="btn btn-outline" onclick="effacerJournal()">🗑 Effacer</button>
+    </div>
+  </div>
+  <div style="background:#0C1526;border-radius:10px;padding:12px;max-height:300px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.7">
+    <div id="journal-content" style="color:#8BA3CC">Cliquez Actualiser...</div>
+  </div>
+
+  <div class="section-title" style="margin-top:20px">🔌 Journal Connexion Sage
+    <small>Diagnostic en temps reel — voir exactement ou bloque le chargement</small>
+  </div>
+  <div class="card">
+    <div class="alert alert-info" style="margin-bottom:10px">
+      Si un module reste bloque en "chargement", actualisez ce journal pour voir quel driver/serveur/encodage echoue et pourquoi.
+    </div>
+    <div id="sage-derniere-co" style="font-size:12px;margin-bottom:8px;font-weight:700"></div>
+    <div class="frow">
+      <button class="btn btn-navy" onclick="chargerJournalSage()">🔄 Actualiser</button>
+      <button class="btn btn-outline" onclick="effacerJournalSage()">🗑 Effacer</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-left:8px">
+        <input type="checkbox" id="sage-journal-auto" onchange="toggleAutoRefreshSage()"> Auto-actualiser (5s)
+      </label>
+    </div>
+  </div>
+  <div style="background:#0C1526;border-radius:10px;padding:12px;max-height:300px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.7">
+    <div id="sage-journal-content" style="color:#8BA3CC">Cliquez Actualiser...</div>
+  </div>
+</div>
+
+<!-- ═══ COMPILER .EXE ══════════════════════════════════════════════ -->
+<div id="s-param-compilation" class="section">
+  <div class="section-title">📦 Compiler NEXORA en exécutable (.exe)</div>
+  <div class="card" style="border:2px solid var(--gold)">
+    <div class="alert alert-info" style="margin-bottom:12px">
+      Crée un fichier NEXORA.exe autonome. Il peut être copié sur n'importe quel PC Windows sans installer Python.
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      Prérequis : Python 3.8+ installé sur ce poste.<br>
+      Durée : 2 à 5 minutes selon la vitesse du PC.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="installerPyInstaller()">
+        ⚙️ Installer PyInstaller
+      </button>
+      <button class="btn btn-gold" onclick="compilerExe()">
+        🔨 Compiler NEXORA en .exe
+      </button>
+    </div>
+    <div id="compile-msg" style="margin-top:12px;font-size:12px;white-space:pre-line;
+      padding:10px;background:var(--bg);border-radius:8px"></div>
+  </div>
+</div>
+
+<!-- ═══ LICENCE ══════════════════════════════════════════════════ -->
+<div id="s-param-licence" class="section">
+  <div class="section-title">🪪 Licence Logicielle NEXORA</div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div id="lic-statut-info"><span style="color:var(--muted)">Chargement...</span></div>
+      <span id="lic-statut-badge" class="badge b-muted">-</span>
+    </div>
+    <div id="lic-details" style="display:none;margin-top:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+        <div><span style="color:var(--muted)">Société :</span> <strong id="lic-nom-soc">-</strong></div>
+        <div><span style="color:var(--muted)">Postes :</span> <strong id="lic-postes">-</strong></div>
+        <div><span style="color:var(--muted)">Expiration :</span> <strong id="lic-exp">-</strong></div>
+      </div>
+      <div style="margin-top:10px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:700">Modules autorisés</div>
+        <div id="lic-modules-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
       </div>
     </div>
-    <div class="frow" style="margin-top:12px">
-      <button class="btn btn-navy" onclick="parametresChangerPassword()">💾 Changer le mot de passe</button>
+  </div>
+  <div class="card">
+    <div class="card-title">🔑 Activer / Renouveler</div>
+    <div class="fgroup" style="margin-bottom:10px"><label>Numéro de série</label>
+      <input type="text" id="lic-serial-input" placeholder="NXR1-XXXX-XXXX-XXXX..."
+        style="font-family:monospace;font-size:14px;text-transform:uppercase"
+        oninput="this.value=this.value.toUpperCase()"></div>
+    <div id="lic-preview" style="display:none;margin-bottom:10px;padding:10px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.3);border-radius:8px">
+      <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">✅ Numéro valide</div>
+      <div style="font-size:11px" id="lic-preview-detail"></div>
+    </div>
+    <div id="lic-preview-err" style="display:none;margin-bottom:10px;padding:10px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.3);border-radius:8px;font-size:12px;color:var(--red)"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" onclick="verifierLicence()">🔍 Vérifier</button>
+      <button class="btn btn-gold" style="flex:1" onclick="activerLicence()">✅ Activer cette licence</button>
+    </div>
+    <div id="lic-activation-msg" style="margin-top:8px;font-size:12px"></div>
+  </div>
+</div>
+
+<!-- ═══ MODALS ════════════════════════════════════════════════════ -->
+
+<!-- Modal Référentiel Client -->
+<div class="modal-overlay" id="modal-ref-client">
+  <div class="modal">
+    <h3>Référentiel client</h3>
+    <div class="form-grid">
+      <div class="fgroup"><label>Code client Sage *</label>
+        <input type="text" id="rc-code" placeholder="CT_Num" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+      <div class="fgroup"><label>Nom</label><input type="text" id="rc-nom"></div>
+      <div class="fgroup"><label>Zone géographique</label><input type="text" id="rc-zone" placeholder="CENTRE, NORD..."></div>
+      <div class="fgroup"><label>Commercial attitré</label><input type="text" id="rc-com" placeholder="Nom exact"></div>
+      <div class="fgroup"><label>Plafond crédit (FCFA)</label><input type="number" id="rc-plafond" placeholder="0"></div>
+      <div class="fgroup"><label>Délai paiement (jours)</label><input type="number" id="rc-delai" value="30"></div>
+      <div class="fgroup" style="grid-column:1/-1"><label>Téléphone</label><input type="text" id="rc-tel"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fermerModal('modal-ref-client');document.getElementById('rc-code').readOnly=false">Annuler</button>
+      <button class="btn btn-navy" onclick="sauvegarderRefClient()">💾 Sauvegarder</button>
+    </div>
+    <div id="rc-msg" style="font-size:12px;margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- Modal Commercial -->
+<div class="modal-overlay" id="modal-commercial">
+  <div class="modal">
+    <h3>Commercial</h3>
+    <div class="form-grid">
+      <div class="fgroup" style="grid-column:1/-1"><label>Nom officiel *</label>
+        <input type="text" id="mc-nom" placeholder="Nom exact tel qu'il apparaît dans Sage"></div>
+      <div class="fgroup"><label>Objectif CA annuel (FCFA)</label><input type="number" id="mc-obj" placeholder="0"></div>
+      <div class="fgroup"><label>Ordre d'affichage</label><input type="number" id="mc-ordre" value="0"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fermerModal('modal-commercial')">Annuler</button>
+      <button class="btn btn-gold" onclick="sauvegarderCommercial()">💾 Sauvegarder</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Utilisateur (complet avec tous les champs) -->
+<div class="modal-overlay" id="modal-user">
+  <div class="modal" style="max-width:650px;width:95%">
+    <h3 id="modal-user-titre">Nouvel utilisateur</h3>
+    <input type="hidden" id="u-id">
+    <div class="form-grid">
+      <div class="fgroup"><label>Login *</label><input type="text" id="u-login" placeholder="identifiant"></div>
+      <div class="fgroup"><label>Nom *</label><input type="text" id="u-nom" placeholder="Nom"></div>
+      <div class="fgroup"><label>Prénom</label><input type="text" id="u-prenom" placeholder="Prénom"></div>
+      <div class="fgroup"><label>Rôle</label>
+        <select id="u-role">
+          <option value="admin">Administrateur</option>
+          <option value="direction">Direction</option>
+          <option value="financier">Financier</option>
+          <option value="agence">Responsable Agence</option>
+          <option value="commercial" selected>Commercial</option>
+          <option value="comptable">Comptable</option>
+          <option value="logistique">Logistique</option>
+          <option value="viewer">Lecteur seul</option>
+        </select></div>
+      <div class="fgroup"><label>Agence</label>
+        <select id="u-agence">
+          <option value="Direction generale">Direction Generale</option>
+          <option value="BERTOUA">Bertoua (Siège)</option>
+          <option value="DOUALA">Douala</option>
+          <option value="YAOUNDE">Yaoundé</option>
+          <option value="BAFOUSSAM">Bafoussam</option>
+          <option value="GAROUA-BOULAI">Garoua-Boulaï</option>
+          <option value="BATOURI">Batouri</option>
+          <option value="ABONG-MBANG">Abong-Mbang</option>
+        </select></div>
+      <div class="fgroup"><label>Poste</label>
+        <select id="u-poste">
+          <option value="">-- Choisir --</option>
+          <option value="PDG">PDG</option>
+          <option value="DG - Directeur General">DG - Directeur Général</option>
+          <option value="DC - Directeur Commercial">DC - Directeur Commercial</option>
+          <option value="Chef Comptable">Chef Comptable</option>
+          <option value="Comptable">Comptable</option>
+          <option value="Auditeur">Auditeur</option>
+          <option value="Chef d'agence">Chef d'agence</option>
+          <option value="Comptable agence">Comptable agence</option>
+          <option value="Commercial">Commercial</option>
+        </select></div>
+      <div class="fgroup"><label>Catégorie</label><input type="text" id="u-categorie" placeholder="Ex: SENIOR"></div>
+      <div class="fgroup"><label>Nom Commercial (lien Sage)</label>
+        <input type="text" id="u-comname" placeholder="Nom exact dans Sage"></div>
+      <div class="fgroup"><label>Telegram ID</label>
+        <input type="text" id="u-tgid" placeholder="Ex: 6259313068" style="font-family:monospace"></div>
+      <div class="fgroup"><label>Mot de passe</label>
+        <input type="password" id="u-pwd" placeholder="(vide = sans mdp)"></div>
+      <div class="fgroup"><label>Confirmer mdp</label>
+        <input type="password" id="u-pwd2" placeholder="Confirmer"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fermerModal('modal-user');document.getElementById('u-id').value='';document.getElementById('u-login').readOnly=false;document.getElementById('modal-user-titre').textContent='Nouvel utilisateur'">Annuler</button>
+      <button class="btn btn-navy" onclick="creerUser()">💾 Enregistrer</button>
     </div>
   </div>
 </div>

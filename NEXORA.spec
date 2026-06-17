@@ -15,7 +15,7 @@ a = Analysis(
     ],
     hiddenimports=[
         'flask', 'jinja2', 'werkzeug', 'click',
-        'pyodbc', 'openpyxl', 'reportlab', 'sqlite3',
+        'pyodbc', 'openpyxl', 'sqlite3', 'telegram',
         'modules.stock.routes',
         'modules.logistique.routes',
         'modules.commercial.routes',

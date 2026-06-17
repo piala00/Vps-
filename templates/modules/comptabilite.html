@@ -1,325 +1,254 @@
 {% extends "base.html" %}
 
 {% block sidebar %}
-<button class="nav-item active" onclick="nav('comptabilite-dashboard')" data-nav="comptabilite-dashboard">🏠 Tableau de bord</button>
+<button class="nav-item active" data-nav="compta-dashboard"
+  onclick="nav('compta-dashboard')">
+  <span class="ico">🏠</span> Tableau de bord
+</button>
 
 <div class="nav-group">
   <button class="nav-group-btn open" onclick="toggleGroup(this)">
-    <span>📊</span> Creances <span class="arrow">▶</span>
+    <span>📒</span> Grand Livre <span class="arrow">▶</span>
   </button>
   <div class="nav-group-children open">
-    <button class="nav-item-sub" onclick="navSub(this,'balance-agee')" data-nav="balance-agee">📊 Balance Agee</button>
-    <button class="nav-item-sub" onclick="navSub(this,'grand-livre-clients')" data-nav="grand-livre-clients">📒 Grand Livre Clients</button>
-    <button class="nav-item-sub" onclick="navSub(this,'paiements')" data-nav="paiements">💳 Paiements</button>
-    <button class="nav-item-sub" onclick="navSub(this,'evolution-creances')" data-nav="evolution-creances">📈 Evolution Creances</button>
+    <button class="nav-item-sub active" data-nav="gl-vue"
+      onclick="navSub(this,'gl-vue')">📒 Grand Livre Client</button>
   </div>
 </div>
 
-<button class="nav-item" onclick="nav('rapport-caisse')" data-nav="rapport-caisse">🏪 Rapport de Caisse</button>
+<div class="nav-group">
+  <button class="nav-group-btn" onclick="toggleGroup(this)">
+    <span>📋</span> Créances <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children">
+    <button class="nav-item-sub" data-nav="cr-global"
+      onclick="navSub(this,'cr-global')">📋 Global</button>
+    <button class="nav-item-sub" data-nav="cr-aging"
+      onclick="navSub(this,'cr-aging')">⏰ Aging (tranches)</button>
+    <button class="nav-item-sub" data-nav="cr-zones"
+      onclick="navSub(this,'cr-zones')">🗺️ Par Zones</button>
+    <button class="nav-item-sub" data-nav="cr-commerciaux"
+      onclick="navSub(this,'cr-commerciaux')">👤 Par Commerciaux</button>
+    <button class="nav-item-sub" data-nav="cr-clients"
+      onclick="navSub(this,'cr-clients')">👥 Par Clients (FNS)</button>
+    <button class="nav-item-sub" data-nav="cr-priorite"
+      onclick="navSub(this,'cr-priorite')">🚨 Priorité</button>
+  </div>
+</div>
+
+<button class="nav-item" data-nav="compta-caisse"
+  onclick="nav('compta-caisse')" style="margin-top:6px">
+  <span class="ico">🏪</span> Rapport de Caisse
+</button>
 {% endblock %}
 
 {% block content %}
 
-<!-- ════════════ TABLEAU DE BORD ════════════ -->
-<div id="s-comptabilite-dashboard" class="section active">
-  <div class="section-title">🏠 Comptabilite — Tableau de bord</div>
-
-  <div class="kpi-grid">
-    <div class="kpi-card k-red">
-      <div class="kico">💰</div>
-      <div class="kval" id="kpi-creances-totales">—</div>
-      <div class="klabel">Creances totales</div>
-    </div>
-    <div class="kpi-card k-blue">
-      <div class="kico">👥</div>
-      <div class="kval" id="kpi-nb-debiteurs">—</div>
-      <div class="klabel">Clients debiteurs</div>
-    </div>
-    <div class="kpi-card k-red">
-      <div class="kico">🔥</div>
-      <div class="kval" id="kpi-creances-critiques">—</div>
-      <div class="klabel">Creances critiques (&gt;500K)</div>
-    </div>
-    <div class="kpi-card k-warn">
-      <div class="kico">⚠️</div>
-      <div class="kval" id="kpi-creances-elevees">—</div>
-      <div class="klabel">Creances elevees (&gt;200K)</div>
-    </div>
-    <div class="kpi-card k-green">
-      <div class="kico">💵</div>
-      <div class="kval" id="kpi-encaisse-mois">—</div>
-      <div class="klabel">Encaisse ce mois (rapports)</div>
-    </div>
-    <div class="kpi-card k-gold">
-      <div class="kico">🏪</div>
-      <div class="kval" id="kpi-rapports-brouillon">—</div>
-      <div class="klabel">Rapports de caisse en brouillon</div>
+<!-- ═══ DASHBOARD ═══════════════════════════════════════════════ -->
+<div id="s-compta-dashboard" class="section active">
+  <div class="section-title">🏠 Comptabilité &amp; Finance — Tableau de bord</div>
+  <div id="compta-kpis" class="kpi-grid"></div>
+  <div class="card">
+    <div class="card-title">⚡ Accès rapide</div>
+    <div class="shortcuts-grid">
+      <button class="shortcut-btn" onclick="navSub(document.querySelector('[data-nav=gl-vue]'),'gl-vue')">
+        <span style="font-size:22px">📒</span><span>Grand Livre</span>
+      </button>
+      <button class="shortcut-btn" onclick="navSub(document.querySelector('[data-nav=cr-global]'),'cr-global')">
+        <span style="font-size:22px">📋</span><span>Créances Global</span>
+      </button>
+      <button class="shortcut-btn" onclick="navSub(document.querySelector('[data-nav=cr-aging]'),'cr-aging')">
+        <span style="font-size:22px">⏰</span><span>Aging</span>
+      </button>
+      <button class="shortcut-btn" onclick="navSub(document.querySelector('[data-nav=cr-priorite]'),'cr-priorite')">
+        <span style="font-size:22px">🚨</span><span>Priorité</span>
+      </button>
     </div>
   </div>
-
   <div class="card">
-    <div class="card-title">Tendance des creances</div>
-    <p>Evolution par rapport a hier : <span id="cpta-tendance">—</span></p>
-    <p style="color:var(--muted);font-size:13px">Si la courbe monte, attention : ventes a credit non encaissees. Si elle descend, les clients paient.</p>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Acces rapides</div>
-    <div class="shortcut-grid">
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=balance-agee]').click()">
-        <div class="ico">📊</div>
-        Balance Agee
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=grand-livre-clients]').click()">
-        <div class="ico">📒</div>
-        Grand Livre Clients
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=paiements]').click()">
-        <div class="ico">💳</div>
-        Paiements
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=evolution-creances]').click()">
-        <div class="ico">📈</div>
-        Evolution Creances
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=rapport-caisse]').click()">
-        <div class="ico">🏪</div>
-        Rapport de Caisse
-      </div>
-    </div>
+    <div class="alert alert-info">Les données proviennent de Sage SQL Server en temps réel via la requête Grand Livre.</div>
   </div>
 </div>
 
-<!-- ════════════ BALANCE AGEE ════════════ -->
-<div id="s-balance-agee" class="section">
-  <div class="section-title">📊 Balance Agee des Creances Clients</div>
-  <div class="alert alert-info">Solde des comptes clients depuis Sage, classes par niveau de risque : CRITIQUE (&gt;500K), ELEVE (&gt;200K), MOYEN (&gt;50K), FAIBLE.</div>
+<!-- ═══ GRAND LIVRE ══════════════════════════════════════════════ -->
+<div id="s-gl-vue" class="section">
+  <div class="section-title">📒 Grand Livre Client</div>
 
   <div class="card">
-    <div class="tbl-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Code Client</th><th>Nom</th><th>Telephone</th>
-            <th>Total Debit</th><th>Total Credit</th><th>Solde</th><th>Risque</th>
-          </tr>
-        </thead>
-        <tbody id="bal-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ GRAND LIVRE CLIENTS ════════════ -->
-<div id="s-grand-livre-clients" class="section">
-  <div class="section-title">📒 Grand Livre Clients (Sage)</div>
-
-  <div class="card">
-    <div class="form-grid">
-      <div class="fgroup">
-        <label>Client</label>
-        <select id="gl-client"></select>
-      </div>
-      <div class="fgroup">
-        <label>Date debut</label>
-        <input type="date" id="gl-date-debut">
-      </div>
-      <div class="fgroup">
-        <label>Date fin</label>
-        <input type="date" id="gl-date-fin">
-      </div>
-      <div class="fgroup" style="flex-direction:row;align-items:flex-end">
-        <button class="btn btn-navy" onclick="cptaChargerGrandLivre()">🔍 Afficher</button>
-      </div>
-    </div>
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead>
-          <tr><th>Date</th><th>Journal</th><th>Piece</th><th>Libelle</th><th>Debit</th><th>Credit</th></tr>
-        </thead>
-        <tbody id="gl-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ PAIEMENTS ════════════ -->
-<div id="s-paiements" class="section">
-  <div class="section-title">💳 Suivi des Paiements (Sage F_DOCREGL)</div>
-
-  <div class="card">
-    <div class="form-grid">
-      <div class="fgroup">
-        <label>Client</label>
-        <select id="pai-client"><option value="">— Tous les clients —</option></select>
-      </div>
-      <div class="fgroup">
-        <label>Date debut</label>
-        <input type="date" id="pai-date-debut">
-      </div>
-      <div class="fgroup">
-        <label>Date fin</label>
-        <input type="date" id="pai-date-fin">
-      </div>
-      <div class="fgroup" style="flex-direction:row;align-items:flex-end">
-        <button class="btn btn-navy" onclick="cptaChargerPaiements()">🔍 Afficher</button>
-      </div>
-    </div>
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead>
-          <tr><th>Date</th><th>Code Client</th><th>Client</th><th>Montant</th><th>Mode</th><th>Reference</th><th>Piece</th></tr>
-        </thead>
-        <tbody id="pai-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ EVOLUTION CREANCES ════════════ -->
-<div id="s-evolution-creances" class="section">
-  <div class="section-title">📈 Evolution des Creances</div>
-  <div class="alert alert-info">Courbe de la creance globale ou d'un client donne, jour par jour. Une hausse signale des ventes a credit non encaissees.</div>
-
-  <div class="card">
-    <div class="form-grid">
-      <div class="fgroup">
-        <label>Client (vide = global)</label>
-        <select id="evo-client"><option value="">— Toutes les creances —</option></select>
-      </div>
-      <div class="fgroup">
-        <label>Periode</label>
-        <select id="evo-jours">
-          <option value="30">30 jours</option>
-          <option value="60">60 jours</option>
-          <option value="90">90 jours</option>
-          <option value="180">180 jours</option>
-        </select>
-      </div>
-      <div class="fgroup" style="flex-direction:row;align-items:flex-end">
-        <button class="btn btn-navy" onclick="cptaChargerEvolution()">🔍 Afficher</button>
-      </div>
-    </div>
-
-    <div class="kpi-grid" style="margin-top:12px">
-      <div class="kpi-card k-blue">
-        <div class="kico">📅</div>
-        <div class="kval" id="evo-valeur-debut">—</div>
-        <div class="klabel">Valeur en debut de periode</div>
-      </div>
-      <div class="kpi-card k-gold">
-        <div class="kico">📍</div>
-        <div class="kval" id="evo-valeur-fin">—</div>
-        <div class="klabel">Valeur actuelle</div>
-      </div>
-      <div class="kpi-card k-warn">
-        <div class="kico">⚖️</div>
-        <div class="kval" id="evo-variation">—</div>
-        <div class="klabel">Variation</div>
-      </div>
-    </div>
-
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead><tr><th>Date</th><th>Valeur</th></tr></thead>
-        <tbody id="evo-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ RAPPORT DE CAISSE ════════════ -->
-<div id="s-rapport-caisse" class="section">
-  <div class="section-title">🏪 Rapport de Caisse</div>
-
-  <div class="card">
-    <div class="card-title">Nouveau rapport journalier</div>
-    <div class="form-grid">
-      <div class="fgroup">
-        <label>Date</label>
-        <input type="date" id="rc-date">
-      </div>
+    <div class="frow">
+      <input type="text" id="gl-search" placeholder="Client, facture, commercial..."
+        style="width:260px" oninput="filtrerGL()">
       <div class="fgroup">
         <label>Commercial</label>
-        <input type="text" id="rc-commercial" placeholder="Nom du commercial">
+        <select id="gl-com-fil" style="width:180px" onchange="filtrerGL()">
+          <option value="">Tous</option>
+        </select>
       </div>
       <div class="fgroup">
-        <label>Agence</label>
-        <input type="text" id="rc-agence" value="BERTOUA">
+        <label>Type</label>
+        <select id="gl-type-fil" style="width:130px" onchange="filtrerGL()">
+          <option value="">Tous</option>
+          <option value="FACTURE">Facture</option>
+          <option value="REGLEMENT">Règlement</option>
+          <option value="AVOIR">Avoir</option>
+          <option value="RETOUR">Retour</option>
+          <option value="REPORT">Report (RAN)</option>
+        </select>
       </div>
-      <div class="fgroup">
-        <label>Total Ventes (FCFA)</label>
-        <input type="number" id="rc-total-ventes" step="0.01" value="0">
-      </div>
-      <div class="fgroup">
-        <label>Total Encaisse (FCFA)</label>
-        <input type="number" id="rc-total-encaisse" step="0.01" value="0">
-      </div>
-      <div class="fgroup">
-        <label>Total Credit (FCFA)</label>
-        <input type="number" id="rc-total-credit" step="0.01" value="0">
-      </div>
-      <div class="fgroup" style="flex:1">
-        <label>Observations</label>
-        <input type="text" id="rc-observations" placeholder="Optionnel">
-      </div>
+      <button class="btn btn-navy" onclick="chargerGL()">🔄 Charger</button>
+      <button class="btn btn-outline" onclick="chargerGL(true)">↺ Forcer</button>
     </div>
-
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead>
-          <tr>
-            <th>No Facture</th><th>Code Client</th><th>Client</th>
-            <th style="width:120px">Mt. Facture</th><th style="width:120px">Mt. Encaisse</th>
-            <th style="width:130px">Mode</th><th>Observations</th><th style="width:50px"></th>
-          </tr>
-        </thead>
-        <tbody id="rcn-lignes-tbody"></tbody>
-      </table>
-    </div>
-
-    <div class="frow" style="justify-content:space-between;margin-top:12px">
-      <button class="btn btn-outline" onclick="cptaAjouterLigneCaisse('rcn-lignes-tbody')">➕ Ajouter une ligne</button>
-      <button class="btn btn-navy" onclick="cptaSoumettreRapportCaisse()">💾 Enregistrer le rapport</button>
-    </div>
+    <div id="gl-totaux" style="font-size:12px;color:var(--gold);margin-top:8px;font-weight:700"></div>
   </div>
 
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th><th>Nom Client</th><th>Date</th><th>Jnl</th>
+          <th>Pièce</th><th>Libellé</th>
+          <th>Débit</th><th>Crédit</th>
+          <th>Solde D</th><th>Solde C</th>
+          <th>Statut</th><th>Non Soldé</th>
+          <th>Échéance</th><th>J.Ret.</th>
+          <th>Commercial</th><th>Type</th>
+        </tr>
+      </thead>
+      <tbody id="gl-tbody">
+        <tr><td colspan="16" class="tbl-empty">Cliquez Charger</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="gl-nb" style="font-size:11px;color:var(--muted);padding:6px 0"></div>
+</div>
+
+<!-- ═══ CRÉANCES — GLOBAL ════════════════════════════════════════ -->
+<div id="s-cr-global" class="section">
+  <div class="section-title">📋 Rapport Créances — Global</div>
+
   <div class="card">
-    <div class="card-title">Historique des rapports</div>
+    <div class="frow">
+      <input type="text" id="cr-search" placeholder="Client, commercial..."
+        style="width:230px" oninput="chargerCreances()">
+      <div class="fgroup">
+        <label>Zone</label>
+        <select id="cr-zone-fil" style="width:130px" onchange="chargerCreances()">
+          <option value="">Toutes</option>
+        </select>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+        <input type="checkbox" id="cr-retard-only" onchange="chargerCreances()"> Retards seulement
+      </label>
+      <button class="btn btn-navy" onclick="chargerCreances()">🔄 Charger</button>
+    </div>
+    <div id="cr-totaux" style="font-size:12px;color:var(--gold);margin-top:8px;font-weight:700"></div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th><th>Nom Client</th><th>Zone</th><th>Commercial</th>
+          <th>Solde</th><th>Fact. Non Sold.</th><th>Créances Éch.</th>
+          <th>NF</th><th>Retard(j)</th><th>Dépassement</th><th>Plafond</th><th>Téléphone</th>
+        </tr>
+      </thead>
+      <tbody id="cr-global-tbody">
+        <tr><td colspan="12" class="tbl-empty">Cliquez Charger</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ CRÉANCES — AGING ══════════════════════════════════════════ -->
+<div id="s-cr-aging" class="section">
+  <div class="section-title">⏰ Créances — Aging (Tranches de retard)</div>
+  <div class="card">
+    <div id="cr-aging-info" style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:10px"></div>
     <div class="tbl-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>Date</th><th>Commercial</th><th>Agence</th><th>Ventes</th>
-            <th>Encaisse</th><th>Credit</th><th>Lignes</th><th>Statut</th><th style="width:90px">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="rch-tbody"></tbody>
+        <thead><tr><th>Tranche</th><th>Nb Clients</th><th>Montant</th><th>% Total</th></tr></thead>
+        <tbody id="cr-aging-tbody">
+          <tr><td colspan="4" class="tbl-empty">Chargez les créances d'abord</td></tr>
+        </tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- ════════════ MODAL DETAIL RAPPORT ════════════ -->
-<div id="modal-rapport-detail" class="modal">
-  <div class="modal-box modal-lg">
-    <div class="card-title" id="rcd-titre">Detail rapport de caisse</div>
-    <div class="tbl-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>No Facture</th><th>Code Client</th><th>Client</th>
-            <th>Mt. Facture</th><th>Mt. Encaisse</th><th>Mode</th><th>Observations</th>
-          </tr>
-        </thead>
-        <tbody id="rcd-tbody"></tbody>
-      </table>
-    </div>
-    <input type="hidden" id="rcd-id">
-    <div class="frow" style="justify-content:flex-end;margin-top:12px">
-      <button class="btn btn-outline" onclick="fermerModal('modal-rapport-detail')">Fermer</button>
-      <button class="btn btn-navy" id="rcd-valider-btn" onclick="cptaValiderRapportCaisse()">✅ Valider</button>
-    </div>
+<!-- ═══ CRÉANCES — ZONES ══════════════════════════════════════════ -->
+<div id="s-cr-zones" class="section">
+  <div class="section-title">🗺️ Créances — Par Zones</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Zone</th><th>Clients</th><th>Solde</th><th>Créances Éch.</th><th>Max Retard</th></tr></thead>
+      <tbody id="cr-zones-tbody">
+        <tr><td colspan="5" class="tbl-empty">Chargez les créances d'abord</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ CRÉANCES — PAR COMMERCIAUX ═══════════════════════════════ -->
+<div id="s-cr-commerciaux" class="section">
+  <div class="section-title">👤 Créances — Par Commerciaux</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Commercial</th><th>Clients</th><th>Solde</th><th>Créances Éch.</th><th>Max Retard</th><th>Dépassement</th></tr></thead>
+      <tbody id="cr-com-tbody">
+        <tr><td colspan="6" class="tbl-empty">Chargez les créances d'abord</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ CRÉANCES — PAR CLIENTS (tri FNS) ════════════════════════ -->
+<div id="s-cr-clients" class="section">
+  <div class="section-title">👥 Créances — Par Clients (tri FNS décroissant)</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Rang</th><th>Client</th><th>Commercial</th><th>Créances Éch.</th><th>Retard(j)</th><th>Solde</th></tr></thead>
+      <tbody id="cr-clients-tbody">
+        <tr><td colspan="6" class="tbl-empty">Chargez les créances d'abord</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ CRÉANCES — PRIORITÉ ══════════════════════════════════════ -->
+<div id="s-cr-priorite" class="section">
+  <div class="section-title">🚨 Créances — Liste de Priorité d'Action</div>
+  <div class="alert alert-warn" style="margin-bottom:10px">
+    Score = retard × 2 + montant / 1000. CRITIQUE = retard &gt; 60j. HAUTE = retard &gt; 30j.
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Priorité</th><th>Client</th><th>Commercial</th>
+          <th>Créances Éch.</th><th>Retard(j)</th><th>Téléphone</th><th>Action recommandée</th>
+        </tr>
+      </thead>
+      <tbody id="cr-prio-tbody">
+        <tr><td colspan="7" class="tbl-empty">Chargez les créances d'abord</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ RAPPORT DE CAISSE ════════════════════════════════════════ -->
+<div id="s-compta-caisse" class="section">
+  <div class="section-title">🏪 Rapports de Caisse</div>
+  <div class="card">
+    <button class="btn btn-navy" onclick="chargerRapportsCaisse()">🔄 Charger</button>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Commercial</th><th>Ventes</th><th>Encaissé</th><th>Crédit</th><th>Statut</th></tr></thead>
+      <tbody id="rc-tbody">
+        <tr><td colspan="6" class="tbl-empty">Cliquez Charger</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 

@@ -9,3 +9,5 @@ build/
 nexora_local.db
 nexora_manager.db
 node_modules/
+Data/*.json
+static/exports/

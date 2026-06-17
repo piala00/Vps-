@@ -1,244 +1,214 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-core/routes_main.py
-NEXORA v2.0 — Routes principales : authentification, setup, accueil, licence
-"""
+"""NEXORA v2.0 — Routes principales"""
 from flask import (render_template, redirect, url_for, request,
-                    session, jsonify)
+                   session, jsonify, Blueprint)
+from core.database import (db_one, db_all, db_exec, get_config, set_config,
+                           audit, get_accessible_modules, set_all_permissions,
+                           hash_pwd, PERMISSIONS_TREE, init_db)
+from core.auth import login_required, get_user, get_ip, process_login, set_master_session
+from core.nexora_licence import get_licence_manager, NexoraLicenceVerifier
+import logging, os
 
-from core.database import (
-    db_all, db_one, db_exec, get_config, set_config,
-    has_permission, get_accessible_modules, set_all_permissions,
-    hash_pwd, verify_pwd, audit, PERMISSIONS_TREE,
-    _NEXORA_MASTER, _NEXORA_MASTER_NOM,
-)
-from core.nexora_licence import get_licence_manager
-from core.nexora_security import is_ip_allowed
-
-
-MODULE_ROUTES = {
-    "stock":         ("stock.module_stock", "📦 Stock"),
-    "logistique":    ("logistique.module_logistique", "🚚 Logistique"),
-    "commercial":    ("commercial.module_commercial", "📊 Commercial"),
-    "comptabilite":  ("comptabilite.module_comptabilite", "💰 Comptabilite"),
-    "caisse":        ("caisse.module_caisse", "🏪 Caisse"),
-    "rh":            ("rh.module_rh", "👥 Ressources Humaines"),
-    "consolidation": ("consolidation.module_consolidation", "🧮 Consolidation"),
-    "multisite":     ("multisite.module_multisite", "🌐 Multi-Agences"),
-    "rapports":      ("rapports.module_rapports", "📋 Rapports"),
-    "parametres":    ("parametres.module_parametres", "⚙️ Parametres"),
-}
+log = logging.getLogger('NEXORA.Main')
+bp = Blueprint('main', __name__)
 
 
-def register_main_routes(app):
+@bp.route('/')
+def index():
+    if session.get('user_id') is None:
+        if not get_config('setup_done'):
+            return redirect(url_for('main.setup'))
+        return redirect(url_for('main.login'))
+    return redirect(url_for('main.accueil'))
 
-    @app.before_request
-    def check_ip():
-        if request.endpoint in ("ip_bloquee", "static"):
-            return None
-        ip = request.remote_addr or ""
-        if not is_ip_allowed(ip):
-            return redirect(url_for("ip_bloquee"))
-        return None
 
-    @app.route("/")
-    def index():
-        if session.get("user_id") is None:
-            return redirect(url_for("login"))
-        if get_config("setup_done") != "1":
-            return redirect(url_for("setup"))
-        return redirect(url_for("accueil"))
+@bp.route('/setup', methods=['GET', 'POST'])
+def setup():
+    if get_config('setup_done') and request.method == 'GET':
+        return redirect(url_for('main.login'))
 
-    # ── Assistant de configuration initiale ──────────────────────────────
-    @app.route("/setup", methods=["GET", "POST"])
-    def setup():
-        if get_config("setup_done") == "1":
-            return redirect(url_for("accueil"))
+    if request.method == 'GET':
+        return render_template('setup.html')
 
-        if request.method == "POST":
-            data = request.form
+    d = request.get_json() or {}
+    try:
+        nom_societe = d.get('nom_societe', '').strip()
+        if not nom_societe:
+            return jsonify({'ok': False, 'message': 'Nom de societe obligatoire'})
 
-            # Etape 1 : societe
-            set_config("societe_nom", data.get("societe_nom", "").strip())
-            set_config("societe_ville", data.get("societe_ville", "").strip())
+        for key, val in {
+            'nom_societe':   nom_societe,
+            'sigle_societe': d.get('sigle_societe', nom_societe[:3].upper()),
+            'secteur':       d.get('secteur', ''),
+            'devise':        d.get('devise', 'XAF'),
+            'pays':          d.get('pays', 'CM'),
+            'ville_siege':   d.get('ville_siege', ''),
+            'telephone':     d.get('telephone', ''),
+            'nom_site':      d.get('nom_siege', nom_societe),
+            'type_site':     d.get('type_site', 'SIEGE'),
+        }.items():
+            set_config(key, val)
 
-            # Etape 2 : agence locale
-            agence_code = data.get("agence_locale", "BERTOUA")
-            set_config("agence_locale", agence_code)
-            depot = data.get("depot_sage_no", "").strip()
-            if depot:
-                db_exec("UPDATE nx_agences SET depot_sage_no=? WHERE code=?",
-                        (depot, agence_code))
+        if d.get('sage_server'):
+            set_config('sage_server',   d.get('sage_server', ''))
+            set_config('sage_database', d.get('sage_database', ''))
+            set_config('sage_user',     d.get('sage_user', 'sa'))
+            set_config('sage_password', d.get('sage_password', ''))
 
-            # Etape 3 : connexion Sage (optionnelle)
-            set_config("sage_server", data.get("sage_server", "").strip())
-            set_config("sage_database", data.get("sage_database", "").strip())
-            set_config("sage_trusted", "1" if data.get("sage_trusted") else "0")
-            set_config("sage_login", data.get("sage_login", "sa").strip())
-            set_config("sage_password", data.get("sage_password", ""))
+        admin_login  = d.get('admin_login', 'admin').strip() or 'admin'
+        admin_nom    = d.get('admin_nom',   'Administrateur').strip()
+        admin_prenom = d.get('admin_prenom', '').strip()
+        admin_pwd    = d.get('admin_password', '')
 
-            # Etape 4 : compte administrateur
-            username = data.get("admin_username", "admin").strip().lower()
-            password = data.get("admin_password", "")
-            nom = data.get("admin_nom", "Administrateur").strip()
-            if not db_one("SELECT id FROM utilisateurs WHERE username=?", (username,)):
-                uid = db_exec(
-                    "INSERT INTO utilisateurs(username,password_hash,nom,agence)"
-                    " VALUES(?,?,?,?)",
-                    (username, hash_pwd(password), nom, agence_code))
-                set_all_permissions(uid, True)
+        db_exec("DELETE FROM utilisateurs WHERE username=?", (admin_login,))
+        uid = db_exec(
+            "INSERT INTO utilisateurs(username,password_hash,nom,prenom,agence,actif)"
+            " VALUES(?,?,?,?,?,1)",
+            (admin_login, hash_pwd(admin_pwd) if admin_pwd else '',
+             admin_nom, admin_prenom, 'SIEGE'))
+        if uid:
+            set_all_permissions(uid, True)
 
-            # Etape 5 : finalisation
-            set_config("mode_conception", "1" if data.get("mode_conception") else "0")
-            set_config("setup_done", "1")
-            audit("système", "INIT", "SETUP", "Configuration initiale terminee")
+        set_config('setup_done',    '1')
+        set_config('setup_version', '2.0')
+        log.info("Setup termine: %s", nom_societe)
+        return jsonify({'ok': True, 'message': 'NEXORA configure pour ' + nom_societe})
 
-            return redirect(url_for("login"))
+    except Exception as e:
+        log.error("Erreur setup: %s", e)
+        return jsonify({'ok': False, 'message': str(e)})
 
-        agences = db_all("SELECT * FROM nx_agences ORDER BY id")
-        return render_template("setup.html", agences=agences)
 
-    # ── Authentification ──────────────────────────────────────────────────
-    @app.route("/login", methods=["GET", "POST"])
-    def login():
-        if get_config("setup_done") != "1":
-            return redirect(url_for("setup"))
+@bp.route('/login', methods=['GET', 'POST'])
+def login():
+    cfg = {'nom_societe': get_config('nom_societe', '')}
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        if not username:
+            return render_template('login.html', error='Saisissez un identifiant', config=cfg)
+        ok, dest = process_login(username)
+        if ok:
+            return redirect(url_for('main.' + dest))
+        return render_template('login.html', error='Utilisateur introuvable', config=cfg)
+    return render_template('login.html', error='', config=cfg)
 
-        erreur = ""
-        mode_conception = get_config("mode_conception", "1") == "1"
 
-        if request.method == "POST":
-            username = request.form.get("username", "").strip().lower()
-            password = request.form.get("password", "")
+@bp.route('/logout')
+def logout():
+    u = session.get('username', '')
+    session.clear()
+    if u:
+        audit(u, 'AUTH', 'LOGOUT', '', get_ip())
+    return redirect(url_for('main.login'))
 
-            user = db_one(
-                "SELECT * FROM utilisateurs WHERE username=? AND actif=1",
-                (username,))
 
-            if not user:
-                erreur = "Identifiant inconnu"
-            elif mode_conception and not user["password_hash"]:
-                ok = True
-            else:
-                ok = verify_pwd(password, user["password_hash"])
-                if not ok:
-                    erreur = "Mot de passe incorrect"
+@bp.route('/accueil')
+@login_required
+def accueil():
+    user    = get_user()
+    modules = session.get('modules', [])
+    cfg     = {
+        'nom_societe':   get_config('nom_societe', ''),
+        'sigle_societe': get_config('sigle_societe', ''),
+        'devise':        get_config('devise', 'XAF'),
+    }
+    return render_template('accueil.html', user=user, modules=modules, config=cfg)
 
-            if user and not erreur:
-                session.clear()
-                session["user_id"] = user["id"]
-                session["username"] = user["username"]
-                session["nom"] = ("%s %s" % (user["prenom"] or "", user["nom"])).strip()
-                session["agence"] = user["agence"]
-                session["is_master"] = (user["username"] == _NEXORA_MASTER)
-                audit(user["username"], "AUTH", "LOGIN", "Connexion", request.remote_addr or "")
-                return redirect(url_for("accueil"))
 
-        users = []
-        if mode_conception:
-            users = db_all(
-                "SELECT id,username,nom,prenom FROM utilisateurs"
-                " WHERE actif=1 AND masque=0 ORDER BY nom")
+@bp.route('/acces-refuse')
+def ip_bloquee():
+    return '<h1>Acces refuse</h1><p>Votre IP n\'est pas autorisee.</p>', 403
 
-        return render_template("login.html", erreur=erreur,
-                                mode_conception=mode_conception, users=users)
 
-    @app.route("/logout")
-    def logout():
-        if session.get("username"):
-            audit(session["username"], "AUTH", "LOGOUT", "Deconnexion", request.remote_addr or "")
-        session.clear()
-        return redirect(url_for("login"))
+# ── API Licence ──────────────────────────────────────────────────
 
-    # ── Accueil ──────────────────────────────────────────────────────────
-    @app.route("/accueil")
-    def accueil():
-        if session.get("user_id") is None:
-            return redirect(url_for("login"))
+@bp.route('/api/licence/statut')
+@login_required
+def api_licence_statut():
+    mgr = get_licence_manager()
+    if not mgr:
+        return jsonify({'ok': False, 'erreur': 'Non initialise'})
+    info = mgr.get_licence()
+    if not info.valide and mgr.mode_demonstration():
+        return jsonify({
+            'ok': True, 'mode': 'DEMO',
+            'jours_demo': mgr.jours_demo_restants(),
+            'message':    'Mode demonstration - ' + str(mgr.jours_demo_restants()) + ' jours restants',
+            'modules':    list(PERMISSIONS_TREE.keys()),
+            'nb_postes':  1,
+        })
+    if not info.valide:
+        return jsonify({'ok': False, 'mode': 'INVALIDE', 'erreur': info.erreur})
+    return jsonify({
+        'ok':             True,
+        'mode':           'PERPETUELLE' if info.perpetuelle else 'ACTIVE',
+        'nom_societe':    info.nom_societe,
+        'modules':        info.modules,
+        'modules_noms':   info.modules_noms,
+        'nb_postes':      info.nb_postes,
+        'date_expiration': str(info.date_expiration) if info.date_expiration else None,
+        'perpetuelle':    info.perpetuelle,
+        'jours_restants': info.jours_restants,
+        'expire_bientot': info.expire_bientot,
+        'reference':      info.reference,
+    })
 
-        uid = session["user_id"]
-        accessibles = get_accessible_modules(uid)
-        modules = []
-        for key in PERMISSIONS_TREE:
-            if key in accessibles:
-                route, label = MODULE_ROUTES.get(key, (None, key))
-                modules.append({
-                    "key": key,
-                    "label": label,
-                    "icon": PERMISSIONS_TREE[key]["icon"],
-                    "url": url_for(route) if route else "#",
-                })
 
-        licence_mgr = get_licence_manager()
-        licence_info = licence_mgr.get_licence().to_dict() if licence_mgr else {}
-        demo = licence_mgr.mode_demonstration() if licence_mgr else False
-        jours_demo = licence_mgr.jours_demo_restants() if licence_mgr else 0
+@bp.route('/api/licence/activer', methods=['POST'])
+@login_required
+def api_licence_activer():
+    mgr = get_licence_manager()
+    if not mgr:
+        return jsonify({'ok': False, 'message': 'Non initialise'})
+    d      = request.get_json() or {}
+    numero = d.get('numero_serie', '').strip()
+    if not numero:
+        return jsonify({'ok': False, 'message': 'Numero de serie manquant'})
+    info = mgr.activer(numero)
+    if info.valide:
+        audit(session.get('username', '?'), 'LICENCE', 'ACTIVATION',
+              'societe=' + info.nom_societe)
+        return jsonify({'ok': True, 'message': 'Licence activee pour ' + info.nom_societe,
+                        'nom_societe': info.nom_societe, 'modules': info.modules})
+    return jsonify({'ok': False, 'message': info.erreur})
 
-        return render_template("accueil.html",
-                                modules=modules,
-                                societe_nom=get_config("societe_nom", "NEXORA"),
-                                licence=licence_info,
-                                demo=demo,
-                                jours_demo=jours_demo)
 
-    # ── Redirection generique de module ─────────────────────────────────
-    @app.route("/module/<nom_module>")
-    def module_page(nom_module):
-        if nom_module not in MODULE_ROUTES:
-            return redirect(url_for("accueil"))
-        route, _ = MODULE_ROUTES[nom_module]
-        return redirect(url_for(route))
+@bp.route('/api/licence/verifier', methods=['POST'])
+def api_licence_verifier():
+    d      = request.get_json() or {}
+    numero = d.get('numero_serie', '').strip()
+    v      = NexoraLicenceVerifier()
+    info   = v.verifier(numero)
+    if info.valide:
+        return jsonify({'ok': True, 'nom_societe': info.nom_societe,
+                        'modules_noms': info.modules_noms, 'nb_postes': info.nb_postes,
+                        'perpetuelle': info.perpetuelle,
+                        'date_expiration': str(info.date_expiration) if info.date_expiration else None,
+                        'jours_restants': info.jours_restants})
+    return jsonify({'ok': False, 'message': info.erreur})
 
-    # ── API session ──────────────────────────────────────────────────────
-    @app.route("/api/me")
-    def api_me():
-        if session.get("user_id") is None:
-            return jsonify(ok=False, msg="Non connecte"), 401
-        uid = session["user_id"]
-        user = db_one("SELECT id,username,nom,prenom,email,agence FROM utilisateurs WHERE id=?", (uid,))
-        return jsonify(ok=True,
-                        user=user,
-                        is_master=bool(session.get("is_master")),
-                        modules=get_accessible_modules(uid))
 
-    # ── API licence ─────────────────────────────────────────────────────
-    @app.route("/api/licence/statut")
-    def api_licence_statut():
-        mgr = get_licence_manager()
-        if not mgr:
-            return jsonify(ok=False, msg="Module licence indisponible")
-        info = mgr.get_licence().to_dict()
-        info["mode_demo"] = mgr.mode_demonstration()
-        info["jours_demo_restants"] = mgr.jours_demo_restants()
-        return jsonify(ok=True, licence=info)
+@bp.route('/api/licence/desactiver', methods=['POST'])
+@login_required
+def api_licence_desactiver():
+    mgr = get_licence_manager()
+    if mgr:
+        mgr.desactiver()
+    audit(session.get('username', '?'), 'LICENCE', 'DESACTIVATION', '')
+    return jsonify({'ok': True})
 
-    @app.route("/api/licence/verifier", methods=["POST"])
-    def api_licence_verifier():
-        mgr = get_licence_manager()
-        if not mgr:
-            return jsonify(ok=False, msg="Module licence indisponible")
-        numero = (request.get_json(silent=True) or {}).get("numero", "")
-        info = mgr._verifier.verifier(numero)
-        return jsonify(ok=True, licence=info.to_dict())
 
-    @app.route("/api/licence/activer", methods=["POST"])
-    def api_licence_activer():
-        if session.get("user_id") is None:
-            return jsonify(ok=False, msg="Session expiree"), 401
-        if not has_permission(session["user_id"], "parametres", "licence", "ecrire"):
-            return jsonify(ok=False, msg="Acces refuse"), 403
-        mgr = get_licence_manager()
-        if not mgr:
-            return jsonify(ok=False, msg="Module licence indisponible")
-        numero = (request.get_json(silent=True) or {}).get("numero", "")
-        info = mgr.activer(numero)
-        if not info.valide:
-            return jsonify(ok=False, msg=info.erreur or "Numero de serie invalide")
-        audit(session["username"], "PARAMETRES", "LICENCE_ACTIVATION", info.nom_societe)
-        return jsonify(ok=True, licence=info.to_dict())
+@bp.route('/api/me')
+@login_required
+def api_me():
+    return jsonify({'ok': True, 'user': get_user()})
 
-    # ── Acces refuse (IP) ───────────────────────────────────────────────
-    @app.route("/acces-refuse")
-    def ip_bloquee():
-        return render_template("ip_bloquee.html"), 403
+
+@bp.route('/api/network-info')
+@login_required
+def api_network_info():
+    import socket
+    try:
+        local_ip = socket.gethostbyname(socket.gethostname())
+    except Exception:
+        local_ip = '127.0.0.1'
+    return jsonify({'ok': True, 'local_ip': local_ip, 'ip_publique': ''})

@@ -1,510 +1,309 @@
-var autoLoad = window.autoLoad || {};
+/**
+ * NEXORA v2.0 - Module Logistique
+ */
+var autoLoad = {
+    'log-dashboard':    function(){ chargerDashLog(); },
+    'log-camions':      function(){ chargerCamions(); },
+    'log-personnel':    function(){ chargerPersonnel(); },
+    'log-voyages':      function(){ chargerVoyages(); },
+    'log-entretiens':   function(){ chargerEntretiens(); },
+    'log-transactions': function(){ chargerTransactions(); chargerCamionsPourSelect(); },
+};
 
-var _logCamionsCache = [];
-var _logPersonnelCache = [];
-var _logVoyagesCache = [];
-var _logVoyagesTableCache = [];
-
-// -- Selects partages --------------------------------------------------------------
-function logRemplirSelectCamions(selectId, emptyLabel) {
-    var sel = document.getElementById(selectId);
-    if (!sel) return;
-    var html = (emptyLabel !== undefined) ? ('<option value="">' + emptyLabel + '</option>') : '';
-    _logCamionsCache.forEach(function(c) {
-        html += '<option value="' + c.id + '">' + c.immatriculation + '</option>';
-    });
-    sel.innerHTML = html;
-}
-
-function logRemplirSelectPersonnel(selectId, role) {
-    var sel = document.getElementById(selectId);
-    if (!sel) return;
-    var html = '<option value="">—</option>';
-    _logPersonnelCache.forEach(function(p) {
-        if (!role || p.role === role) {
-            html += '<option value="' + p.id + '">' + p.nom + (p.prenom ? (' ' + p.prenom) : '') + '</option>';
-        }
-    });
-    sel.innerHTML = html;
-}
-
-function logRemplirSelectVoyages(selectId) {
-    var sel = document.getElementById(selectId);
-    if (!sel) return;
-    var html = '<option value="">—</option>';
-    _logVoyagesCache.forEach(function(v) {
-        html += '<option value="' + v.id + '">' + v.no_voyage + ' (' + v.origine + ' -> ' + v.destination + ')</option>';
-    });
-    sel.innerHTML = html;
-}
-
-// -- Tableau de bord ----------------------------------------------------------------
-function logChargerDashboard() {
-    apiGet('/api/logistique/dashboard-summary', function(d) {
-        var s = d.summary;
-        document.getElementById('kpi-camions-actifs').textContent = s.camions_actifs;
-        document.getElementById('kpi-voyages-jour').textContent = s.voyages_jour;
-        document.getElementById('kpi-voyages-cours').textContent = s.voyages_en_cours;
-        document.getElementById('kpi-entretiens-alerte').textContent = s.entretiens_alerte;
-        document.getElementById('kpi-recettes-mois').textContent = fmt.money(s.recettes_mois);
-        document.getElementById('kpi-depenses-mois').textContent = fmt.money(s.depenses_mois);
-    });
-}
-autoLoad['logistique-dashboard'] = function() { logChargerDashboard(); };
-
-// -- Camions --------------------------------------------------------------------------
-function logChargerCamions(callback) {
-    loadingTable('cam-tbody', 8);
+function chargerDashLog() {
     apiGet('/api/logistique/camions', function(d) {
-        _logCamionsCache = d.data;
-        logRenduCamions();
-        if (callback) callback();
+        var kpis = document.getElementById('lk-kpis');
+        if (kpis) kpis.innerHTML =
+            kpiCard('🚛', 'Camions actifs', (d.camions||[]).length, '#1A3263') +
+            kpiCard('📅', 'Voyages du jour', 0, '#10B981') +
+            kpiCard('🔧', 'En entretien', 0, '#F59E0B') +
+            kpiCard('⛽', 'Cout carburant (mois)', fmt.money(0), '#EF4444');
     });
 }
 
-function logRenduCamions() {
-    if (!_logCamionsCache.length) {
-        emptyTable('cam-tbody', 8, 'Aucun camion');
-        return;
-    }
-    var html = '';
-    _logCamionsCache.forEach(function(c) {
-        html += '<tr>' +
-            '<td>' + c.immatriculation + '</td>' +
-            '<td>' + (c.marque || '') + ' ' + (c.modele || '') + '</td>' +
-            '<td>' + c.type_flotte + '</td>' +
-            '<td>' + fmt.qty(c.capacite_tonnes) + '</td>' +
-            '<td>' + (c.proprietaire || '—') + '</td>' +
-            '<td>' + (c.compte_sage || '—') + '</td>' +
-            '<td>' + (c.actif ? badge('Actif', 'ok') : badge('Inactif', 'muted')) + '</td>' +
-            '<td><button class="btn btn-outline btn-sm" onclick="logOuvrirCamion(' + c.id + ')">✏️</button></td>' +
-            '</tr>';
+function chargerCamions() {
+    tableLoader('camions-tbody', 5);
+    apiGet('/api/logistique/camions', function(d) {
+        var tbody = document.getElementById('camions-tbody');
+        if (!tbody) return;
+        if (!d.camions || !d.camions.length) { tableVide('camions-tbody', 5, 'Aucun camion'); return; }
+        tbody.innerHTML = d.camions.map(function(c) {
+            return '<tr><td style="font-weight:700;color:var(--navy)">' + c.immatriculation + '</td>' +
+                   '<td>' + (c.marque||'-') + '</td><td>' + (c.modele||'-') + '</td>' +
+                   '<td>' + badge(c.type_flotte,'info') + '</td><td>' + (c.capacite_tonnes||0) + ' t</td></tr>';
+        }).join('');
     });
-    document.getElementById('cam-tbody').innerHTML = html;
 }
 
-function logOuvrirCamion(id) {
-    document.getElementById('mc-id').value = id || '';
-    if (id) {
-        var c = _logCamionsCache.filter(function(x) { return x.id === id; })[0];
-        if (!c) return;
-        document.getElementById('mc-titre').textContent = 'Modifier camion';
-        document.getElementById('mc-immat').value = c.immatriculation;
-        document.getElementById('mc-marque').value = c.marque || '';
-        document.getElementById('mc-modele').value = c.modele || '';
-        document.getElementById('mc-type-flotte').value = c.type_flotte || 'MAISON';
-        document.getElementById('mc-capacite').value = c.capacite_tonnes || 0;
-        document.getElementById('mc-annee').value = c.annee_mise_service || '';
-        document.getElementById('mc-proprietaire').value = c.proprietaire || '';
-        document.getElementById('mc-compte-sage').value = c.compte_sage || '';
-        document.getElementById('mc-observations').value = c.observations || '';
-        document.getElementById('mc-actif').checked = !!c.actif;
-    } else {
-        document.getElementById('mc-titre').textContent = 'Nouveau camion';
-        document.getElementById('mc-immat').value = '';
-        document.getElementById('mc-marque').value = '';
-        document.getElementById('mc-modele').value = '';
-        document.getElementById('mc-type-flotte').value = 'MAISON';
-        document.getElementById('mc-capacite').value = '';
-        document.getElementById('mc-annee').value = '';
-        document.getElementById('mc-proprietaire').value = '';
-        document.getElementById('mc-compte-sage').value = '';
-        document.getElementById('mc-observations').value = '';
-        document.getElementById('mc-actif').checked = true;
-    }
-    ouvrirModal('modal-camion');
-}
-
-function logSauverCamion() {
-    var id = document.getElementById('mc-id').value;
-    var data = {
-        immatriculation: document.getElementById('mc-immat').value.trim(),
-        marque: document.getElementById('mc-marque').value.trim(),
-        modele: document.getElementById('mc-modele').value.trim(),
-        type_flotte: document.getElementById('mc-type-flotte').value,
-        capacite_tonnes: parseFloat(document.getElementById('mc-capacite').value) || 0,
-        annee_mise_service: parseInt(document.getElementById('mc-annee').value) || null,
-        proprietaire: document.getElementById('mc-proprietaire').value.trim(),
-        compte_sage: document.getElementById('mc-compte-sage').value.trim(),
-        observations: document.getElementById('mc-observations').value.trim(),
-        actif: document.getElementById('mc-actif').checked
-    };
-    if (id) {
-        apiPut('/api/logistique/camions/' + id, data, function(d) {
-            fermerModal('modal-camion');
-            status(d.msg);
-            logChargerCamions();
-        });
-    } else {
-        apiPost('/api/logistique/camions', data, function(d) {
-            fermerModal('modal-camion');
-            status(d.msg);
-            logChargerCamions();
-        });
-    }
-}
-autoLoad['camions'] = function() { logChargerCamions(); };
-
-// -- Chauffeurs & convoyeurs -----------------------------------------------------------
-function logChargerPersonnel(callback) {
-    loadingTable('pers-tbody', 8);
+function chargerPersonnel() {
+    tableLoader('personnel-tbody', 5);
     apiGet('/api/logistique/personnel', function(d) {
-        _logPersonnelCache = d.data;
-        logRenduPersonnel();
-        if (callback) callback();
+        var tbody = document.getElementById('personnel-tbody');
+        if (!tbody) return;
+        if (!d.personnel || !d.personnel.length) { tableVide('personnel-tbody', 5, 'Aucun personnel'); return; }
+        tbody.innerHTML = d.personnel.map(function(p) {
+            return '<tr><td style="font-weight:700">' + (p.prenom?p.prenom+' ':'') + p.nom + '</td>' +
+                   '<td>' + badge(p.role, p.role==='CHAUFFEUR'?'navy':'info') + '</td>' +
+                   '<td>' + (p.telephone||'-') + '</td><td>' + (p.permis||'-') + '</td>' +
+                   '<td>' + (p.immatriculation||'-') + '</td></tr>';
+        }).join('');
     });
 }
 
-function logRenduPersonnel() {
-    if (!_logPersonnelCache.length) {
-        emptyTable('pers-tbody', 8, 'Aucun personnel');
-        return;
-    }
-    var html = '';
-    _logPersonnelCache.forEach(function(p) {
-        html += '<tr>' +
-            '<td>' + p.nom + '</td>' +
-            '<td>' + (p.prenom || '—') + '</td>' +
-            '<td>' + (p.role === 'CHAUFFEUR' ? badge('Chauffeur', 'info') : badge('Convoyeur', 'muted')) + '</td>' +
-            '<td>' + (p.telephone || '—') + '</td>' +
-            '<td>' + (p.permis || '—') + '</td>' +
-            '<td>' + (p.camion_immat || '—') + '</td>' +
-            '<td>' + (p.actif ? badge('Actif', 'ok') : badge('Inactif', 'muted')) + '</td>' +
-            '<td><button class="btn btn-outline btn-sm" onclick="logOuvrirPersonnel(' + p.id + ')">✏️</button></td>' +
-            '</tr>';
-    });
-    document.getElementById('pers-tbody').innerHTML = html;
-}
-
-function logOuvrirPersonnel(id) {
-    logChargerCamions(function() {
-        logRemplirSelectCamions('mp-camion', '—');
-        document.getElementById('mp-id').value = id || '';
-        if (id) {
-            var p = _logPersonnelCache.filter(function(x) { return x.id === id; })[0];
-            if (!p) return;
-            document.getElementById('mp-titre').textContent = 'Modifier personnel';
-            document.getElementById('mp-nom').value = p.nom;
-            document.getElementById('mp-prenom').value = p.prenom || '';
-            document.getElementById('mp-role').value = p.role || 'CHAUFFEUR';
-            document.getElementById('mp-telephone').value = p.telephone || '';
-            document.getElementById('mp-permis').value = p.permis || '';
-            document.getElementById('mp-camion').value = p.camion_id || '';
-            document.getElementById('mp-actif').checked = !!p.actif;
-        } else {
-            document.getElementById('mp-titre').textContent = 'Nouveau personnel';
-            document.getElementById('mp-nom').value = '';
-            document.getElementById('mp-prenom').value = '';
-            document.getElementById('mp-role').value = 'CHAUFFEUR';
-            document.getElementById('mp-telephone').value = '';
-            document.getElementById('mp-permis').value = '';
-            document.getElementById('mp-camion').value = '';
-            document.getElementById('mp-actif').checked = true;
-        }
-        ouvrirModal('modal-personnel');
-    });
-}
-
-function logSauverPersonnel() {
-    var id = document.getElementById('mp-id').value;
-    var data = {
-        nom: document.getElementById('mp-nom').value.trim(),
-        prenom: document.getElementById('mp-prenom').value.trim(),
-        role: document.getElementById('mp-role').value,
-        telephone: document.getElementById('mp-telephone').value.trim(),
-        permis: document.getElementById('mp-permis').value.trim(),
-        camion_id: document.getElementById('mp-camion').value || null,
-        actif: document.getElementById('mp-actif').checked
-    };
-    if (id) {
-        apiPut('/api/logistique/personnel/' + id, data, function(d) {
-            fermerModal('modal-personnel');
-            status(d.msg);
-            logChargerPersonnel();
-        });
-    } else {
-        apiPost('/api/logistique/personnel', data, function(d) {
-            fermerModal('modal-personnel');
-            status(d.msg);
-            logChargerPersonnel();
-        });
-    }
-}
-autoLoad['chauffeurs'] = function() { logChargerPersonnel(); };
-
-// -- Voyages -----------------------------------------------------------------------------
-function logChargerVoyages() {
-    loadingTable('voy-tbody', 9);
-    var statut = document.getElementById('voy-filtre-statut').value;
-    var url = '/api/logistique/voyages' + (statut ? '?statut=' + statut : '');
-    apiGet(url, function(d) {
-        _logVoyagesTableCache = d.data;
-        if (!d.data.length) {
-            emptyTable('voy-tbody', 9, 'Aucun voyage');
-            return;
-        }
-        var badges = {planifie: 'info', en_cours: 'warn', termine: 'ok', annule: 'err'};
-        var html = '';
-        d.data.forEach(function(v) {
-            html += '<tr>' +
-                '<td>' + v.no_voyage + '</td>' +
-                '<td>' + (v.camion_immat || '—') + '</td>' +
-                '<td>' + (v.chauffeur_nom || '—') + '</td>' +
-                '<td>' + v.origine + '</td>' +
-                '<td>' + v.destination + '</td>' +
-                '<td>' + fmt.date(v.date_depart) + '</td>' +
-                '<td>' + fmt.date(v.date_retour) + '</td>' +
-                '<td>' + badge(v.statut, badges[v.statut] || 'info') + '</td>' +
-                '<td><button class="btn btn-outline btn-sm" onclick="logOuvrirVoyage(' + v.id + ')">✏️</button></td>' +
-                '</tr>';
-        });
-        document.getElementById('voy-tbody').innerHTML = html;
-    });
-}
-
-function logOuvrirVoyage(id) {
-    logChargerCamions(function() {
-        logChargerPersonnel(function() {
-            logRemplirSelectCamions('mv-camion');
-            logRemplirSelectPersonnel('mv-chauffeur', 'CHAUFFEUR');
-            logRemplirSelectPersonnel('mv-convoyeur', 'CONVOYEUR');
-            document.getElementById('mv-id').value = id || '';
-            if (id) {
-                var v = _logVoyagesTableCache.filter(function(x) { return x.id === id; })[0];
-                if (!v) return;
-                document.getElementById('mv-titre').textContent = 'Modifier voyage ' + v.no_voyage;
-                document.getElementById('mv-camion').value = v.camion_id || '';
-                document.getElementById('mv-chauffeur').value = v.chauffeur_id || '';
-                document.getElementById('mv-convoyeur').value = v.convoyeur_id || '';
-                document.getElementById('mv-statut').value = v.statut || 'planifie';
-                document.getElementById('mv-origine').value = v.origine || '';
-                document.getElementById('mv-destination').value = v.destination || '';
-                document.getElementById('mv-date-depart').value = v.date_depart || '';
-                document.getElementById('mv-date-retour').value = v.date_retour || '';
-                document.getElementById('mv-client').value = v.client_fournisseur || '';
-                document.getElementById('mv-marchandises').value = v.marchandises || '';
-                document.getElementById('mv-observations').value = v.observations || '';
-            } else {
-                document.getElementById('mv-titre').textContent = 'Nouveau voyage';
-                document.getElementById('mv-camion').value = '';
-                document.getElementById('mv-chauffeur').value = '';
-                document.getElementById('mv-convoyeur').value = '';
-                document.getElementById('mv-statut').value = 'planifie';
-                document.getElementById('mv-origine').value = '';
-                document.getElementById('mv-destination').value = '';
-                document.getElementById('mv-date-depart').value = '';
-                document.getElementById('mv-date-retour').value = '';
-                document.getElementById('mv-client').value = '';
-                document.getElementById('mv-marchandises').value = '';
-                document.getElementById('mv-observations').value = '';
-            }
-            ouvrirModal('modal-voyage');
-        });
-    });
-}
-
-function logSauverVoyage() {
-    var id = document.getElementById('mv-id').value;
-    var data = {
-        camion_id: document.getElementById('mv-camion').value || null,
-        chauffeur_id: document.getElementById('mv-chauffeur').value || null,
-        convoyeur_id: document.getElementById('mv-convoyeur').value || null,
-        statut: document.getElementById('mv-statut').value,
-        origine: document.getElementById('mv-origine').value.trim(),
-        destination: document.getElementById('mv-destination').value.trim(),
-        date_depart: document.getElementById('mv-date-depart').value,
-        date_retour: document.getElementById('mv-date-retour').value,
-        client_fournisseur: document.getElementById('mv-client').value.trim(),
-        marchandises: document.getElementById('mv-marchandises').value.trim(),
-        observations: document.getElementById('mv-observations').value.trim()
-    };
-    if (id) {
-        apiPut('/api/logistique/voyages/' + id, data, function(d) {
-            fermerModal('modal-voyage');
-            status(d.msg);
-            logChargerVoyages();
-        });
-    } else {
-        apiPost('/api/logistique/voyages', data, function(d) {
-            fermerModal('modal-voyage');
-            status(d.msg);
-            logChargerVoyages();
-        });
-    }
-}
-autoLoad['voyages'] = function() { logChargerVoyages(); };
-
-// -- Entretiens --------------------------------------------------------------------------
-function logChargerEntretiens() {
-    loadingTable('ent-tbody', 7);
-    apiGet('/api/logistique/entretiens', function(d) {
-        if (!d.data.length) {
-            emptyTable('ent-tbody', 7, 'Aucun entretien');
-            return;
-        }
-        var html = '';
-        d.data.forEach(function(e) {
-            html += '<tr>' +
-                '<td>' + fmt.date(e.date_entretien) + '</td>' +
-                '<td>' + (e.camion_immat || '—') + '</td>' +
-                '<td>' + e.type_entretien + '</td>' +
-                '<td>' + fmt.qty(e.kilometrage) + '</td>' +
-                '<td>' + fmt.money(e.cout) + '</td>' +
-                '<td>' + (e.prestataire || '—') + '</td>' +
-                '<td>' + fmt.date(e.prochaine_revision) + '</td>' +
-                '</tr>';
-        });
-        document.getElementById('ent-tbody').innerHTML = html;
-    });
-}
-
-function logSauverEntretien() {
-    var data = {
-        camion_id: document.getElementById('ent-camion').value || null,
-        type_entretien: document.getElementById('ent-type').value,
-        date_entretien: document.getElementById('ent-date').value,
-        kilometrage: parseInt(document.getElementById('ent-km').value) || 0,
-        cout: parseFloat(document.getElementById('ent-cout').value) || 0,
-        prestataire: document.getElementById('ent-prestataire').value.trim(),
-        description: document.getElementById('ent-description').value.trim(),
-        prochaine_revision: document.getElementById('ent-prochaine').value
-    };
-    apiPost('/api/logistique/entretiens', data, function(d) {
-        status(d.msg);
-        document.getElementById('ent-km').value = '';
-        document.getElementById('ent-cout').value = '';
-        document.getElementById('ent-prestataire').value = '';
-        document.getElementById('ent-description').value = '';
-        document.getElementById('ent-prochaine').value = '';
-        logChargerEntretiens();
-    });
-}
-autoLoad['entretiens'] = function() {
-    logChargerCamions(function() {
-        logRemplirSelectCamions('ent-camion');
-    });
-    logChargerEntretiens();
-};
-
-// -- Recettes & depenses -------------------------------------------------------------------
-function logChargerVoyagesCache(callback) {
+function chargerVoyages() {
+    tableLoader('voyages-tbody', 6);
     apiGet('/api/logistique/voyages', function(d) {
-        _logVoyagesCache = d.data;
-        if (callback) callback();
+        var tbody = document.getElementById('voyages-tbody');
+        if (!tbody) return;
+        if (!d.voyages || !d.voyages.length) { tableVide('voyages-tbody', 6, 'Aucun voyage'); return; }
+        tbody.innerHTML = d.voyages.map(function(v) {
+            var s = {planifie:badge('Planifie','info'), en_cours:badge('En cours','warn'),
+                     termine:badge('Termine','ok'), annule:badge('Annule','muted')}[v.statut] || badge(v.statut,'muted');
+            return '<tr><td style="font-weight:700;color:var(--navy)">' + (v.no_voyage||'-') + '</td>' +
+                   '<td>' + (v.immatriculation||'-') + '</td>' +
+                   '<td>' + (v.origine||'-') + '</td><td>' + (v.destination||'-') + '</td>' +
+                   '<td>' + fmt.date(v.date_depart) + '</td><td>' + s + '</td></tr>';
+        }).join('');
     });
 }
 
-function logChargerTransactions() {
-    loadingTable('tr-tbody', 8);
-    var camionId = document.getElementById('trh-filtre-camion').value;
-    var url = '/api/logistique/transactions' + (camionId ? '?camion_id=' + camionId : '');
-    apiGet(url, function(d) {
-        if (!d.data.length) {
-            emptyTable('tr-tbody', 8, 'Aucune transaction');
-            return;
-        }
-        var html = '';
-        d.data.forEach(function(t) {
-            html += '<tr>' +
-                '<td>' + fmt.date(t.date_transaction) + '</td>' +
-                '<td>' + (t.camion_immat || '—') + '</td>' +
-                '<td>' + (t.no_voyage || '—') + '</td>' +
-                '<td>' + (t.type_transaction === 'RECETTE' ? badge('Recette', 'ok') : badge('Depense', 'err')) + '</td>' +
-                '<td>' + t.categorie + '</td>' +
-                '<td>' + fmt.money(t.montant) + '</td>' +
-                '<td>' + (t.libelle || '—') + '</td>' +
-                '<td>' + (t.reference_sage || '—') + '</td>' +
-                '</tr>';
+function chargerEntretiens() {
+    tableLoader('entretiens-tbody', 6);
+    apiGet('/api/logistique/entretiens', function(d) {
+        var tbody = document.getElementById('entretiens-tbody');
+        if (!tbody) return;
+        if (!d.entretiens || !d.entretiens.length) { tableVide('entretiens-tbody', 6, 'Aucun entretien'); return; }
+        tbody.innerHTML = d.entretiens.map(function(e) {
+            return '<tr><td>' + (e.immatriculation||'-') + '</td>' +
+                   '<td>' + badge(e.type_entretien,'info') + '</td>' +
+                   '<td>' + fmt.date(e.date_entretien) + '</td>' +
+                   '<td>' + (e.kilometrage||0) + ' km</td>' +
+                   '<td style="font-weight:700;color:var(--gold)">' + fmt.money(e.cout||0) + '</td>' +
+                   '<td>' + (e.prochaine_revision?fmt.date(e.prochaine_revision):'-') + '</td></tr>';
+        }).join('');
+    });
+}
+
+function chargerTransactions() {
+    var camion = document.getElementById('tx-camion-sel') ? document.getElementById('tx-camion-sel').value : '';
+    tableLoader('tx-tbody', 6);
+    apiGet('/api/logistique/transactions' + (camion?'?camion_id='+camion:''), function(d) {
+        var tbody = document.getElementById('tx-tbody');
+        if (!tbody) return;
+        if (!d.transactions || !d.transactions.length) { tableVide('tx-tbody', 6, 'Aucune transaction'); return; }
+        tbody.innerHTML = d.transactions.map(function(t) {
+            var col = t.type_transaction === 'RECETTE' ? 'var(--green)' : 'var(--red)';
+            return '<tr><td>' + fmt.date(t.date_transaction) + '</td>' +
+                   '<td>' + (t.immatriculation||'-') + '</td>' +
+                   '<td>' + badge(t.type_transaction, t.type_transaction==='RECETTE'?'ok':'err') + '</td>' +
+                   '<td>' + (t.categorie||'-') + '</td>' +
+                   '<td style="font-weight:700;color:' + col + '">' + fmt.money(t.montant||0) + '</td>' +
+                   '<td>' + (t.libelle||'-') + '</td></tr>';
+        }).join('');
+    });
+}
+
+function chargerCamionsPourSelect() {
+    var sel = document.getElementById('tx-camion-sel');
+    if (!sel) return;
+    apiGet('/api/logistique/camions', function(d) {
+        sel.innerHTML = '<option value="">Tous les camions</option>';
+        (d.camions||[]).forEach(function(c) {
+            var opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.immatriculation + (c.marque ? ' - '+c.marque : '');
+            sel.appendChild(opt);
         });
-        document.getElementById('tr-tbody').innerHTML = html;
     });
 }
 
-function logSauverTransaction() {
+document.addEventListener('DOMContentLoaded', function() { chargerDashLog(); });
+
+// ── Creation Camion ──────────────────────────────────────────────
+function creerCamion() {
+    var immat = document.getElementById('cam-immat') ? document.getElementById('cam-immat').value.trim() : '';
+    if (!immat) { alert('Immatriculation obligatoire'); return; }
     var data = {
-        camion_id: document.getElementById('tr-camion').value || null,
-        voyage_id: document.getElementById('tr-voyage').value || null,
-        type_transaction: document.getElementById('tr-type').value,
-        categorie: document.getElementById('tr-categorie').value,
-        date_transaction: document.getElementById('tr-date').value,
-        montant: parseFloat(document.getElementById('tr-montant').value) || 0,
-        libelle: document.getElementById('tr-libelle').value.trim(),
-        reference_sage: document.getElementById('tr-reference').value.trim()
+        immatriculation:    immat,
+        marque:              document.getElementById('cam-marque')   ? document.getElementById('cam-marque').value   : '',
+        modele:               document.getElementById('cam-modele')   ? document.getElementById('cam-modele').value   : '',
+        type_flotte:          document.getElementById('cam-type')     ? document.getElementById('cam-type').value     : 'MAISON',
+        proprietaire:         document.getElementById('cam-proprio')  ? document.getElementById('cam-proprio').value  : '',
+        compte_sage:          document.getElementById('cam-sage')     ? document.getElementById('cam-sage').value     : '',
+        capacite_tonnes:      document.getElementById('cam-capacite') ? parseFloat(document.getElementById('cam-capacite').value) || 0 : 0,
+        observations:         document.getElementById('cam-obs')      ? document.getElementById('cam-obs').value      : '',
     };
-    apiPost('/api/logistique/transactions', data, function(d) {
-        status(d.msg);
-        document.getElementById('tr-montant').value = '';
-        document.getElementById('tr-libelle').value = '';
-        document.getElementById('tr-reference').value = '';
-        logChargerTransactions();
+    var msg = document.getElementById('cam-msg');
+    apiPost('/api/logistique/camions', data, function() {
+        fermerModal('modal-camion');
+        chargerCamions();
+        status('Camion enregistre: ' + immat);
+        if (msg) msg.innerHTML = '';
+        var inputs = ['cam-immat','cam-marque','cam-modele','cam-proprio','cam-sage','cam-capacite','cam-obs'];
+        inputs.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    }, function(e) {
+        if (msg) msg.innerHTML = '<span style="color:var(--red)">Erreur: ' + e + '</span>';
     });
 }
-autoLoad['transactions'] = function() {
-    logChargerCamions(function() {
-        logRemplirSelectCamions('tr-camion');
-        logRemplirSelectCamions('trh-filtre-camion', 'Tous les camions');
-        logChargerVoyagesCache(function() {
-            logRemplirSelectVoyages('tr-voyage');
+
+// ── Creation Personnel ───────────────────────────────────────────
+function peuplerSelectCamions(selectIds) {
+    apiGet('/api/logistique/camions', function(d) {
+        var camions = d.camions || [];
+        selectIds.forEach(function(sid) {
+            var sel = document.getElementById(sid);
+            if (!sel) return;
+            var current = sel.value;
+            sel.innerHTML = '<option value="">-- Choisir --</option>';
+            camions.forEach(function(c) {
+                var opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.immatriculation + (c.marque ? ' - ' + c.marque : '');
+                sel.appendChild(opt);
+            });
+            sel.value = current;
         });
-        logChargerTransactions();
     });
-};
+}
 
-// -- Grand livre camion --------------------------------------------------------------------
-function logChargerGrandLivre() {
-    var camionId = document.getElementById('gl-camion').value;
-    if (!camionId) {
-        emptyTable('gl-tbody', 7, 'Selectionnez un camion');
-        return;
-    }
-    loadingTable('gl-tbody', 7);
-    apiGet('/api/logistique/grand-livre-camion?camion_id=' + camionId, function(d) {
-        if (!d.data.length) {
-            emptyTable('gl-tbody', 7, 'Aucune ecriture');
-            return;
-        }
-        var html = '';
-        d.data.forEach(function(l) {
-            html += '<tr>' +
-                '<td>' + fmt.date(l.date) + '</td>' +
-                '<td>' + badge(l.source, l.source === 'SAGE' ? 'info' : 'muted') + '</td>' +
-                '<td>' + (l.type_transaction === 'RECETTE' ? badge('Recette', 'ok') : badge('Depense', 'err')) + '</td>' +
-                '<td>' + (l.categorie || '—') + '</td>' +
-                '<td>' + fmt.money(l.montant) + '</td>' +
-                '<td>' + (l.libelle || '—') + '</td>' +
-                '<td>' + (l.reference_sage || '—') + '</td>' +
-                '</tr>';
+function peuplerSelectPersonnel(selectIds) {
+    apiGet('/api/logistique/personnel', function(d) {
+        var personnel = d.personnel || [];
+        selectIds.forEach(function(sid) {
+            var sel = document.getElementById(sid);
+            if (!sel) return;
+            var current = sel.value;
+            sel.innerHTML = '<option value="">-- Choisir --</option>';
+            personnel.forEach(function(p) {
+                var opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = (p.prenom ? p.prenom + ' ' : '') + p.nom + ' (' + p.role + ')';
+                sel.appendChild(opt);
+            });
+            sel.value = current;
         });
-        document.getElementById('gl-tbody').innerHTML = html;
     });
 }
-autoLoad['grand-livre'] = function() {
-    logChargerCamions(function() {
-        logRemplirSelectCamions('gl-camion', 'Choisir un camion');
-        emptyTable('gl-tbody', 7, 'Selectionnez un camion');
-    });
-};
 
-// -- Rapprochement camion -------------------------------------------------------------------
-function logChargerRapprochement() {
-    var camionId = document.getElementById('rap-camion').value;
-    if (!camionId) return;
-    apiGet('/api/logistique/rapprochement-camion?camion_id=' + camionId, function(d) {
-        var r = d.rapprochement;
-        document.getElementById('rap-local-recettes').textContent = fmt.money(r.local_recettes);
-        document.getElementById('rap-local-depenses').textContent = fmt.money(r.local_depenses);
-        document.getElementById('rap-sage-credit').textContent = fmt.money(r.sage_credit);
-        document.getElementById('rap-sage-debit').textContent = fmt.money(r.sage_debit);
-        document.getElementById('rap-ecart-recettes').textContent = fmt.money(r.ecart_recettes);
-        document.getElementById('rap-ecart-depenses').textContent = fmt.money(r.ecart_depenses);
+function ouvrirModalPersonnel() {
+    peuplerSelectCamions(['per-camion']);
+    ouvrirModal('modal-personnel');
+}
+
+function creerPersonnel() {
+    var nom = document.getElementById('per-nom') ? document.getElementById('per-nom').value.trim() : '';
+    if (!nom) { alert('Nom obligatoire'); return; }
+    var data = {
+        nom: nom,
+        prenom:    document.getElementById('per-prenom') ? document.getElementById('per-prenom').value : '',
+        role:      document.getElementById('per-role')   ? document.getElementById('per-role').value   : 'CHAUFFEUR',
+        telephone: document.getElementById('per-tel')     ? document.getElementById('per-tel').value     : '',
+        permis:    document.getElementById('per-permis')  ? document.getElementById('per-permis').value  : '',
+        camion_id: document.getElementById('per-camion')  ? (document.getElementById('per-camion').value || null) : null,
+    };
+    var msg = document.getElementById('per-msg');
+    apiPost('/api/logistique/personnel', data, function() {
+        fermerModal('modal-personnel');
+        chargerPersonnel();
+        status('Personnel enregistre: ' + nom);
+        if (msg) msg.innerHTML = '';
+        ['per-nom','per-prenom','per-tel','per-permis'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    }, function(e) {
+        if (msg) msg.innerHTML = '<span style="color:var(--red)">Erreur: ' + e + '</span>';
     });
 }
-autoLoad['rapprochement'] = function() {
-    logChargerCamions(function() {
-        logRemplirSelectCamions('rap-camion', 'Choisir un camion');
+
+// ── Creation Voyage ───────────────────────────────────────────────
+function ouvrirModalVoyage() {
+    peuplerSelectCamions(['voy-camion']);
+    peuplerSelectPersonnel(['voy-chauffeur','voy-convoyeur']);
+    ouvrirModal('modal-voyage');
+}
+
+function creerVoyage() {
+    var camion = document.getElementById('voy-camion') ? document.getElementById('voy-camion').value : '';
+    var origine = document.getElementById('voy-origine') ? document.getElementById('voy-origine').value.trim() : '';
+    var dest = document.getElementById('voy-destination') ? document.getElementById('voy-destination').value.trim() : '';
+    if (!camion) { alert('Camion obligatoire'); return; }
+    if (!origine || !dest) { alert('Origine et destination obligatoires'); return; }
+    var data = {
+        camion_id:          camion,
+        chauffeur_id:        document.getElementById('voy-chauffeur')   ? (document.getElementById('voy-chauffeur').value || null) : null,
+        convoyeur_id:         document.getElementById('voy-convoyeur')   ? (document.getElementById('voy-convoyeur').value || null) : null,
+        origine:              origine,
+        destination:          dest,
+        date_depart:          document.getElementById('voy-depart')     ? document.getElementById('voy-depart').value     : '',
+        date_retour:          document.getElementById('voy-retour')     ? document.getElementById('voy-retour').value     : '',
+        statut:               document.getElementById('voy-statut')     ? document.getElementById('voy-statut').value     : 'planifie',
+        marchandises:         document.getElementById('voy-marchandises') ? document.getElementById('voy-marchandises').value : '',
+        client_fournisseur:  document.getElementById('voy-client')      ? document.getElementById('voy-client').value      : '',
+        observations:         document.getElementById('voy-obs')        ? document.getElementById('voy-obs').value        : '',
+    };
+    var msg = document.getElementById('voy-msg');
+    apiPost('/api/logistique/voyages', data, function(d) {
+        fermerModal('modal-voyage');
+        chargerVoyages();
+        status('Voyage cree: ' + (d.no_voyage || ''));
+        if (msg) msg.innerHTML = '';
+    }, function(e) {
+        if (msg) msg.innerHTML = '<span style="color:var(--red)">Erreur: ' + e + '</span>';
     });
-};
+}
 
-window.autoLoad = autoLoad;
+// ── Creation Entretien ───────────────────────────────────────────
+function ouvrirModalEntretien() {
+    peuplerSelectCamions(['ent-camion']);
+    ouvrirModal('modal-entretien');
+}
 
-logChargerDashboard();
+function creerEntretien() {
+    var camion = document.getElementById('ent-camion') ? document.getElementById('ent-camion').value : '';
+    if (!camion) { alert('Camion obligatoire'); return; }
+    var data = {
+        camion_id:          camion,
+        type_entretien:      document.getElementById('ent-type')        ? document.getElementById('ent-type').value        : 'AUTRE',
+        date_entretien:      document.getElementById('ent-date')        ? document.getElementById('ent-date').value        : '',
+        kilometrage:          document.getElementById('ent-km')          ? parseInt(document.getElementById('ent-km').value) || 0 : 0,
+        cout:                 document.getElementById('ent-cout')        ? parseFloat(document.getElementById('ent-cout').value) || 0 : 0,
+        prestataire:          document.getElementById('ent-prestataire') ? document.getElementById('ent-prestataire').value : '',
+        description:          document.getElementById('ent-description') ? document.getElementById('ent-description').value : '',
+        prochaine_revision:  document.getElementById('ent-prochaine')   ? document.getElementById('ent-prochaine').value   : '',
+    };
+    var msg = document.getElementById('ent-msg');
+    apiPost('/api/logistique/entretiens', data, function() {
+        fermerModal('modal-entretien');
+        chargerEntretiens();
+        status('Entretien enregistre');
+        if (msg) msg.innerHTML = '';
+    }, function(e) {
+        if (msg) msg.innerHTML = '<span style="color:var(--red)">Erreur: ' + e + '</span>';
+    });
+}
+
+// ── Creation Transaction ─────────────────────────────────────────
+function ouvrirModalTransaction() {
+    peuplerSelectCamions(['tx-camion']);
+    ouvrirModal('modal-transaction');
+}
+
+function creerTransaction() {
+    var camion = document.getElementById('tx-camion') ? document.getElementById('tx-camion').value : '';
+    if (!camion) { alert('Camion obligatoire'); return; }
+    var data = {
+        camion_id:           camion,
+        type_transaction:    document.getElementById('tx-type')      ? document.getElementById('tx-type').value      : 'DEPENSE',
+        categorie:            document.getElementById('tx-categorie') ? document.getElementById('tx-categorie').value : 'AUTRE',
+        date_transaction:     document.getElementById('tx-date')      ? document.getElementById('tx-date').value      : '',
+        montant:              document.getElementById('tx-montant')   ? parseFloat(document.getElementById('tx-montant').value) || 0 : 0,
+        libelle:               document.getElementById('tx-libelle')   ? document.getElementById('tx-libelle').value   : '',
+    };
+    var msg = document.getElementById('tx-msg');
+    apiPost('/api/logistique/transactions', data, function() {
+        fermerModal('modal-transaction');
+        chargerTransactions();
+        status('Transaction enregistree');
+        if (msg) msg.innerHTML = '';
+    }, function(e) {
+        if (msg) msg.innerHTML = '<span style="color:var(--red)">Erreur: ' + e + '</span>';
+    });
+}

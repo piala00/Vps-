@@ -2,41 +2,89 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NEXORA — {{ module_label }}</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/nexora.css') }}">
-{% block head %}{% endblock %}
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEXORA — {{ module_label | default('Accueil') }}</title>
+<link rel="stylesheet" href="/static/css/nexora.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <div class="layout">
 
+  <!-- SIDEBAR -->
   <div id="sidebar">
-    <div class="sidebar-header">
-      <div class="logo">NEXORA</div>
-      <div class="sub">v2.0 — {{ module_label }}</div>
+    <div class="sidebar-logo">
+      <h1>⚡ NEXORA</h1>
+      <p>Plateforme ERP v2.0</p>
     </div>
-
-    <button class="nav-item" onclick="window.location.href='{{ url_for('accueil') }}'">🏠 Accueil</button>
+    <div class="sidebar-user">
+      <div class="uname">{{ user.prenom }} {{ user.nom }}</div>
+      <div class="urole">{{ user.agence }}</div>
+    </div>
 
     {% block sidebar %}{% endblock %}
 
-    <button class="nav-item" onclick="window.location.href='{{ url_for('logout') }}'">🚪 Deconnexion</button>
+    <a href="/logout" class="nav-item" style="color:rgba(255,255,255,.4);margin-top:8px;
+       border-top:1px solid rgba(255,255,255,.1);padding-top:12px">
+      <span class="ico">🚪</span> Deconnexion
+    </a>
   </div>
 
-  <div id="content">
-    {% block content %}{% endblock %}
+  <!-- CONTENU PRINCIPAL -->
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+    <!-- TOPBAR FIXE : toujours visible, acces permanent au retour module -->
+    <div id="topbar">
+      <a href="/accueil" id="topbar-home" title="Retour a l'accueil des modules">
+        🏠 <span>Accueil</span>
+      </a>
+      <span class="topbar-sep">›</span>
+      <span class="topbar-current">{{ module_label | default('Accueil') }}</span>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+        <span class="topbar-user">{{ user.prenom }} {{ user.nom }}</span>
+      </div>
+    </div>
+    {% if module in ['commercial', 'comptabilite'] %}
+    <div id="periode-bar">
+      <span class="periode-lbl">Période :</span>
+      <select id="pb-annee"></select>
+      <select id="pb-mois">
+        <option value="">Tous</option>
+        <option value="1">Janvier</option><option value="2">Février</option>
+        <option value="3">Mars</option><option value="4">Avril</option>
+        <option value="5">Mai</option><option value="6">Juin</option>
+        <option value="7">Juillet</option><option value="8">Août</option>
+        <option value="9">Septembre</option><option value="10">Octobre</option>
+        <option value="11">Novembre</option><option value="12">Décembre</option>
+      </select>
+      <button class="btn btn-gold btn-sm" onclick="nexoraAppliquerPeriode()">▶ Appliquer</button>
+      <span class="periode-sep">|</span>
+      <label class="periode-lbl">Du</label>
+      <input type="date" id="pb-du" style="width:130px">
+      <label class="periode-lbl">Au</label>
+      <input type="date" id="pb-au" style="width:130px">
+      <span class="periode-sep">|</span>
+      <button class="btn btn-outline btn-sm" onclick="nexoraRaccourciPeriode('annee')">Cette année</button>
+      <button class="btn btn-outline btn-sm" onclick="nexoraRaccourciPeriode('mois')">Mois en cours</button>
+      <button class="btn btn-outline btn-sm" onclick="nexoraRaccourciPeriode('3mois')">3 mois</button>
+      <span id="pb-active-label" style="margin-left:auto;font-size:11px;font-weight:700;color:var(--gold)"></span>
+    </div>
+    {% endif %}
+    <div id="content">
+      {% block content %}{% endblock %}
+    </div>
+    <div id="sbar">
+      <span id="sbar-txt">NEXORA v2.0 — Pret</span>
+      <span style="margin-left:auto;color:var(--muted)">
+        {{ user.nom }} | {{ config.nom_societe | default('NEXORA') }}
+      </span>
+    </div>
   </div>
+
 
 </div>
 
-<div id="sbar">
-  <span id="sbar-txt">NEXORA v2.0 — Pret</span>
-  <span style="margin-left:auto">{{ session.get('nom','') }} — {{ societe_nom }}</span>
-</div>
-
-<script src="{{ url_for('static', filename='js/nexora-core.js') }}"></script>
-{% if module %}
-<script src="{{ url_for('static', filename='js/modules/' + module + '.js') }}"></script>
+<script src="/static/js/nexora-core.js"></script>
+{% if module is defined %}
+<script src="/static/js/modules/{{ module }}.js"></script>
 {% endif %}
 {% block scripts %}{% endblock %}
 </body>

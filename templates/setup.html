@@ -2,143 +2,207 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NEXORA — Configuration initiale</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/nexora.css') }}">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
+body{min-height:100vh;background:linear-gradient(135deg,#1A3263 0%,#0F172A 100%);display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:white;border-radius:16px;padding:36px;width:560px;box-shadow:0 24px 80px rgba(0,0,0,.4)}
+.brand{text-align:center;margin-bottom:18px}
+.brand h1{font-size:22px;font-weight:900;color:#1A3263;letter-spacing:2px}
+.brand p{font-size:11px;color:#64748B;margin-top:3px}
+.divider{height:3px;background:linear-gradient(90deg,#FBC013,#1A3263);border-radius:2px;margin:0 0 20px}
+.steps{display:flex;justify-content:center;gap:6px;margin-bottom:4px}
+.step{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;transition:.3s}
+.step.done{background:#10B981;color:white}
+.step.active{background:#1A3263;color:white}
+.step.pending{background:#E8EDF4;color:#9AA4B2}
+.step-label{text-align:center;font-size:11px;color:#64748B;margin-bottom:16px;font-weight:600}
+.pane{display:none}.pane.active{display:block}
+h2{font-size:15px;font-weight:700;color:#1A3263;margin-bottom:3px}
+.subtitle{font-size:11px;color:#64748B;margin-bottom:14px}
+.fg{margin-bottom:10px}
+.fg label{display:block;font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+input,select{width:100%;padding:8px 11px;border:2px solid #E2E8F0;border-radius:7px;font-size:13px;color:#1A3263;outline:none;transition:.2s;background:white}
+input:focus,select:focus{border-color:#1A3263}
+.frow{display:flex;gap:10px}.frow .fg{flex:1}
+.btn{padding:10px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:.2s;width:100%;margin-top:4px}
+.btn-navy{background:#1A3263;color:white}.btn-navy:hover{background:#142651}
+.btn-gold{background:#FBC013;color:#1A3263}
+.btn-out{background:white;color:#1A3263;border:2px solid #1A3263}
+.btns{display:flex;gap:8px;margin-top:14px}
+.btns .btn{flex:1}
+.prog{height:5px;background:#E8EDF4;border-radius:3px;overflow:hidden;margin:10px 0}
+.prog-fill{height:100%;background:linear-gradient(90deg,#1A3263,#FBC013);transition:width .5s;border-radius:3px}
+.log{font-size:11px;color:#64748B;min-height:60px;margin:8px 0;line-height:1.9}
+</style>
 </head>
 <body>
-<div class="auth-wrap">
-  <div class="auth-box auth-wide">
-    <div class="auth-logo">
-      <div class="title">NEXORA</div>
-      <div class="sub">v2.0 — Assistant de configuration</div>
+<div class="card">
+  <div class="brand"><div style="font-size:36px">⚡</div><h1>NEXORA</h1><p>Assistant de configuration — Premiere utilisation</p></div>
+  <div class="divider"></div>
+  <div class="steps">
+    <div class="step active" id="s1">1</div><div class="step pending" id="s2">2</div>
+    <div class="step pending" id="s3">3</div><div class="step pending" id="s4">4</div>
+    <div class="step pending" id="s5">5</div>
+  </div>
+  <div class="step-label" id="step-label">Etape 1 — Informations de la societe</div>
+
+  <div class="pane active" id="pane1">
+    <h2>🏢 Votre societe</h2>
+    <p class="subtitle">Ces informations apparaitront dans toute l'application.</p>
+    <div class="frow"><div class="fg" style="flex:2"><label>Nom de la societe *</label><input type="text" id="soc-nom" placeholder="Ex: Maison Durand SARL"></div>
+    <div class="fg" style="flex:1"><label>Sigle</label><input type="text" id="soc-sigle" placeholder="Ex: MDU"></div></div>
+    <div class="frow">
+      <div class="fg"><label>Secteur</label><select id="soc-secteur"><option value="">Choisir</option>
+        <option value="commerce_general">Commerce general</option><option value="alimentaire">Alimentaire</option>
+        <option value="btp">BTP / Materiaux</option><option value="pharmacie">Pharmacie</option>
+        <option value="transport">Transport</option><option value="autre">Autre</option></select></div>
+      <div class="fg"><label>Devise</label><select id="soc-devise"><option value="XAF">FCFA (XAF)</option>
+        <option value="EUR">Euro (EUR)</option><option value="USD">Dollar (USD)</option></select></div>
     </div>
-
-    <div class="wizard-steps">
-      <div class="wizard-step active" id="wst-1">1. Societe</div>
-      <div class="wizard-step" id="wst-2">2. Agence</div>
-      <div class="wizard-step" id="wst-3">3. Sage</div>
-      <div class="wizard-step" id="wst-4">4. Administrateur</div>
-      <div class="wizard-step" id="wst-5">5. Recapitulatif</div>
+    <div class="frow">
+      <div class="fg"><label>Pays</label><select id="soc-pays"><option value="CM">Cameroun</option>
+        <option value="CI">Cote d'Ivoire</option><option value="SN">Senegal</option>
+        <option value="GA">Gabon</option><option value="FR">France</option></select></div>
+      <div class="fg"><label>Ville siege</label><input type="text" id="soc-ville" placeholder="Ex: Bertoua"></div>
     </div>
+    <button class="btn btn-navy" onclick="goStep(2)">Continuer →</button>
+  </div>
 
-    <form method="post" id="setupform">
+  <div class="pane" id="pane2">
+    <h2>🏪 Structure</h2>
+    <p class="subtitle">Nom du siege et agences de votre entreprise.</p>
+    <div class="fg"><label>Nom du siege *</label><input type="text" id="siege-nom" placeholder="Ex: Direction Generale Bertoua"></div>
+    <div class="btns"><button class="btn btn-out" onclick="goStep(1)">← Retour</button><button class="btn btn-navy" onclick="goStep(3)">Continuer →</button></div>
+  </div>
 
-      <div class="wizard-pane active" id="wp-1">
-        <div class="form-grid">
-          <div class="fgroup">
-            <label>Nom de la societe</label>
-            <input type="text" name="societe_nom" placeholder="GTC Bertoua" required>
-          </div>
-          <div class="fgroup">
-            <label>Ville</label>
-            <input type="text" name="societe_ville" placeholder="Bertoua">
-          </div>
-        </div>
-      </div>
+  <div class="pane" id="pane3">
+    <h2>🔌 Connexion Sage</h2>
+    <p class="subtitle">Optionnel. Vous pouvez ignorer cette etape et configurer plus tard dans Parametres.</p>
+    <div class="fg"><label>Serveur SQL Server</label><input type="text" id="sage-srv" placeholder="Ex: GTCSVRDC01\SAGE100"></div>
+    <div class="frow"><div class="fg"><label>Base de donnees</label><input type="text" id="sage-db" placeholder="Ex: GTC 2026"></div>
+    <div class="fg"><label>Exercice</label><input type="text" id="sage-annee" placeholder="2026" value="2026"></div></div>
+    <div class="frow"><div class="fg"><label>Utilisateur</label><input type="text" id="sage-user" placeholder="sa"></div>
+    <div class="fg"><label>Mot de passe</label><input type="password" id="sage-pwd"></div></div>
+    <div class="btns">
+      <button class="btn btn-out" onclick="goStep(2)">← Retour</button>
+      <button class="btn btn-out" onclick="goStep(4)">Ignorer</button>
+      <button class="btn btn-navy" onclick="goStep(4)">Continuer →</button>
+    </div>
+  </div>
 
-      <div class="wizard-pane" id="wp-2">
-        <div class="form-grid">
-          <div class="fgroup">
-            <label>Agence locale (ce poste)</label>
-            <select name="agence_locale">
-              {% for a in agences %}
-              <option value="{{ a.code }}">{{ a.nom }} ({{ a.ville }})</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="fgroup">
-            <label>N° depot Sage associe</label>
-            <input type="number" name="depot_sage_no" placeholder="7">
-          </div>
-        </div>
-        <div class="alert alert-info">Le depot Sage correspond au numero F_DEPOT (ex : 7 = Bertoua).</div>
-      </div>
+  <div class="pane" id="pane4">
+    <h2>👤 Compte administrateur</h2>
+    <p class="subtitle">Compte principal. Mot de passe optionnel en mode conception.</p>
+    <div class="frow"><div class="fg"><label>Prenom</label><input type="text" id="adm-prenom" placeholder="Votre prenom"></div>
+    <div class="fg"><label>Nom *</label><input type="text" id="adm-nom" placeholder="Votre nom"></div></div>
+    <div class="fg"><label>Identifiant *</label><input type="text" id="adm-login" placeholder="Ex: admin" value="admin"></div>
+    <div class="frow"><div class="fg"><label>Mot de passe (optionnel)</label><input type="password" id="adm-pwd" placeholder="Vide = sans mot de passe"></div>
+    <div class="fg"><label>Confirmer</label><input type="password" id="adm-pwd2"></div></div>
+    <div class="btns"><button class="btn btn-out" onclick="goStep(3)">← Retour</button><button class="btn btn-gold" onclick="goStep(5)">Installer →</button></div>
+  </div>
 
-      <div class="wizard-pane" id="wp-3">
-        <div class="alert alert-info">Connexion a Sage 100 (facultative — peut etre configuree plus tard dans Parametres).</div>
-        <div class="form-grid">
-          <div class="fgroup">
-            <label>Serveur SQL Server</label>
-            <input type="text" name="sage_server" placeholder="SERVEUR\\SAGE100">
-          </div>
-          <div class="fgroup">
-            <label>Base de donnees</label>
-            <input type="text" name="sage_database" placeholder="GTC 2026">
-          </div>
-          <div class="fgroup">
-            <label>Identifiant SQL</label>
-            <input type="text" name="sage_login" placeholder="sa">
-          </div>
-          <div class="fgroup">
-            <label>Mot de passe SQL</label>
-            <input type="password" name="sage_password">
-          </div>
-        </div>
-        <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px">
-          <input type="checkbox" name="sage_trusted" id="sage_trusted" style="width:auto" checked>
-          <label for="sage_trusted" style="margin:0">Authentification Windows (Trusted Connection)</label>
-        </div>
-      </div>
-
-      <div class="wizard-pane" id="wp-4">
-        <div class="form-grid">
-          <div class="fgroup">
-            <label>Identifiant administrateur</label>
-            <input type="text" name="admin_username" value="admin" required>
-          </div>
-          <div class="fgroup">
-            <label>Nom complet</label>
-            <input type="text" name="admin_nom" value="Administrateur">
-          </div>
-          <div class="fgroup">
-            <label>Mot de passe</label>
-            <input type="password" name="admin_password" placeholder="Facultatif en mode conception">
-          </div>
-        </div>
-      </div>
-
-      <div class="wizard-pane" id="wp-5">
-        <div class="alert alert-ok">Tout est pret. Cliquez sur "Terminer" pour finaliser l'installation.</div>
-        <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px">
-          <input type="checkbox" name="mode_conception" id="mode_conception" style="width:auto" checked>
-          <label for="mode_conception" style="margin:0">Activer le mode conception (connexion sans mot de passe)</label>
-        </div>
-      </div>
-
-      <div class="frow" style="justify-content:space-between;margin-top:18px">
-        <button type="button" class="btn btn-outline" id="btn-prev" onclick="wizardPrev()" disabled>Precedent</button>
-        <button type="button" class="btn btn-navy" id="btn-next" onclick="wizardNext()">Suivant</button>
-        <button type="submit" class="btn btn-gold" id="btn-finish" style="display:none">Terminer</button>
-      </div>
-
-    </form>
+  <div class="pane" id="pane5">
+    <h2>⚡ Installation en cours</h2>
+    <p class="subtitle">NEXORA configure votre environnement...</p>
+    <div class="prog"><div class="prog-fill" id="prog" style="width:0%"></div></div>
+    <div class="log" id="install-log"></div>
+    <div id="install-ok" style="display:none;text-align:center;padding:16px 0">
+      <div style="font-size:48px">✅</div>
+      <h2 style="color:#10B981;margin:8px 0">Configuration terminee !</h2>
+      <button class="btn btn-gold" style="margin-top:12px" onclick="window.location='/login'">Acceder a NEXORA →</button>
+    </div>
+    <div id="install-err" style="display:none">
+      <div style="color:#EF4444;font-size:13px;padding:10px;background:#FEF2F2;border-radius:8px" id="install-err-msg"></div>
+      <button class="btn btn-out" style="margin-top:10px" onclick="goStep(1)">Recommencer</button>
+    </div>
   </div>
 </div>
-
 <script>
-var wizardStep = 1;
-var wizardTotal = 5;
-
-function wizardShow(n) {
-    for (var i = 1; i <= wizardTotal; i++) {
-        document.getElementById('wp-' + i).classList.remove('active');
-        document.getElementById('wst-' + i).classList.remove('active');
+var currentStep = 1;
+function showPane(n) {
+    var labels = {1:'Etape 1 — Societe',2:'Etape 2 — Structure',3:'Etape 3 — Sage',4:'Etape 4 — Administrateur',5:'Etape 5 — Installation'};
+    for (var i=1; i<=5; i++) {
+        var p = document.getElementById('pane'+i);
+        var s = document.getElementById('s'+i);
+        if (p) p.className = i===n ? 'pane active' : 'pane';
+        if (s) s.className = i===n ? 'step active' : (i<n ? 'step done' : 'step pending');
     }
-    document.getElementById('wp-' + n).classList.add('active');
-    document.getElementById('wst-' + n).classList.add('active');
-    document.getElementById('btn-prev').disabled = (n === 1);
-    document.getElementById('btn-next').style.display = (n === wizardTotal) ? 'none' : '';
-    document.getElementById('btn-finish').style.display = (n === wizardTotal) ? '' : 'none';
-    wizardStep = n;
+    var lbl = document.getElementById('step-label');
+    if (lbl) lbl.textContent = labels[n]||'';
+    currentStep = n;
 }
-
-function wizardNext() {
-    if (wizardStep < wizardTotal) wizardShow(wizardStep + 1);
+function goStep(n) {
+    if (n===2) {
+        var nom = document.getElementById('soc-nom') ? document.getElementById('soc-nom').value.trim() : '';
+        if (!nom) { alert('Nom de la societe obligatoire'); return; }
+    }
+    if (n===5) {
+        var nom2 = document.getElementById('adm-nom') ? document.getElementById('adm-nom').value.trim() : '';
+        if (!nom2) { document.getElementById('adm-nom').value = 'Administrateur'; }
+        var login = document.getElementById('adm-login') ? document.getElementById('adm-login').value.trim() : '';
+        if (!login) { document.getElementById('adm-login').value = 'admin'; }
+        var p1 = document.getElementById('adm-pwd') ? document.getElementById('adm-pwd').value : '';
+        var p2 = document.getElementById('adm-pwd2') ? document.getElementById('adm-pwd2').value : '';
+        if (p1 && p1 !== p2) { alert('Mots de passe differents'); return; }
+        showPane(5);
+        setTimeout(lancerInstallation, 300);
+        return;
+    }
+    showPane(n);
 }
-
-function wizardPrev() {
-    if (wizardStep > 1) wizardShow(wizardStep - 1);
+function log(msg, pct) {
+    var el = document.getElementById('install-log');
+    if (el) el.innerHTML += '<div>' + msg + '</div>';
+    if (pct !== undefined) {
+        var prog = document.getElementById('prog');
+        if (prog) prog.style.width = pct + '%';
+    }
+}
+function lancerInstallation() {
+    log('Creation de la base de donnees...', 20);
+    var data = {
+        nom_societe:   document.getElementById('soc-nom')    ? document.getElementById('soc-nom').value.trim()    : '',
+        sigle_societe: document.getElementById('soc-sigle')  ? document.getElementById('soc-sigle').value.trim()  : '',
+        secteur:       document.getElementById('soc-secteur')? document.getElementById('soc-secteur').value       : '',
+        devise:        document.getElementById('soc-devise') ? document.getElementById('soc-devise').value        : 'XAF',
+        pays:          document.getElementById('soc-pays')   ? document.getElementById('soc-pays').value          : 'CM',
+        ville_siege:   document.getElementById('soc-ville')  ? document.getElementById('soc-ville').value.trim()  : '',
+        nom_siege:     document.getElementById('siege-nom')  ? document.getElementById('siege-nom').value.trim()  : '',
+        type_site:     'SIEGE',
+        sage_server:   document.getElementById('sage-srv')   ? document.getElementById('sage-srv').value.trim()   : '',
+        sage_database: document.getElementById('sage-db')    ? document.getElementById('sage-db').value.trim()    : '',
+        sage_annee:    document.getElementById('sage-annee') ? document.getElementById('sage-annee').value        : '2026',
+        sage_user:     document.getElementById('sage-user')  ? document.getElementById('sage-user').value.trim()  : 'sa',
+        sage_password: document.getElementById('sage-pwd')   ? document.getElementById('sage-pwd').value          : '',
+        admin_nom:     document.getElementById('adm-nom')    ? document.getElementById('adm-nom').value.trim()    : 'Administrateur',
+        admin_prenom:  document.getElementById('adm-prenom') ? document.getElementById('adm-prenom').value.trim() : '',
+        admin_login:   document.getElementById('adm-login')  ? document.getElementById('adm-login').value.trim()  : 'admin',
+        admin_password:document.getElementById('adm-pwd')    ? document.getElementById('adm-pwd').value           : '',
+    };
+    setTimeout(function(){ log('Configuration de la societe...', 40); }, 500);
+    setTimeout(function(){ log("Creation du compte administrateur...", 60); }, 1000);
+    setTimeout(function(){ log('Finalisation...', 80); }, 1500);
+    fetch('/setup', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+        if (d.ok) {
+            log('Installation terminee !', 100);
+            document.getElementById('install-ok').style.display = 'block';
+        } else {
+            var err = document.getElementById('install-err');
+            var msg = document.getElementById('install-err-msg');
+            if (err) err.style.display = 'block';
+            if (msg) msg.textContent = d.message || 'Erreur';
+        }
+    })
+    .catch(function(e) {
+        var err = document.getElementById('install-err');
+        var msg = document.getElementById('install-err-msg');
+        if (err) err.style.display = 'block';
+        if (msg) msg.textContent = 'Erreur: ' + e.message;
+    });
 }
 </script>
 </body>

@@ -19,7 +19,7 @@ pause & exit /b 1
 :found
 echo Python trouve : %PYTHON%
 echo Installation des dependances...
-%PYTHON% -m pip install flask pyodbc openpyxl reportlab Pillow --quiet
+%PYTHON% -m pip install flask pyodbc openpyxl python-telegram-bot Pillow --quiet
 
 echo Demarrage de NEXORA...
 %PYTHON% run.py

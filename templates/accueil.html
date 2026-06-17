@@ -2,65 +2,92 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NEXORA — Accueil</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/nexora.css') }}">
+<link rel="stylesheet" href="/static/css/nexora.css">
+<style>
+body{background:var(--bg);min-height:100vh;padding:0}
+.header{background:var(--navy);color:white;padding:14px 24px;
+        display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:18px;font-weight:900;letter-spacing:2px}
+.header .info{font-size:12px;color:rgba(255,255,255,.6)}
+.main{padding:24px;max-width:1100px;margin:0 auto}
+.welcome{margin-bottom:24px}
+.welcome h2{font-size:20px;font-weight:800;color:var(--navy)}
+.welcome p{color:var(--muted);font-size:13px;margin-top:4px}
+.modules-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:14px;
+}
+.mod-card{
+  background:white;border-radius:12px;padding:20px;
+  border:2px solid var(--border);text-decoration:none;color:var(--text);
+  transition:all .2s;display:block;
+  box-shadow:0 2px 8px rgba(0,0,0,.06);
+}
+.mod-card:hover{border-color:var(--gold);transform:translateY(-2px);
+  box-shadow:0 8px 24px rgba(0,0,0,.1)}
+.mod-card .mod-ico{font-size:32px;margin-bottom:10px}
+.mod-card .mod-name{font-size:14px;font-weight:800;color:var(--navy);
+  margin-bottom:4px}
+.mod-card .mod-desc{font-size:11px;color:var(--muted);line-height:1.5}
+.mod-card .mod-badge{display:inline-block;margin-top:8px;padding:2px 8px;
+  border-radius:20px;background:rgba(26,50,99,.08);
+  color:var(--navy);font-size:10px;font-weight:700}
+</style>
 </head>
 <body>
-<div class="layout">
 
-  <div id="sidebar">
-    <div class="sidebar-header">
-      <div class="logo">NEXORA</div>
-      <div class="sub">v2.0 — {{ societe_nom }}</div>
-    </div>
+<div class="header">
+  <div>
+    <h1>⚡ NEXORA</h1>
+    <div class="info">Plateforme ERP v2.0 — {{ config.nom_societe | default('') }}</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <span style="font-size:12px;color:rgba(255,255,255,.7)">
+      👤 {{ user.prenom }} {{ user.nom }}
+    </span>
+    <a href="/logout" style="font-size:12px;color:rgba(255,255,255,.5);
+       text-decoration:none;border:1px solid rgba(255,255,255,.2);
+       padding:5px 12px;border-radius:6px">
+      Deconnexion
+    </a>
+  </div>
+</div>
 
-    <button class="nav-item active" data-nav="accueil">🏠 Accueil</button>
-    {% for m in modules %}
-    <button class="nav-item" onclick="window.location.href='{{ m.url }}'">{{ m.icon }} {{ m.label.split(' ',1)[1] if ' ' in m.label else m.label }}</button>
-    {% endfor %}
-
-    <button class="nav-item" onclick="window.location.href='{{ url_for('logout') }}'">🚪 Deconnexion</button>
+<div class="main">
+  <div class="welcome">
+    <h2>Bonjour, {{ user.prenom or user.nom }} 👋</h2>
+    <p>Choisissez un module pour commencer</p>
   </div>
 
-  <div id="content">
-    <div class="section active">
-      <div class="section-title">🏠 Bienvenue sur NEXORA</div>
+  <div class="modules-grid">
+    {% set module_defs = [
+      ('stock',        '📦', 'Stock & Inventaire',       'BL Sage, mouvements, analyses dormants, inter-agences'),
+      ('logistique',   '🚛', 'Logistique',               'Flotte, voyages, entretiens, comptabilite camions'),
+      ('commercial',   '📊', 'Commercial',               'Clients, objectifs, suivi ventes, analyse CA'),
+      ('comptabilite', '💰', 'Comptabilite',             'Creances, balance agee, rapport de caisse'),
+      ('caisse',       '🏪', 'Caisse',                   'Saisie rapport journalier, historique'),
+      ('rh',           '👥', 'Ressources Humaines',      'Employes, presences (a venir)'),
+      ('rapports',     '📋', 'Rapports',                 'Excel, PDF, analyses consolidees'),
+      ('consolidation','🏆', 'Consolidation',            'Vue reseau, benchmark, tendances multi-agences'),
+      ('multisite',    '🌐', 'Multi-Sites',              'Stock inter-agences, transferts DT/DA'),
+      ('parametres',   '⚙️', 'Parametres',              'Config, utilisateurs, licence, securite'),
+    ] %}
 
-      {% if demo %}
-      <div class="alert alert-warn">
-        Mode demonstration actif — {{ jours_demo }} jour(s) restant(s). Activez une licence dans Parametres.
-      </div>
-      {% elif not licence.valide %}
-      <div class="alert alert-err">
-        Aucune licence active — {{ licence.erreur }}
-      </div>
+    {% for mod_id, ico, name, desc in module_defs %}
+      {% if mod_id in modules %}
+      <a href="/module/{{ mod_id }}" class="mod-card">
+        <div class="mod-ico">{{ ico }}</div>
+        <div class="mod-name">{{ name }}</div>
+        <div class="mod-desc">{{ desc }}</div>
+        <span class="mod-badge">Ouvrir →</span>
+      </a>
       {% endif %}
-
-      <div class="card">
-        <div class="card-title">Modules disponibles</div>
-        <div class="shortcut-grid">
-          {% for m in modules %}
-          <div class="shortcut-btn" onclick="window.location.href='{{ m.url }}'">
-            <div class="ico">{{ m.icon }}</div>
-            {{ m.label.split(' ',1)[1] if ' ' in m.label else m.label }}
-          </div>
-          {% endfor %}
-          {% if not modules %}
-          <div class="tbl-empty">Aucun module accessible — contactez l'administrateur.</div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
+    {% endfor %}
   </div>
-
 </div>
 
-<div id="sbar">
-  <span id="sbar-txt">NEXORA v2.0 — Pret</span>
-  <span style="margin-left:auto">{{ session.get('nom','') }} — {{ societe_nom }}</span>
-</div>
-
-<script src="{{ url_for('static', filename='js/nexora-core.js') }}"></script>
 </body>
 </html>

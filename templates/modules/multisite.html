@@ -1,430 +1,48 @@
 {% extends "base.html" %}
-
 {% block sidebar %}
-<button class="nav-item active" onclick="nav('multisite-dashboard')" data-nav="multisite-dashboard">🏠 Tableau de bord</button>
-
 <div class="nav-group">
-  <button class="nav-group-btn open" onclick="toggleGroup(this)">
-    <span>🏢</span> Agences <span class="arrow">▶</span>
-  </button>
+  <button class="nav-group-btn open" onclick="toggleGroup(this)"><span>🌐</span> Multi-Sites <span class="arrow">▶</span></button>
   <div class="nav-group-children open">
-    <button class="nav-item-sub" onclick="navSub(this,'agences')" data-nav="agences">🏢 Gestion des agences</button>
-    <button class="nav-item-sub" onclick="navSub(this,'visibilite')" data-nav="visibilite">👁️ Visibilite</button>
-  </div>
-</div>
-
-<div class="nav-group">
-  <button class="nav-group-btn open" onclick="toggleGroup(this)">
-    <span>🌐</span> Inter-Agences <span class="arrow">▶</span>
-  </button>
-  <div class="nav-group-children open">
-    <button class="nav-item-sub" onclick="navSub(this,'stock-reseau')" data-nav="stock-reseau">📦 Stock reseau</button>
-    <button class="nav-item-sub" onclick="navSub(this,'creances')" data-nav="creances">💰 Creances consolidees</button>
-  </div>
-</div>
-
-<div class="nav-group">
-  <button class="nav-group-btn open" onclick="toggleGroup(this)">
-    <span>🔄</span> Transferts DT <span class="arrow">▶</span>
-  </button>
-  <div class="nav-group-children open">
-    <button class="nav-item-sub" onclick="navSub(this,'dt-liste')" data-nav="dt-liste">📋 Liste des DT</button>
-    <button class="nav-item-sub" onclick="navSub(this,'dt-nouvelle')" data-nav="dt-nouvelle">➕ Nouvelle DT</button>
-  </div>
-</div>
-
-<div class="nav-group">
-  <button class="nav-group-btn open" onclick="toggleGroup(this)">
-    <span>🏭</span> Achats DA <span class="arrow">▶</span>
-  </button>
-  <div class="nav-group-children open">
-    <button class="nav-item-sub" onclick="navSub(this,'da-liste')" data-nav="da-liste">📋 Liste des DA</button>
-    <button class="nav-item-sub" onclick="navSub(this,'da-nouvelle')" data-nav="da-nouvelle">➕ Nouvelle DA</button>
+    <button class="nav-item-sub active" onclick="navSub(this,'ms2-stock')" data-nav="ms2-stock">📦 Stock inter-agences</button>
+    <button class="nav-item-sub" onclick="navSub(this,'ms2-transferts')" data-nav="ms2-transferts">🔄 Transferts DT</button>
+    <button class="nav-item-sub" onclick="navSub(this,'ms2-achats')" data-nav="ms2-achats">🏭 Achats DA</button>
   </div>
 </div>
 {% endblock %}
-
 {% block content %}
-<script>window.NEXORA_EST_SIEGE = {{ 'true' if est_siege else 'false' }};</script>
-
-<!-- ════════════ TABLEAU DE BORD ════════════ -->
-<div id="s-multisite-dashboard" class="section active">
-  <div class="section-title">🏠 Multi-Agences — Tableau de bord</div>
-
-  <div class="kpi-grid">
-    <div class="kpi-card k-blue">
-      <div class="kico">🏢</div>
-      <div class="kval" id="kpi-nb-agences">—</div>
-      <div class="klabel">Agences actives</div>
-    </div>
-    <div class="kpi-card k-warn">
-      <div class="kico">🔄</div>
-      <div class="kval" id="kpi-dt-attente">—</div>
-      <div class="klabel">DT en attente de validation</div>
-    </div>
-    <div class="kpi-card k-gold">
-      <div class="kico">🚚</div>
-      <div class="kval" id="kpi-dt-cours">—</div>
-      <div class="klabel">DT validees / en cours</div>
-    </div>
-    <div class="kpi-card k-red">
-      <div class="kico">🏭</div>
-      <div class="kval" id="kpi-da-attente">—</div>
-      <div class="klabel">DA en attente de validation</div>
-    </div>
+<div id="s-ms2-stock" class="section active">
+  <div class="section-title">📦 Stock Disponible Inter-Agences</div>
+  <div class="card"><div class="frow">
+    <select id="ms2-agence" style="width:180px" onchange="chargerMS2Stock()">
+      <option value="2">Bertoua (Siege)</option>
+      <option value="3">Douala</option>
+      <option value="4">Yaounde</option>
+      <option value="5">Garoua-Bouali</option>
+    </select>
+    <input type="text" id="ms2-search" placeholder="Reference..." style="width:200px" oninput="filtrerMS2()">
+    <button class="btn btn-navy" onclick="chargerMS2Stock()">🔄 Actualiser</button>
   </div>
-
-  <div class="alert alert-info" id="msite-siege-info" style="display:none">
-    Cette agence est le siege : vous pouvez valider ou refuser les Transferts (DT) et Demandes d'Achat (DA) soumis par les autres agences.
-  </div>
-
-  <div class="card">
-    <div class="card-title">Acces rapides</div>
-    <div class="shortcut-grid">
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=stock-reseau]').click()">
-        <div class="ico">📦</div>
-        Stock reseau
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=dt-nouvelle]').click()">
-        <div class="ico">🔄</div>
-        Nouvelle DT
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=da-nouvelle]').click()">
-        <div class="ico">🏭</div>
-        Nouvelle DA
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=agences]').click()">
-        <div class="ico">🏢</div>
-        Gestion des agences
-      </div>
-    </div>
-  </div>
+  <div class="alert alert-info" style="margin-top:8px">Stock dispo = AS_QteSto - AS_QteRes - DTs validees non livrees</div></div>
+  <div class="tbl-wrap"><table><thead><tr><th>Ref.</th><th>Designation</th><th>Physique</th><th style="color:#F97316">Reserve</th><th style="color:#818CF8">En DT</th><th style="color:#10B981;font-weight:700">DISPONIBLE</th><th>P.U</th></tr></thead>
+  <tbody id="ms2-tbody"><tr><td colspan="7" class="tbl-empty">Cliquez Actualiser</td></tr></tbody></table></div>
 </div>
-
-<!-- ════════════ GESTION DES AGENCES ════════════ -->
-<div id="s-agences" class="section">
-  <div class="section-title">🏢 Gestion des agences</div>
-
-  <div class="card">
-    <div class="frow" style="justify-content:space-between">
-      <div class="card-title" style="margin:0">Agences du reseau GTC</div>
-      <button class="btn btn-navy" onclick="msiteOuvrirAgence(null)">➕ Nouvelle agence</button>
-    </div>
-    <div class="tbl-wrap" style="margin-top:8px">
-      <table>
-        <thead>
-          <tr>
-            <th>Code</th><th>Nom</th><th>Ville</th><th>Type</th>
-            <th>Depot Sage</th><th>Telephone</th><th>Statut</th><th style="width:110px">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="ag-tbody"></tbody>
-      </table>
-    </div>
-  </div>
+<div id="s-ms2-transferts" class="section">
+  <div class="section-title">🔄 Demandes de Transfert (DT)</div>
+  <div class="card"><div class="frow">
+    <select id="ms2-dt-statut" style="width:160px">
+      <option value="">Tous</option><option value="SOUMISE">En attente</option>
+      <option value="VALIDEE">Validees</option><option value="LIVREE">Livrees</option>
+    </select>
+    <button class="btn btn-navy" onclick="chargerMS2DTs()">🔄 Actualiser</button>
+  </div></div>
+  <div id="ms2-dt-liste"><div class="tbl-empty">Cliquez Actualiser</div></div>
 </div>
-
-<!-- Modal agence -->
-<div class="modal" id="modal-agence">
-  <div class="modal-box">
-    <div class="modal-title">
-      <span id="ma-titre">Nouvelle agence</span>
-      <button class="modal-close" onclick="fermerModal('modal-agence')">✕</button>
-    </div>
-    <input type="hidden" id="ma-id">
-    <div class="form-grid">
-      <div class="fgroup">
-        <label>Code</label>
-        <input type="text" id="ma-code" placeholder="EX: NGAOUNDERE">
-      </div>
-      <div class="fgroup">
-        <label>Nom</label>
-        <input type="text" id="ma-nom">
-      </div>
-      <div class="fgroup">
-        <label>Ville</label>
-        <input type="text" id="ma-ville">
-      </div>
-      <div class="fgroup">
-        <label>Adresse</label>
-        <input type="text" id="ma-adresse">
-      </div>
-      <div class="fgroup">
-        <label>Telephone</label>
-        <input type="text" id="ma-telephone">
-      </div>
-      <div class="fgroup">
-        <label>Type de site</label>
-        <select id="ma-type-site">
-          <option value="AGENCE">Agence</option>
-          <option value="SIEGE">Siege</option>
-          <option value="DEPOT">Depot</option>
-        </select>
-      </div>
-      <div class="fgroup">
-        <label>N° depot Sage</label>
-        <input type="number" id="ma-depot-sage" placeholder="Ex: 7">
-      </div>
-      <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px;margin-top:24px">
-        <input type="checkbox" id="ma-actif" style="width:auto" checked>
-        <label for="ma-actif" style="margin:0">Agence active</label>
-      </div>
-    </div>
-    <div class="frow" style="justify-content:flex-end;margin-top:12px">
-      <button class="btn btn-outline" onclick="fermerModal('modal-agence')">Annuler</button>
-      <button class="btn btn-navy" onclick="msiteSauverAgence()">💾 Enregistrer</button>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ VISIBILITE ════════════ -->
-<div id="s-visibilite" class="section">
-  <div class="section-title">👁️ Permissions de visibilite inter-agences</div>
-  <div class="alert alert-info">Definit ce qu'une agence "source" peut consulter chez chaque agence "cible" : stock, transferts DT, ventes, creances.</div>
-
-  <div class="card">
-    <div class="frow">
-      <div class="fgroup" style="flex:1">
-        <label>Agence source</label>
-        <select id="vis-source" onchange="msiteChargerVisibilite()"></select>
-      </div>
-    </div>
-
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead>
-          <tr><th>Agence cible</th><th>Stock</th><th>Transferts DT</th><th>Ventes</th><th>Creances</th><th style="width:100px">Action</th></tr>
-        </thead>
-        <tbody id="vis-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ STOCK RESEAU ════════════ -->
-<div id="s-stock-reseau" class="section">
-  <div class="section-title">📦 Stock reseau — disponibilites inter-agences</div>
-  <div class="alert alert-info">Stock disponible par agence (donnees Sage), pour trouver rapidement quelle agence peut repondre a une commande.</div>
-
-  <div class="card">
-    <div class="frow">
-      <div class="fgroup" style="flex:1">
-        <label>Rechercher un article</label>
-        <input type="text" id="sr-recherche" placeholder="Code ou designation">
-      </div>
-      <button class="btn btn-navy" style="align-self:flex-end" onclick="msiteChargerStockReseau()">🔎 Rechercher</button>
-    </div>
-
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead>
-          <tr><th>Code article</th><th>Designation</th><th>Famille</th><th>Agence</th><th>Depot</th><th>Stock dispo</th><th>Valeur</th></tr>
-        </thead>
-        <tbody id="sr-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ CREANCES CONSOLIDEES ════════════ -->
-<div id="s-creances" class="section">
-  <div class="section-title">💰 Creances clients consolidees</div>
-  <div class="alert alert-info">Vue consolidee des creances clients (donnees Sage).</div>
-
-  <div class="card">
-    <div class="tbl-wrap">
-      <table>
-        <thead>
-          <tr><th>Code client</th><th>Nom</th><th>Telephone</th><th>Total debit</th><th>Total credit</th><th>Solde</th></tr>
-        </thead>
-        <tbody id="cr-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ LISTE DES DT ════════════ -->
-<div id="s-dt-liste" class="section">
-  <div class="section-title">📋 Transferts inter-agences (DT)</div>
-
-  <div class="card">
-    <div class="frow">
-      <div class="fgroup">
-        <label>Statut</label>
-        <select id="dt-filtre-statut" onchange="msiteChargerDT()">
-          <option value="">Tous</option>
-          <option value="SOUMISE">Soumise</option>
-          <option value="VALIDEE">Validee</option>
-          <option value="EN_COURS">En cours</option>
-          <option value="LIVREE">Livree</option>
-          <option value="REFUSEE">Refusee</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead>
-          <tr><th>N°</th><th>Source</th><th>Destination</th><th>Date</th><th>Articles</th><th>Valeur</th><th>Statut</th><th style="width:90px">Detail</th></tr>
-        </thead>
-        <tbody id="dt-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- Modal detail DT -->
-<div class="modal" id="modal-dt-detail">
-  <div class="modal-box modal-lg">
-    <div class="modal-title">
-      <span id="dtd-titre">Transfert</span>
-      <button class="modal-close" onclick="fermerModal('modal-dt-detail')">✕</button>
-    </div>
-    <div id="dtd-info"></div>
-    <div class="tbl-wrap" style="margin-top:8px">
-      <table>
-        <thead><tr><th>Code article</th><th>Designation</th><th>Qte demandee</th><th>Prix unitaire</th><th>Stock dispo source</th></tr></thead>
-        <tbody id="dtd-tbody"></tbody>
-      </table>
-    </div>
-    <div id="dtd-actions" class="frow" style="justify-content:flex-end;margin-top:12px"></div>
-  </div>
-</div>
-
-<!-- ════════════ NOUVELLE DT ════════════ -->
-<div id="s-dt-nouvelle" class="section">
-  <div class="section-title">➕ Nouvelle demande de transfert (DT)</div>
-  <div class="alert alert-warn">Composez votre panier d'articles puis soumettez la demande au siege pour validation.</div>
-
-  <div class="card">
-    <div class="form-grid">
-      <div class="fgroup">
-        <label>Agence source</label>
-        <select id="dtn-source"></select>
-      </div>
-      <div class="fgroup">
-        <label>Agence destination</label>
-        <select id="dtn-dest"></select>
-      </div>
-      <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px;margin-top:24px">
-        <input type="checkbox" id="dtn-urgence" style="width:auto">
-        <label for="dtn-urgence" style="margin:0">Demande urgente</label>
-      </div>
-      <div class="fgroup" style="flex:1">
-        <label>Observations</label>
-        <input type="text" id="dtn-observations" placeholder="Optionnel">
-      </div>
-    </div>
-
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead>
-          <tr><th>Code article</th><th>Designation</th><th style="width:120px">Quantite</th><th style="width:130px">Prix unitaire</th><th style="width:50px"></th></tr>
-        </thead>
-        <tbody id="dtn-lignes-tbody"></tbody>
-      </table>
-    </div>
-
-    <div class="frow" style="justify-content:space-between;margin-top:12px">
-      <button class="btn btn-outline" onclick="msiteAjouterLigne('dtn-lignes-tbody')">➕ Ajouter une ligne</button>
-      <button class="btn btn-navy" onclick="msiteSoumettreDT()">📨 Soumettre la demande</button>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ LISTE DES DA ════════════ -->
-<div id="s-da-liste" class="section">
-  <div class="section-title">📋 Demandes d'achat (DA)</div>
-
-  <div class="card">
-    <div class="frow">
-      <div class="fgroup">
-        <label>Statut</label>
-        <select id="da-filtre-statut" onchange="msiteChargerDA()">
-          <option value="">Tous</option>
-          <option value="SOUMISE">Soumise</option>
-          <option value="VALIDEE">Validee</option>
-          <option value="COMMANDEE">Commandee</option>
-          <option value="REFUSEE">Refusee</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead>
-          <tr><th>N°</th><th>Agence</th><th>Fournisseur</th><th>Date</th><th>BC Sage</th><th>Statut</th><th style="width:90px">Detail</th></tr>
-        </thead>
-        <tbody id="da-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- Modal detail DA -->
-<div class="modal" id="modal-da-detail">
-  <div class="modal-box modal-lg">
-    <div class="modal-title">
-      <span id="dad-titre">Demande d'achat</span>
-      <button class="modal-close" onclick="fermerModal('modal-da-detail')">✕</button>
-    </div>
-    <div id="dad-info"></div>
-    <div class="tbl-wrap" style="margin-top:8px">
-      <table>
-        <thead><tr><th>Code article</th><th>Designation</th><th>Qte demandee</th><th>Prix unitaire</th></tr></thead>
-        <tbody id="dad-tbody"></tbody>
-      </table>
-    </div>
-    <div id="dad-actions" class="frow" style="justify-content:flex-end;margin-top:12px"></div>
-  </div>
-</div>
-
-<!-- ════════════ NOUVELLE DA ════════════ -->
-<div id="s-da-nouvelle" class="section">
-  <div class="section-title">➕ Nouvelle demande d'achat (DA)</div>
-  <div class="alert alert-warn">Soumet une demande au siege, qui generera un bon de commande Sage apres validation.</div>
-
-  <div class="card">
-    <div class="form-grid">
-      <div class="fgroup">
-        <label>Agence demandeuse</label>
-        <select id="dan-agence"></select>
-      </div>
-      <div class="fgroup">
-        <label>Agence de livraison</label>
-        <select id="dan-livraison"></select>
-      </div>
-      <div class="fgroup">
-        <label>Code fournisseur</label>
-        <input type="text" id="dan-fournisseur-code" placeholder="Optionnel">
-      </div>
-      <div class="fgroup">
-        <label>Nom fournisseur</label>
-        <input type="text" id="dan-fournisseur-nom" placeholder="Optionnel">
-      </div>
-      <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px;margin-top:24px">
-        <input type="checkbox" id="dan-urgence" style="width:auto">
-        <label for="dan-urgence" style="margin:0">Demande urgente</label>
-      </div>
-      <div class="fgroup" style="flex:1">
-        <label>Observations</label>
-        <input type="text" id="dan-observations" placeholder="Optionnel">
-      </div>
-    </div>
-
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead>
-          <tr><th>Code article</th><th>Designation</th><th style="width:120px">Quantite</th><th style="width:130px">Prix unitaire</th><th style="width:50px"></th></tr>
-        </thead>
-        <tbody id="dan-lignes-tbody"></tbody>
-      </table>
-    </div>
-
-    <div class="frow" style="justify-content:space-between;margin-top:12px">
-      <button class="btn btn-outline" onclick="msiteAjouterLigne('dan-lignes-tbody')">➕ Ajouter une ligne</button>
-      <button class="btn btn-navy" onclick="msiteSoumettreDA()">📨 Soumettre la demande</button>
-    </div>
-  </div>
+<div id="s-ms2-achats" class="section">
+  <div class="section-title">🏭 Demandes d'Achat Fournisseurs (DA)</div>
+  <div class="card"><div class="frow">
+    <button class="btn btn-gold" onclick="ouvrirModal('modal-da2')">+ Nouvelle DA</button>
+    <button class="btn btn-navy" onclick="chargerMS2DAs()">🔄 Actualiser</button>
+  </div></div>
+  <div id="ms2-da-liste"><div class="tbl-empty">Cliquez Actualiser</div></div>
 </div>
 {% endblock %}

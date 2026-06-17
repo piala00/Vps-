@@ -1,355 +1,331 @@
 {% extends "base.html" %}
 
 {% block sidebar %}
-<button class="nav-item active" onclick="nav('commercial-dashboard')" data-nav="commercial-dashboard">🏠 Tableau de bord</button>
+<button class="nav-item active" data-nav="com-dashboard"
+  onclick="nav('com-dashboard')">
+  <span class="ico">🏠</span> Tableau de bord
+</button>
 
 <div class="nav-group">
   <button class="nav-group-btn open" onclick="toggleGroup(this)">
-    <span>👥</span> Clients <span class="arrow">▶</span>
+    <span>🏅</span> Classement <span class="arrow">▶</span>
   </button>
   <div class="nav-group-children open">
-    <button class="nav-item-sub" onclick="navSub(this,'fiches-clients')" data-nav="fiches-clients">👥 Fiches Clients</button>
-    <button class="nav-item-sub" onclick="navSub(this,'objectifs-commerciaux')" data-nav="objectifs-commerciaux">🎯 Objectifs</button>
+    <button class="nav-item-sub active" data-nav="com-classement"
+      onclick="navSub(this,'com-classement')">🏅 Classement Commerciaux</button>
+    <button class="nav-item-sub" data-nav="com-cockpit"
+      onclick="navSub(this,'com-cockpit')">🧭 Cockpit Commercial</button>
+    <button class="nav-item-sub" data-nav="com-tendances"
+      onclick="navSub(this,'com-tendances')">📈 Tendances</button>
   </div>
 </div>
 
 <div class="nav-group">
-  <button class="nav-group-btn open" onclick="toggleGroup(this)">
-    <span>📈</span> Ventes &amp; Analyses <span class="arrow">▶</span>
+  <button class="nav-group-btn" onclick="toggleGroup(this)">
+    <span>👥</span> Clients <span class="arrow">▶</span>
   </button>
-  <div class="nav-group-children open">
-    <button class="nav-item-sub" onclick="navSub(this,'suivi-ventes')" data-nav="suivi-ventes">📈 Suivi des Ventes</button>
-    <button class="nav-item-sub" onclick="navSub(this,'previsions-commandes')" data-nav="previsions-commandes">🔮 Previsions</button>
-    <button class="nav-item-sub" onclick="navSub(this,'analyse-ca')" data-nav="analyse-ca">💰 Analyse CA</button>
+  <div class="nav-group-children">
+    <button class="nav-item-sub" data-nav="com-clients"
+      onclick="navSub(this,'com-clients')">👥 Fiches Clients</button>
+    <button class="nav-item-sub" data-nav="com-objectifs"
+      onclick="navSub(this,'com-objectifs')">🎯 Objectifs</button>
+  </div>
+</div>
+
+<div class="nav-group">
+  <button class="nav-group-btn" onclick="toggleGroup(this)">
+    <span>📊</span> Analyses <span class="arrow">▶</span>
+  </button>
+  <div class="nav-group-children">
+    <button class="nav-item-sub" data-nav="com-analyse-ca"
+      onclick="navSub(this,'com-analyse-ca')">💰 Analyse CA</button>
+    <button class="nav-item-sub" data-nav="com-previsions"
+      onclick="navSub(this,'com-previsions')">🔮 Prévisions</button>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
 
-<!-- ════════════ TABLEAU DE BORD ════════════ -->
-<div id="s-commercial-dashboard" class="section active">
-  <div class="section-title">🏠 Commercial — Tableau de bord</div>
-
-  <div class="kpi-grid">
-    <div class="kpi-card k-green">
-      <div class="kico">💰</div>
-      <div class="kval" id="kpi-ca-jour">—</div>
-      <div class="klabel">CA du jour</div>
-    </div>
-    <div class="kpi-card k-blue">
-      <div class="kico">📅</div>
-      <div class="kval" id="kpi-ca-mois">—</div>
-      <div class="klabel">CA du mois</div>
-    </div>
-    <div class="kpi-card k-gold">
-      <div class="kico">👥</div>
-      <div class="kval" id="kpi-clients-actifs">—</div>
-      <div class="klabel">Clients actifs</div>
-    </div>
-    <div class="kpi-card k-red">
-      <div class="kico">⚠️</div>
-      <div class="kval" id="kpi-creances-depassement">—</div>
-      <div class="klabel">Creances en depassement de plafond</div>
-    </div>
-  </div>
-
+<!-- ═══ DASHBOARD ═══════════════════════════════════════════════ -->
+<div id="s-com-dashboard" class="section active">
+  <div class="section-title">🏠 Commercial &amp; Ventes — Tableau de bord</div>
+  <div id="com-source-info" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+  <div id="com-kpis" class="kpi-grid"></div>
   <div class="card">
-    <div class="card-title">Acces rapides</div>
-    <div class="shortcut-grid">
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=fiches-clients]').click()">
-        <div class="ico">👥</div>
-        Fiches Clients
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=suivi-ventes]').click()">
-        <div class="ico">📈</div>
-        Suivi des Ventes
-      </div>
-      <div class="shortcut-btn" onclick="document.querySelector('[data-nav=analyse-ca]').click()">
-        <div class="ico">💰</div>
-        Analyse CA
-      </div>
+    <div class="card-title">⚠️ Alertes</div>
+    <div id="com-alertes"><div class="tbl-empty">Chargement...</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">⚡ Accès rapide</div>
+    <div class="shortcuts-grid">
+      <button class="shortcut-btn" onclick="navSub(document.querySelector('[data-nav=com-classement]'),'com-classement')">
+        <span style="font-size:22px">🏅</span><span>Classement</span>
+      </button>
+      <button class="shortcut-btn" onclick="navSub(document.querySelector('[data-nav=com-cockpit]'),'com-cockpit')">
+        <span style="font-size:22px">🧭</span><span>Cockpit</span>
+      </button>
+      <button class="shortcut-btn" onclick="navSub(document.querySelector('[data-nav=com-tendances]'),'com-tendances')">
+        <span style="font-size:22px">📈</span><span>Tendances</span>
+      </button>
+      <button class="shortcut-btn" onclick="navSub(document.querySelector('[data-nav=com-clients]'),'com-clients')">
+        <span style="font-size:22px">👥</span><span>Clients</span>
+      </button>
     </div>
   </div>
 </div>
 
-<!-- ════════════ FICHES CLIENTS ════════════ -->
-<div id="s-fiches-clients" class="section">
-  <div class="section-title">👥 Fiches Clients</div>
+<!-- ═══ CLASSEMENT COMMERCIAUX ══════════════════════════════════ -->
+<div id="s-com-classement" class="section">
+  <div class="section-title">🏅 Classement Commerciaux</div>
 
   <div class="card">
-    <div class="frow" style="justify-content:space-between">
-      <div class="fgroup" style="flex:1">
-        <label>Recherche</label>
-        <input type="text" id="fc-recherche" placeholder="Code, nom ou telephone" oninput="cmRechercheClients()">
-      </div>
-      <button class="btn btn-navy" style="align-self:flex-end" onclick="cmOuvrirClient(null)">➕ Nouveau client</button>
+    <div class="frow">
+      <button class="btn btn-navy" onclick="chargerClassement()">🔄 Charger depuis Sage</button>
+      <button class="btn btn-outline" onclick="chargerClassement(true)">🔄 Forcer rechargement</button>
     </div>
-    <div class="tbl-wrap" style="margin-top:8px">
-      <table>
-        <thead>
-          <tr>
-            <th>Code</th><th>Nom</th><th>Telephone</th><th>Ville</th>
-            <th>Commercial attitre</th><th>Plafond credit</th><th>Delai paiement</th>
-            <th>Statut</th><th style="width:60px">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="fc-tbody"></tbody>
-      </table>
+  </div>
+
+  <!-- Podium Top 3 -->
+  <div id="cl-podium" class="kpi-grid" style="margin-bottom:12px"></div>
+
+  <!-- Tableau complet -->
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Rang</th><th>Commercial</th>
+          <th>CA Réalisé</th><th>Objectif</th><th>% Obj.</th>
+          <th>Recouvrement</th><th>Taux Rec.</th>
+          <th>Créances Éch.</th><th>Clients Ret.</th><th>Score</th>
+        </tr>
+      </thead>
+      <tbody id="cl-tbody">
+        <tr><td colspan="10" class="tbl-empty">Cliquez Charger</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ COCKPIT COMMERCIAL ══════════════════════════════════════ -->
+<div id="s-com-cockpit" class="section">
+  <div class="section-title">🧭 Cockpit Commercial — Mon copilote quotidien</div>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Sélectionner un commercial</label>
+        <select id="cockpit-com-sel" style="width:240px" onchange="chargerCockpit()">
+          <option value="">-- Choisir --</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn btn-navy" onclick="chargerCockpit()">🔄 Actualiser</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Copilote quotidien : progression du jour vers l'objectif du mois -->
+  <div id="cockpit-copilote" class="card" style="border:2px solid var(--gold)">
+    <div class="card-title">🧭 Copilote — Progression du jour</div>
+    <div id="cockpit-copilote-content"><div class="tbl-empty">Sélectionnez un commercial</div></div>
+  </div>
+
+  <!-- 12 KPIs -->
+  <div id="cockpit-kpis" class="kpi-grid" style="margin-bottom:12px"></div>
+
+  <!-- Sous-onglets -->
+  <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">
+    <button class="btn btn-navy btn-sm" onclick="afficherOngletCockpit('resume')">📋 Résumé</button>
+    <button class="btn btn-outline btn-sm" onclick="afficherOngletCockpit('clients')">👥 Clients CA</button>
+    <button class="btn btn-outline btn-sm" onclick="afficherOngletCockpit('creances')">⚠️ Créances</button>
+    <button class="btn btn-outline btn-sm" onclick="afficherOngletCockpit('mouvements')">📒 Grand Livre (mon portefeuille)</button>
+  </div>
+
+  <div id="cockpit-resume" class="card">
+    <div class="card-title">📋 Résumé du commercial</div>
+    <div id="cockpit-resume-content"><div class="tbl-empty">Sélectionnez un commercial</div></div>
+  </div>
+
+  <div id="cockpit-clients" class="card" style="display:none">
+    <div class="card-title">👥 Clients — CA de la période &amp; statut</div>
+    <div class="tbl-wrap">
+      <table><thead><tr><th>Code</th><th>Client</th><th>Zone</th><th>CA</th><th>Statut</th><th>Téléphone</th></tr></thead>
+      <tbody id="cockpit-clients-tbody"><tr><td colspan="6" class="tbl-empty">-</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div id="cockpit-creances" class="card" style="display:none">
+    <div class="card-title">⚠️ Créances du commercial</div>
+    <div class="tbl-wrap">
+      <table><thead><tr><th>Code</th><th>Client</th><th>Solde</th><th>FNS</th><th>Retard(j)</th><th>Dépassement</th><th>Tél.</th></tr></thead>
+      <tbody id="cockpit-creances-tbody"><tr><td colspan="7" class="tbl-empty">-</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div id="cockpit-mouvements" class="card" style="display:none">
+    <div class="card-title">📒 Grand Livre — Mon portefeuille client uniquement
+      <small>Distinct du Grand Livre général (Comptabilité) — uniquement vos clients</small>
+    </div>
+    <div class="tbl-wrap">
+      <table><thead><tr>
+        <th>Code</th><th>Client</th><th>Date</th><th>Pièce</th><th>Libellé</th>
+        <th>Débit</th><th>Crédit</th><th>Statut</th><th>Non Soldé</th><th>Échéance</th><th>J.Ret.</th>
+      </tr></thead>
+      <tbody id="cockpit-mvt-tbody"><tr><td colspan="11" class="tbl-empty">-</td></tr></tbody></table>
     </div>
   </div>
 </div>
 
-<!-- Modal fiche client -->
-<div class="modal" id="modal-client">
-  <div class="modal-box modal-lg">
-    <div class="modal-title">
-      <span id="fc-titre">Nouveau client</span>
-      <button class="modal-close" onclick="fermerModal('modal-client')">✕</button>
-    </div>
-    <input type="hidden" id="fc-id">
-    <div class="form-grid">
-      <div class="fgroup">
-        <label>Code client</label>
-        <input type="text" id="fc-code" placeholder="Ex: CL010">
-      </div>
-      <div class="fgroup">
-        <label>Nom</label>
-        <input type="text" id="fc-nom">
-      </div>
-      <div class="fgroup">
-        <label>Prenom</label>
-        <input type="text" id="fc-prenom">
-      </div>
-      <div class="fgroup">
-        <label>Telephone</label>
-        <input type="text" id="fc-telephone">
-      </div>
-      <div class="fgroup">
-        <label>Telephone 2</label>
-        <input type="text" id="fc-telephone2">
-      </div>
-      <div class="fgroup">
-        <label>Email</label>
-        <input type="text" id="fc-email">
-      </div>
-      <div class="fgroup">
-        <label>Adresse</label>
-        <input type="text" id="fc-adresse">
-      </div>
-      <div class="fgroup">
-        <label>Ville</label>
-        <input type="text" id="fc-ville">
-      </div>
-      <div class="fgroup">
-        <label>Quartier</label>
-        <input type="text" id="fc-quartier">
-      </div>
-      <div class="fgroup">
-        <label>Activite</label>
-        <input type="text" id="fc-activite">
-      </div>
-      <div class="fgroup">
-        <label>Secteur</label>
-        <input type="text" id="fc-secteur">
-      </div>
-      <div class="fgroup">
-        <label>Commercial attitre</label>
-        <input type="text" id="fc-commercial">
-      </div>
-      <div class="fgroup">
-        <label>Plafond credit (FCFA)</label>
-        <input type="number" id="fc-plafond" step="0.01" value="0">
-      </div>
-      <div class="fgroup">
-        <label>Delai de paiement (jours)</label>
-        <input type="number" id="fc-delai" value="30">
-      </div>
-      <div class="fgroup" style="flex:1">
-        <label>Observations</label>
-        <input type="text" id="fc-observations">
-      </div>
-      <div class="fgroup" style="flex-direction:row;align-items:center;gap:8px;margin-top:24px">
-        <input type="checkbox" id="fc-actif" style="width:auto" checked>
-        <label for="fc-actif" style="margin:0">Client actif</label>
-      </div>
-    </div>
-    <div class="frow" style="justify-content:flex-end;margin-top:12px">
-      <button class="btn btn-outline" onclick="fermerModal('modal-client')">Annuler</button>
-      <button class="btn btn-navy" onclick="cmSauverClient()">💾 Enregistrer</button>
-    </div>
+<!-- ═══ TENDANCES ════════════════════════════════════════════════ -->
+<div id="s-com-tendances" class="section">
+  <div class="section-title">📈 Tendances
+    <small>Évolution CA, Recouvrement, Créances</small>
   </div>
-</div>
-
-<!-- ════════════ OBJECTIFS COMMERCIAUX ════════════ -->
-<div id="s-objectifs-commerciaux" class="section">
-  <div class="section-title">🎯 Objectifs Commerciaux</div>
 
   <div class="card">
-    <div class="card-title">Definir un objectif</div>
-    <div class="form-grid">
+    <div class="frow">
+      <div class="fgroup">
+        <label>Vue</label>
+        <select id="tend-vue" style="width:160px" onchange="chargerTendances()">
+          <option value="CA">CA Réalisé</option>
+          <option value="Recouvrement">Recouvrement</option>
+          <option value="Creances">Créances échues</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Granularité</label>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-outline btn-sm" data-gran="journalier"
+            onclick="setGran('journalier')">Jour</button>
+          <button class="btn btn-outline btn-sm" data-gran="hebdomadaire"
+            onclick="setGran('hebdomadaire')">Semaine</button>
+          <button class="btn btn-navy btn-sm" data-gran="mensuel"
+            onclick="setGran('mensuel')">Mois</button>
+          <button class="btn btn-outline btn-sm" data-gran="trimestriel"
+            onclick="setGran('trimestriel')">Trimestre</button>
+          <button class="btn btn-outline btn-sm" data-gran="annuel"
+            onclick="setGran('annuel')">Année</button>
+        </div>
+        <input type="hidden" id="tend-gran" value="mensuel">
+      </div>
       <div class="fgroup">
         <label>Commercial</label>
-        <input type="text" id="obj-commercial" placeholder="Nom du commercial">
-      </div>
-      <div class="fgroup">
-        <label>Periode (AAAA-MM ou AAAA)</label>
-        <input type="text" id="obj-periode" placeholder="Ex: 2026-06">
-      </div>
-      <div class="fgroup">
-        <label>Objectif CA (FCFA)</label>
-        <input type="number" id="obj-ca" step="0.01" value="0">
-      </div>
-      <div class="fgroup">
-        <label>Objectif recouvrement (FCFA)</label>
-        <input type="number" id="obj-recouvrement" step="0.01" value="0">
-      </div>
-      <div class="fgroup">
-        <label>Objectif nb. clients</label>
-        <input type="number" id="obj-nb-clients" value="0">
-      </div>
-    </div>
-    <div class="frow" style="justify-content:flex-end;margin-top:12px">
-      <button class="btn btn-navy" onclick="cmSauverObjectif()">💾 Enregistrer</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Objectifs enregistres</div>
-    <div class="tbl-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Periode</th><th>Commercial</th><th>Objectif CA</th>
-            <th>Objectif recouvrement</th><th>Objectif nb. clients</th>
-          </tr>
-        </thead>
-        <tbody id="obj-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ SUIVI DES VENTES ════════════ -->
-<div id="s-suivi-ventes" class="section">
-  <div class="section-title">📈 Suivi des Ventes</div>
-  <div class="alert alert-info">Donnees issues de Sage (factures de vente, F_DOCENTETE DO_Type=6).</div>
-
-  <div class="card">
-    <div class="frow">
-      <div class="fgroup">
-        <label>Code client</label>
-        <input type="text" id="sv-client" placeholder="Optionnel">
-      </div>
-      <div class="fgroup">
-        <label>Date debut</label>
-        <input type="date" id="sv-date-debut">
-      </div>
-      <div class="fgroup">
-        <label>Date fin</label>
-        <input type="date" id="sv-date-fin">
-      </div>
-      <button class="btn btn-navy" style="align-self:flex-end" onclick="cmChargerVentes()">🔍 Rechercher</button>
-    </div>
-    <div class="tbl-wrap" style="margin-top:12px">
-      <table>
-        <thead>
-          <tr><th>Date</th><th>No Facture</th><th>Code Client</th><th>Client</th><th>Montant TTC</th></tr>
-        </thead>
-        <tbody id="sv-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ PREVISIONS COMMANDES ════════════ -->
-<div id="s-previsions-commandes" class="section">
-  <div class="section-title">🔮 Previsions de Commandes</div>
-  <div class="alert alert-info">Estimation basee sur la frequence moyenne des commandes de chaque client (minimum 2 commandes sur les 12 derniers mois). Triees par echeance la plus proche.</div>
-
-  <div class="card">
-    <div class="tbl-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Code Client</th><th>Client</th><th>Nb. commandes</th>
-            <th>Frequence (jours)</th><th>Derniere commande</th><th>Jours restants</th>
-          </tr>
-        </thead>
-        <tbody id="prev-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ════════════ ANALYSE CA ════════════ -->
-<div id="s-analyse-ca" class="section">
-  <div class="section-title">💰 Analyse du Chiffre d'Affaires</div>
-  <div class="alert alert-info">Comparaison de la periode en cours avec la meme periode de l'annee precedente (N-1).</div>
-
-  <div class="card">
-    <div class="frow">
-      <div class="fgroup">
-        <label>Granularite</label>
-        <select id="aca-granularite" onchange="cmChargerAnalyseCA()">
-          <option value="jour">Quotidien (30 jours)</option>
-          <option value="semaine">Hebdomadaire (12 semaines)</option>
-          <option value="mois">Mensuel (12 mois)</option>
+        <select id="tend-com" style="width:180px" onchange="chargerTendances()">
+          <option value="">Tous</option>
         </select>
       </div>
     </div>
-
-    <div class="kpi-grid" style="margin-top:12px">
-      <div class="kpi-card k-green">
-        <div class="kico">💰</div>
-        <div class="kval" id="aca-ca-total">—</div>
-        <div class="klabel">CA periode actuelle</div>
-      </div>
-      <div class="kpi-card k-blue">
-        <div class="kico">📅</div>
-        <div class="kval" id="aca-ca-total-n1">—</div>
-        <div class="klabel">CA periode N-1</div>
-      </div>
-      <div class="kpi-card k-gold">
-        <div class="kico">📊</div>
-        <div class="kval" id="aca-variation">—</div>
-        <div class="klabel">Variation vs N-1</div>
-      </div>
-      <div class="kpi-card k-warn">
-        <div class="kico">🏆</div>
-        <div class="kval" id="aca-top10-progression">—</div>
-        <div class="klabel">Progression Top 10 clients</div>
-      </div>
-    </div>
   </div>
 
   <div class="card">
-    <div class="card-title">Evolution du CA — periode actuelle</div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>Periode</th><th>CA</th></tr></thead>
-        <tbody id="aca-tbody"></tbody>
-      </table>
-    </div>
+    <canvas id="tend-chart" height="120"></canvas>
   </div>
 
+  <div class="tbl-wrap" style="margin-top:10px">
+    <table>
+      <thead><tr><th>Période</th><th>Valeur (FCFA)</th><th>Évol.</th><th>Écart/préc.</th><th>Taux/Risque</th></tr></thead>
+      <tbody id="tend-tbody">
+        <tr><td colspan="5" class="tbl-empty">Sélectionnez une granularité</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ FICHES CLIENTS ═══════════════════════════════════════════ -->
+<div id="s-com-clients" class="section">
+  <div class="section-title">👥 Fiches Clients</div>
   <div class="card">
-    <div class="card-title">Evolution du CA — periode N-1</div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>Periode</th><th>CA</th></tr></thead>
-        <tbody id="aca-n1-tbody"></tbody>
-      </table>
+    <div class="frow">
+      <input type="text" id="cli-search" placeholder="Nom, code, téléphone..."
+        style="width:250px" oninput="chargerClients()">
+      <button class="btn btn-gold" onclick="ouvrirModal('modal-client')">+ Nouveau client</button>
+      <button class="btn btn-navy" onclick="chargerClients()">🔄</button>
     </div>
   </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Code</th><th>Nom</th><th>Téléphone</th><th>Ville</th><th>Commercial</th><th>Plafond Crédit</th></tr></thead>
+      <tbody id="clients-tbody">
+        <tr><td colspan="6" class="tbl-empty">Chargement...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
+<!-- ═══ OBJECTIFS ════════════════════════════════════════════════ -->
+<div id="s-com-objectifs" class="section">
+  <div class="section-title">🎯 Objectifs Commerciaux</div>
   <div class="card">
-    <div class="card-title">Top 10 clients (periode actuelle)</div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>Code Client</th><th>Client</th><th>Total achats</th></tr></thead>
-        <tbody id="aca-top-tbody"></tbody>
-      </table>
+    <div class="frow">
+      <button class="btn btn-gold" onclick="ouvrirModal('modal-objectif')">+ Nouvel objectif</button>
+      <button class="btn btn-navy" onclick="chargerObjectifs()">🔄 Actualiser</button>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Commercial</th><th>Période</th><th>Obj. CA</th><th>Obj. Recouvrement</th><th>Obj. Clients</th></tr></thead>
+      <tbody id="objectifs-tbody">
+        <tr><td colspan="5" class="tbl-empty">Chargement...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ ANALYSE CA ════════════════════════════════════════════════ -->
+<div id="s-com-analyse-ca" class="section">
+  <div class="section-title">💰 Analyse CA
+    <small>Toujours comparé vs même période N-1</small>
+  </div>
+  <div class="card">
+    <div class="card-title">Sélecteur de période</div>
+    <div id="ca-selector"></div>
+  </div>
+  <div id="ca-comparaison" style="margin-bottom:12px"></div>
+</div>
+
+<!-- ═══ PRÉVISIONS ════════════════════════════════════════════════ -->
+<div id="s-com-previsions" class="section">
+  <div class="section-title">🔮 Prévisions</div>
+  <div class="card">
+    <div class="alert alert-info">Prévisions basées sur la fréquence des commandes clients.</div>
+  </div>
+</div>
+
+<!-- Modal Client -->
+<div class="modal-overlay" id="modal-client">
+  <div class="modal">
+    <h3>Nouveau client</h3>
+    <div class="form-grid">
+      <div class="fgroup"><label>Code *</label><input type="text" id="c-code" placeholder="CT_Num" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+      <div class="fgroup"><label>Nom *</label><input type="text" id="c-nom"></div>
+      <div class="fgroup"><label>Téléphone</label><input type="text" id="c-tel"></div>
+      <div class="fgroup"><label>Ville</label><input type="text" id="c-ville"></div>
+      <div class="fgroup"><label>Commercial attitré</label><input type="text" id="c-com"></div>
+      <div class="fgroup"><label>Plafond Crédit (FCFA)</label><input type="number" id="c-plafond" placeholder="0"></div>
+      <div class="fgroup"><label>Délai paiement (jours)</label><input type="number" id="c-delai" value="30"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fermerModal('modal-client')">Annuler</button>
+      <button class="btn btn-navy" onclick="creerClient()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Objectif -->
+<div class="modal-overlay" id="modal-objectif">
+  <div class="modal">
+    <h3>Nouvel objectif</h3>
+    <div class="form-grid">
+      <div class="fgroup"><label>Commercial *</label><input type="text" id="obj-com"></div>
+      <div class="fgroup"><label>Période *</label><input type="text" id="obj-per" placeholder="2026-06 ou 2026"></div>
+      <div class="fgroup"><label>Objectif CA (FCFA)</label><input type="number" id="obj-ca" placeholder="0"></div>
+      <div class="fgroup"><label>Objectif Recouvrement</label><input type="number" id="obj-rec" placeholder="0"></div>
+      <div class="fgroup"><label>Objectif Nb Clients</label><input type="number" id="obj-nb" placeholder="0"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fermerModal('modal-objectif')">Annuler</button>
+      <button class="btn btn-gold" onclick="creerObjectif()">Enregistrer</button>
     </div>
   </div>
 </div>

@@ -1,328 +1,303 @@
-var autoLoad = window.autoLoad || {};
+/**
+ * NEXORA v2.0 — Module Comptabilite & Finance
+ * Grand Livre + 6 onglets Creances depuis GTC ERP PILOT V3
+ */
 
-var _cptaBalanceCache = [];
-var _cptaRapportsCache = [];
-
-// -- Selects partages --------------------------------------------------------------
-function cptaRemplirSelectClients(selectId, emptyLabel) {
-    var sel = document.getElementById(selectId);
-    if (!sel) return;
-    var html = (emptyLabel !== undefined) ? ('<option value="">' + emptyLabel + '</option>') : '';
-    _cptaBalanceCache.forEach(function(c) {
-        html += '<option value="' + c.code_client + '">' + c.code_client + ' - ' + (c.nom || '') + '</option>';
-    });
-    sel.innerHTML = html;
-}
-
-function cptaChargerClients(callback) {
-    apiGet('/api/comptabilite/balance-agee', function(d) {
-        _cptaBalanceCache = d.data;
-        if (callback) callback();
-    });
-}
-
-// -- Tableau de bord ----------------------------------------------------------------
-function cptaChargerDashboard() {
-    apiGet('/api/comptabilite/dashboard-summary', function(d) {
-        var s = d.summary;
-        document.getElementById('kpi-creances-totales').textContent = fmt.money(s.creances_totales);
-        document.getElementById('kpi-nb-debiteurs').textContent = s.nb_clients_debiteurs;
-        document.getElementById('kpi-creances-critiques').textContent = fmt.money(s.creances_critiques);
-        document.getElementById('kpi-creances-elevees').textContent = fmt.money(s.creances_elevees);
-        document.getElementById('kpi-encaisse-mois').textContent = fmt.money(s.encaisse_mois);
-        document.getElementById('kpi-rapports-brouillon').textContent = s.rapports_brouillon;
-
-        var labels = {hausse: 'En hausse', baisse: 'En baisse', stable: 'Stable'};
-        var types = {hausse: 'err', baisse: 'ok', stable: 'info'};
-        document.getElementById('cpta-tendance').innerHTML =
-            badge(labels[s.tendance] || s.tendance, types[s.tendance] || 'info');
-    });
-}
-autoLoad['comptabilite-dashboard'] = function() { cptaChargerDashboard(); };
-
-// -- Balance agee ---------------------------------------------------------------------
-function cptaChargerBalanceAgee() {
-    loadingTable('bal-tbody', 7);
-    apiGet('/api/comptabilite/balance-agee', function(d) {
-        _cptaBalanceCache = d.data;
-        if (!_cptaBalanceCache.length) {
-            emptyTable('bal-tbody', 7, 'Aucune creance');
-            return;
-        }
-        var riskTypes = {CRITIQUE: 'err', ELEVE: 'warn', MOYEN: 'info', FAIBLE: 'muted'};
-        var html = '';
-        _cptaBalanceCache.forEach(function(c) {
-            html += '<tr>' +
-                '<td>' + c.code_client + '</td>' +
-                '<td>' + (c.nom || '—') + '</td>' +
-                '<td>' + (c.telephone || '—') + '</td>' +
-                '<td>' + fmt.money(c.total_debit) + '</td>' +
-                '<td>' + fmt.money(c.total_credit) + '</td>' +
-                '<td>' + fmt.money(c.solde) + '</td>' +
-                '<td>' + badge(c.niveau_risque, riskTypes[c.niveau_risque] || 'info') + '</td>' +
-                '</tr>';
-        });
-        document.getElementById('bal-tbody').innerHTML = html;
-    });
-}
-autoLoad['balance-agee'] = function() { cptaChargerBalanceAgee(); };
-
-// -- Grand livre clients ----------------------------------------------------------------
-function cptaChargerGrandLivre() {
-    var code = document.getElementById('gl-client').value;
-    if (!code) {
-        emptyTable('gl-tbody', 6, 'Selectionnez un client');
-        return;
-    }
-    loadingTable('gl-tbody', 6);
-    var dd = document.getElementById('gl-date-debut').value;
-    var df = document.getElementById('gl-date-fin').value;
-    var url = '/api/comptabilite/grand-livre-client?code_client=' + encodeURIComponent(code);
-    if (dd) url += '&date_debut=' + dd;
-    if (df) url += '&date_fin=' + df;
-    apiGet(url, function(d) {
-        if (!d.data.length) {
-            emptyTable('gl-tbody', 6, 'Aucune ecriture');
-            return;
-        }
-        var html = '';
-        d.data.forEach(function(l) {
-            html += '<tr>' +
-                '<td>' + fmt.date(l.date_ecriture) + '</td>' +
-                '<td>' + (l.journal || '—') + '</td>' +
-                '<td>' + (l.piece || '—') + '</td>' +
-                '<td>' + (l.libelle || '—') + '</td>' +
-                '<td>' + fmt.money(l.debit) + '</td>' +
-                '<td>' + fmt.money(l.credit) + '</td>' +
-                '</tr>';
-        });
-        document.getElementById('gl-tbody').innerHTML = html;
-    });
-}
-autoLoad['grand-livre-clients'] = function() {
-    cptaChargerClients(function() {
-        cptaRemplirSelectClients('gl-client', 'Choisir un client');
-        emptyTable('gl-tbody', 6, 'Selectionnez un client');
-    });
+var autoLoad = {
+    'compta-dashboard': function(){ chargerDashCompta(); },
+    'gl-vue':           function(){ /* chargement manuel */ },
+    'cr-global':        function(){ chargerCreances(); },
+    'cr-aging':         function(){ afficherAging(); },
+    'cr-zones':         function(){ afficherZones(); },
+    'cr-commerciaux':   function(){ afficherParCom(); },
+    'cr-clients':       function(){ afficherParClients(); },
+    'cr-priorite':      function(){ afficherPriorite(); },
+    'compta-caisse':    function(){ chargerRapportsCaisse(); },
 };
 
-// -- Paiements ----------------------------------------------------------------------------
-function cptaChargerPaiements() {
-    loadingTable('pai-tbody', 7);
-    var code = document.getElementById('pai-client').value;
-    var dd = document.getElementById('pai-date-debut').value;
-    var df = document.getElementById('pai-date-fin').value;
-    var parts = [];
-    if (code) parts.push('code_client=' + encodeURIComponent(code));
-    if (dd) parts.push('date_debut=' + dd);
-    if (df) parts.push('date_fin=' + df);
-    var url = '/api/comptabilite/paiements' + (parts.length ? ('?' + parts.join('&')) : '');
+var _glData       = null;
+var _crData       = null;
+
+// ── Dashboard ──────────────────────────────────────────────────
+
+function chargerDashCompta() {
+    var kpis = document.getElementById('compta-kpis');
+    if (kpis) kpis.innerHTML = '<div class="tbl-empty"><span class="loader"></span> Chargement...</div>';
+    apiGet(nexoraAppendPeriode('/api/comptabilite/evolution-creances'), function(d) {
+        var clients = d.clients || [];
+        if (!clients.length && d.message) {
+            if (kpis) kpis.innerHTML = '<div class="alert alert-warn" style="grid-column:1/-1">⚠️ ' + d.message +
+                '. Verifiez la connexion Sage ou importez un fichier Excel dans Parametres &gt; Source &amp; Config.</div>';
+            return;
+        }
+        var total  = clients.reduce(function(s,c){ return s+c.solde; }, 0);
+        var fns    = clients.reduce(function(s,c){ return s+c.fns;   }, 0);
+        var crit   = clients.filter(function(c){ return c.niveau_risque === 'CRITIQUE'; }).length;
+        if (kpis) kpis.innerHTML =
+            kpiCard('💳', 'Creances totales', fmt.money(total), '#EF4444') +
+            kpiCard('⏰', 'Creances echues',  fmt.money(fns),   '#F59E0B') +
+            kpiCard('🚨', 'Critiques',        crit + ' clients', '#EF4444') +
+            kpiCard('👥', 'Clients analyses', clients.length,   '#1A3263');
+    }, function(e) {
+        if (kpis) kpis.innerHTML = '<div class="alert alert-warn" style="grid-column:1/-1">⚠️ Erreur de chargement: ' + e + '</div>';
+        status('Erreur de connexion');
+    });
+}
+
+// ── Grand Livre ────────────────────────────────────────────────
+
+function chargerGL(force) {
+    var url = nexoraAppendPeriode('/api/comptabilite/grand-livre') + (force ? '&force=1' : '');
+    tableLoader('gl-tbody', 16);
+    var totEl = document.getElementById('gl-totaux');
+    if (totEl) totEl.textContent = 'Chargement...';
     apiGet(url, function(d) {
-        if (!d.data.length) {
-            emptyTable('pai-tbody', 7, 'Aucun paiement');
-            return;
-        }
-        var html = '';
-        d.data.forEach(function(p) {
-            html += '<tr>' +
-                '<td>' + fmt.date(p.date_paiement) + '</td>' +
-                '<td>' + (p.code_client || '—') + '</td>' +
-                '<td>' + (p.client_nom || '—') + '</td>' +
-                '<td>' + fmt.money(p.montant) + '</td>' +
-                '<td>' + (p.mode_paiement || '—') + '</td>' +
-                '<td>' + (p.reference || '—') + '</td>' +
-                '<td>' + (p.piece || '—') + '</td>' +
-                '</tr>';
-        });
-        document.getElementById('pai-tbody').innerHTML = html;
-    });
-}
-autoLoad['paiements'] = function() {
-    cptaChargerClients(function() {
-        cptaRemplirSelectClients('pai-client', '— Tous les clients —');
-        cptaChargerPaiements();
-    });
-};
-
-// -- Evolution creances -----------------------------------------------------------------------
-function cptaChargerEvolution() {
-    var code = document.getElementById('evo-client').value;
-    var jours = document.getElementById('evo-jours').value;
-    loadingTable('evo-tbody', 2);
-    var url = '/api/comptabilite/evolution-creances?jours=' + jours;
-    if (code) url += '&code_client=' + encodeURIComponent(code);
-    apiGet(url, function(d) {
-        var rows = d.data || [];
-        if (!rows.length) {
-            emptyTable('evo-tbody', 2, 'Aucune donnee');
-            document.getElementById('evo-valeur-debut').textContent = '—';
-            document.getElementById('evo-valeur-fin').textContent = '—';
-            document.getElementById('evo-variation').textContent = '—';
-            return;
-        }
-        var html = '';
-        rows.forEach(function(r) {
-            html += '<tr><td>' + fmt.date(r.periode) + '</td><td>' + fmt.money(r.valeur) + '</td></tr>';
-        });
-        document.getElementById('evo-tbody').innerHTML = html;
-
-        var debut = parseFloat(rows[0].valeur) || 0;
-        var fin = parseFloat(rows[rows.length - 1].valeur) || 0;
-        var variation = fin - debut;
-        document.getElementById('evo-valeur-debut').textContent = fmt.money(debut);
-        document.getElementById('evo-valeur-fin').textContent = fmt.money(fin);
-        document.getElementById('evo-variation').textContent =
-            (variation >= 0 ? '+' : '') + fmt.money(variation);
-    });
-}
-autoLoad['evolution-creances'] = function() {
-    cptaChargerClients(function() {
-        cptaRemplirSelectClients('evo-client', '— Toutes les creances —');
-        cptaChargerEvolution();
-    });
-};
-
-// -- Rapport de caisse -------------------------------------------------------------------------
-function cptaAjouterLigneCaisse(tbodyId) {
-    var tbody = document.getElementById(tbodyId);
-    var tr = document.createElement('tr');
-    tr.innerHTML =
-        '<td><input type="text" class="ln-facture" style="width:100%"></td>' +
-        '<td><input type="text" class="ln-code-client" style="width:100%"></td>' +
-        '<td><input type="text" class="ln-client-nom" style="width:100%"></td>' +
-        '<td><input type="number" class="ln-mt-facture" value="0" step="0.01" style="width:100%"></td>' +
-        '<td><input type="number" class="ln-mt-encaisse" value="0" step="0.01" style="width:100%"></td>' +
-        '<td><select class="ln-mode" style="width:100%">' +
-            '<option value="ESPECES">Especes</option>' +
-            '<option value="CHEQUE">Cheque</option>' +
-            '<option value="VIREMENT">Virement</option>' +
-            '<option value="MOBILE_MONEY">Mobile Money</option>' +
-            '<option value="CREDIT">Credit</option>' +
-        '</select></td>' +
-        '<td><input type="text" class="ln-observations" style="width:100%"></td>' +
-        '<td><button class="btn btn-outline btn-sm" onclick="this.closest(\'tr\').remove()">✕</button></td>';
-    tbody.appendChild(tr);
-}
-
-function cptaLireLignesCaisse(tbodyId) {
-    var lignes = [];
-    document.querySelectorAll('#' + tbodyId + ' tr').forEach(function(tr) {
-        var facture = tr.querySelector('.ln-facture');
-        if (!facture) return;
-        var f = facture.value.trim();
-        if (!f) return;
-        lignes.push({
-            no_facture: f,
-            code_client: tr.querySelector('.ln-code-client').value.trim(),
-            client_nom: tr.querySelector('.ln-client-nom').value.trim(),
-            montant_facture: parseFloat(tr.querySelector('.ln-mt-facture').value) || 0,
-            montant_encaisse: parseFloat(tr.querySelector('.ln-mt-encaisse').value) || 0,
-            mode_paiement: tr.querySelector('.ln-mode').value,
-            observations: tr.querySelector('.ln-observations').value.trim()
-        });
-    });
-    return lignes;
-}
-
-function cptaSoumettreRapportCaisse() {
-    var data = {
-        date_rapport: document.getElementById('rc-date').value,
-        commercial: document.getElementById('rc-commercial').value.trim(),
-        agence: document.getElementById('rc-agence').value.trim() || 'BERTOUA',
-        total_ventes: parseFloat(document.getElementById('rc-total-ventes').value) || 0,
-        total_encaisse: parseFloat(document.getElementById('rc-total-encaisse').value) || 0,
-        total_credit: parseFloat(document.getElementById('rc-total-credit').value) || 0,
-        observations: document.getElementById('rc-observations').value.trim(),
-        lignes: cptaLireLignesCaisse('rcn-lignes-tbody')
-    };
-    if (!data.date_rapport) { status('⚠ Choisissez une date'); return; }
-    apiPost('/api/comptabilite/rapport-caisse', data, function(d) {
-        status(d.msg);
-        document.getElementById('rc-commercial').value = '';
-        document.getElementById('rc-total-ventes').value = '0';
-        document.getElementById('rc-total-encaisse').value = '0';
-        document.getElementById('rc-total-credit').value = '0';
-        document.getElementById('rc-observations').value = '';
-        document.getElementById('rcn-lignes-tbody').innerHTML = '';
-        cptaChargerHistoriqueRapports();
-    });
-}
-
-function cptaChargerHistoriqueRapports() {
-    loadingTable('rch-tbody', 9);
-    apiGet('/api/comptabilite/rapport-caisse', function(d) {
-        _cptaRapportsCache = d.data;
-        if (!_cptaRapportsCache.length) {
-            emptyTable('rch-tbody', 9, 'Aucun rapport');
-            return;
-        }
-        var html = '';
-        _cptaRapportsCache.forEach(function(r) {
-            html += '<tr>' +
-                '<td>' + fmt.date(r.date_rapport) + '</td>' +
-                '<td>' + (r.commercial || '—') + '</td>' +
-                '<td>' + (r.agence || '—') + '</td>' +
-                '<td>' + fmt.money(r.total_ventes) + '</td>' +
-                '<td>' + fmt.money(r.total_encaisse) + '</td>' +
-                '<td>' + fmt.money(r.total_credit) + '</td>' +
-                '<td>' + r.nb_lignes + '</td>' +
-                '<td>' + (r.statut === 'valide' ? badge('Valide', 'ok') : badge('Brouillon', 'warn')) + '</td>' +
-                '<td><button class="btn btn-outline btn-sm" onclick="cptaVoirRapport(' + r.id + ')">👁️</button></td>' +
-                '</tr>';
-        });
-        document.getElementById('rch-tbody').innerHTML = html;
-    });
-}
-
-function cptaVoirRapport(id) {
-    var r = _cptaRapportsCache.filter(function(x) { return x.id === id; })[0];
-    if (!r) return;
-    document.getElementById('rcd-id').value = id;
-    document.getElementById('rcd-titre').textContent =
-        'Rapport du ' + fmt.date(r.date_rapport) + ' - ' + (r.commercial || '');
-    var btn = document.getElementById('rcd-valider-btn');
-    btn.style.display = (r.statut === 'valide') ? 'none' : '';
-
-    loadingTable('rcd-tbody', 7);
-    apiGet('/api/comptabilite/rapport-caisse/' + id + '/lignes', function(d) {
-        if (!d.data.length) {
-            emptyTable('rcd-tbody', 7, 'Aucune ligne');
-        } else {
-            var html = '';
-            d.data.forEach(function(l) {
-                html += '<tr>' +
-                    '<td>' + (l.no_facture || '—') + '</td>' +
-                    '<td>' + (l.code_client || '—') + '</td>' +
-                    '<td>' + (l.client_nom || '—') + '</td>' +
-                    '<td>' + fmt.money(l.montant_facture) + '</td>' +
-                    '<td>' + fmt.money(l.montant_encaisse) + '</td>' +
-                    '<td>' + (l.mode_paiement || '—') + '</td>' +
-                    '<td>' + (l.observations || '—') + '</td>' +
-                    '</tr>';
+        _glData = d;
+        // Peupler filtre commerciaux
+        var comSel = document.getElementById('gl-com-fil');
+        if (comSel && d.commerciaux) {
+            comSel.innerHTML = '<option value="">Tous</option>';
+            d.commerciaux.forEach(function(c) {
+                var opt = document.createElement('option');
+                opt.value = c; opt.textContent = c;
+                comSel.appendChild(opt);
             });
-            document.getElementById('rcd-tbody').innerHTML = html;
         }
-        ouvrirModal('modal-rapport-detail');
+        filtrerGL();
+        if (totEl) totEl.textContent =
+            'Total Debit: ' + fmt.money(d.total_debit||0) +
+            ' | Total Credit: ' + fmt.money(d.total_credit||0) +
+            ' | Solde Debit: ' + fmt.money(d.total_solde||0);
+    }, function() {
+        tableVide('gl-tbody', 16, 'Sage non disponible');
     });
 }
 
-function cptaValiderRapportCaisse() {
-    var id = document.getElementById('rcd-id').value;
-    apiPut('/api/comptabilite/rapport-caisse/' + id, {statut: 'valide'}, function(d) {
-        status(d.msg);
-        fermerModal('modal-rapport-detail');
-        cptaChargerHistoriqueRapports();
+function filtrerGL() {
+    if (!_glData) return;
+    var q    = document.getElementById('gl-search')   ? document.getElementById('gl-search').value.toLowerCase()   : '';
+    var com  = document.getElementById('gl-com-fil')  ? document.getElementById('gl-com-fil').value                : '';
+    var type = document.getElementById('gl-type-fil') ? document.getElementById('gl-type-fil').value               : '';
+    var lignes = (_glData.lignes || []).filter(function(r) {
+        if (com  && r.commercial !== com)  return false;
+        if (type && r.type !== type)       return false;
+        if (q && !(r.code+r.nom+r.piece+r.libelle+r.commercial).toLowerCase().includes(q)) return false;
+        return true;
+    });
+    var tbody = document.getElementById('gl-tbody');
+    var nbEl  = document.getElementById('gl-nb');
+    if (!tbody) return;
+    if (!lignes.length) { tableVide('gl-tbody', 16, 'Aucune ligne'); if(nbEl) nbEl.textContent=''; return; }
+    if (nbEl) nbEl.textContent = lignes.length + ' lignes';
+    tbody.innerHTML = lignes.map(function(r) {
+        var retCol = r.retard > 30 ? 'color:var(--red)' : r.retard > 0 ? 'color:var(--warn)' : '';
+        var staCol = r.statut === 'Non Soldee' ? 'color:var(--red)' : 'color:var(--green)';
+        var bgRow  = r.is_total ? 'background:rgba(251,192,19,.08);font-weight:700' : '';
+        return '<tr style="' + bgRow + '">' +
+               '<td style="font-family:monospace;font-weight:700;color:var(--navy)">' + (r.code||'-') + '</td>' +
+               '<td>' + (r.nom||'-') + '</td>' +
+               '<td>' + fmt.date(r.date) + '</td>' +
+               '<td>' + (r.journal||'-') + '</td>' +
+               '<td style="font-family:monospace">' + (r.piece||'-') + '</td>' +
+               '<td style="max-width:180px;overflow:hidden;white-space:nowrap">' + (r.libelle||'-') + '</td>' +
+               '<td style="text-align:right">' + (r.debit ? fmt.money(r.debit) : '') + '</td>' +
+               '<td style="text-align:right;color:var(--green)">' + (r.credit ? fmt.money(r.credit) : '') + '</td>' +
+               '<td style="text-align:right">' + (r.solde_d ? fmt.money(r.solde_d) : '') + '</td>' +
+               '<td style="text-align:right">' + (r.solde_c ? fmt.money(r.solde_c) : '') + '</td>' +
+               '<td style="' + staCol + '">' + (r.statut||'-') + '</td>' +
+               '<td style="text-align:right;color:var(--red);font-weight:700">' + (r.ouvert ? fmt.money(r.ouvert) : '') + '</td>' +
+               '<td style="' + retCol + '">' + fmt.date(r.echeance) + '</td>' +
+               '<td style="' + retCol + ';font-weight:700">' + (r.retard > 0 ? r.retard + 'j' : '') + '</td>' +
+               '<td>' + (r.commercial||'-') + '</td>' +
+               '<td>' + badge(r.type||'-', r.type==='FACTURE'?'navy':r.type==='REGLEMENT'?'ok':r.type==='AVOIR'?'warn':'muted') + '</td>' +
+               '</tr>';
+    }).join('');
+}
+
+// ── Créances ──────────────────────────────────────────────────
+
+function chargerCreances() {
+    var q    = document.getElementById('cr-search')      ? document.getElementById('cr-search').value       : '';
+    var zone = document.getElementById('cr-zone-fil')    ? document.getElementById('cr-zone-fil').value     : '';
+    var reto = document.getElementById('cr-retard-only') ? document.getElementById('cr-retard-only').checked : false;
+    var url  = nexoraAppendPeriode('/api/comptabilite/creances');
+    if (q)    url += '&q='    + encodeURIComponent(q);
+    if (zone) url += '&zone=' + encodeURIComponent(zone);
+    if (reto) url += '&retard_only=1';
+    tableLoader('cr-global-tbody', 12);
+    apiGet(url, function(d) {
+        _crData = d;
+        // Peupler filtre zones
+        var zoneSel = document.getElementById('cr-zone-fil');
+        if (zoneSel && d.zones) {
+            zoneSel.innerHTML = '<option value="">Toutes</option>';
+            d.zones.forEach(function(z) {
+                var opt = document.createElement('option'); opt.value=z; opt.textContent=z;
+                zoneSel.appendChild(opt);
+            });
+        }
+        // Totaux
+        var tot = d.totaux || {};
+        var totEl = document.getElementById('cr-totaux');
+        if (totEl) totEl.textContent =
+            tot.nb_clients + ' clients | Solde: ' + fmt.money(tot.solde) +
+            ' | FNS: ' + fmt.money(tot.fnstot) +
+            ' | Echues: ' + fmt.money(tot.fns_echu) +
+            ' | Depassements: ' + fmt.money(tot.depasses);
+        // Tableau global
+        var tbody = document.getElementById('cr-global-tbody');
+        if (tbody) {
+            var clients = d.clients || [];
+            if (!clients.length) { tableVide('cr-global-tbody', 12, 'Aucune creance'); }
+            else tbody.innerHTML = clients.map(function(c) {
+                var retCol = c.retard > 30 ? 'color:var(--red)' : c.retard > 0 ? 'color:var(--warn)' : '';
+                return '<tr>' +
+                       '<td style="font-weight:700;color:var(--navy)">' + (c.code||'-') + '</td>' +
+                       '<td>' + (c.nom||'-') + '</td>' +
+                       '<td>' + (c.zone||'-') + '</td>' +
+                       '<td>' + (c.commercial||'-') + '</td>' +
+                       '<td style="font-weight:700">' + fmt.money(c.solde||0) + '</td>' +
+                       '<td style="color:var(--warn)">' + fmt.money(c.fnstot||0) + '</td>' +
+                       '<td style="color:var(--red);font-weight:700">' + fmt.money(c.fns||0) + '</td>' +
+                       '<td>' + (c.nf||0) + '</td>' +
+                       '<td style="font-weight:700;' + retCol + '">' + (c.retard||0) + 'j</td>' +
+                       '<td>' + (c.mdp ? fmt.money(c.mdp) : '-') + '</td>' +
+                       '<td>' + (c.plafond ? fmt.money(c.plafond) : '-') + '</td>' +
+                       '<td>' + (c.telephone||'-') + '</td>' +
+                       '</tr>';
+            }).join('');
+        }
+        afficherAging();
+        afficherZones();
+        afficherParCom();
+        afficherParClients();
+        afficherPriorite();
+    }, function() {
+        tableVide('cr-global-tbody', 12, 'Sage non disponible');
     });
 }
 
-autoLoad['rapport-caisse'] = function() {
-    if (!document.getElementById('rc-date').value) {
-        var aujourdhui = new Date();
-        document.getElementById('rc-date').value = aujourdhui.toISOString().substring(0, 10);
+function afficherAging() {
+    if (!_crData) return;
+    var aging  = _crData.aging || [];
+    var infoEl = document.getElementById('cr-aging-info');
+    var tbody  = document.getElementById('cr-aging-tbody');
+    if (infoEl && _crData.totaux) {
+        infoEl.textContent = 'Total creances echues : ' + fmt.money(_crData.totaux.fns_echu || 0) + ' FCFA';
     }
-    cptaChargerHistoriqueRapports();
-};
+    if (!tbody) return;
+    tbody.innerHTML = aging.map(function(a) {
+        var col = a.tranche.includes('90') ? 'color:var(--red)' :
+                  (a.tranche.includes('31') || a.tranche.includes('61')) ? 'color:var(--warn)' : '';
+        return '<tr style="' + col + '">' +
+               '<td style="font-weight:700">' + a.tranche + '</td>' +
+               '<td>' + a.nb + '</td>' +
+               '<td style="font-weight:700">' + fmt.money(a.montant) + '</td>' +
+               '<td>' + a.pct + '%</td></tr>';
+    }).join('') || '<tr><td colspan="4" class="tbl-empty">Chargez les creances</td></tr>';
+}
 
-window.autoLoad = autoLoad;
+function afficherZones() {
+    if (!_crData) return;
+    var tbody = document.getElementById('cr-zones-tbody');
+    if (!tbody) return;
+    var rows = _crData.par_zone || [];
+    tbody.innerHTML = rows.map(function(z) {
+        var col = z.retard > 30 ? 'color:var(--red)' : z.retard > 0 ? 'color:var(--warn)' : '';
+        return '<tr><td style="font-weight:700">' + (z.zone||'N/A') + '</td>' +
+               '<td>' + z.nb + '</td>' +
+               '<td>' + fmt.money(z.solde) + '</td>' +
+               '<td style="color:var(--red);font-weight:700">' + fmt.money(z.fns) + '</td>' +
+               '<td style="' + col + ';font-weight:700">' + z.retard + 'j</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="tbl-empty">Chargez les creances</td></tr>';
+}
 
-cptaChargerDashboard();
+function afficherParCom() {
+    if (!_crData) return;
+    var tbody = document.getElementById('cr-com-tbody');
+    if (!tbody) return;
+    var rows = _crData.par_commercial || [];
+    tbody.innerHTML = rows.map(function(c) {
+        var col = c.retard > 30 ? 'color:var(--red)' : c.retard > 0 ? 'color:var(--warn)' : '';
+        return '<tr><td style="font-weight:700">' + (c.commercial||'N/A') + '</td>' +
+               '<td>' + c.nb + '</td>' +
+               '<td>' + fmt.money(c.solde) + '</td>' +
+               '<td style="color:var(--red);font-weight:700">' + fmt.money(c.fns) + '</td>' +
+               '<td style="' + col + ';font-weight:700">' + c.retard + 'j</td>' +
+               '<td>' + (c.mdp ? fmt.money(c.mdp) : '-') + '</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="tbl-empty">Chargez les creances</td></tr>';
+}
+
+function afficherParClients() {
+    if (!_crData) return;
+    var tbody  = document.getElementById('cr-clients-tbody');
+    if (!tbody) return;
+    var sorted = (_crData.clients || []).slice().sort(function(a,b){ return b.fns - a.fns; });
+    tbody.innerHTML = sorted.map(function(c, i) {
+        var col = c.retard > 30 ? 'color:var(--red)' : c.retard > 0 ? 'color:var(--warn)' : '';
+        return '<tr><td style="font-weight:800;color:var(--gold)">' + (i+1) + '</td>' +
+               '<td style="font-weight:700">' + (c.nom||'-') + '</td>' +
+               '<td>' + (c.commercial||'-') + '</td>' +
+               '<td style="color:var(--red);font-weight:700">' + fmt.money(c.fns) + '</td>' +
+               '<td style="' + col + ';font-weight:700">' + c.retard + 'j</td>' +
+               '<td>' + fmt.money(c.solde) + '</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="tbl-empty">Chargez les creances</td></tr>';
+}
+
+function afficherPriorite() {
+    if (!_crData) return;
+    var tbody = document.getElementById('cr-prio-tbody');
+    if (!tbody) return;
+    var rows = _crData.priorite || [];
+    tbody.innerHTML = rows.map(function(r) {
+        var pCol = {CRITIQUE:'color:var(--red);font-weight:800',
+                    HAUTE:'color:var(--warn);font-weight:700',
+                    MOYENNE:'color:#F59E0B',BASSE:''}[r.priorite] || '';
+        return '<tr><td style="' + pCol + '">' + (r.priorite||'-') + '</td>' +
+               '<td style="font-weight:700">' + (r.nom||'-') + '</td>' +
+               '<td>' + (r.commercial||'-') + '</td>' +
+               '<td style="color:var(--red);font-weight:700">' + fmt.money(r.fns||0) + '</td>' +
+               '<td style="' + pCol + '">' + (r.retard||0) + 'j</td>' +
+               '<td>' + (r.telephone||'-') + '</td>' +
+               '<td style="font-weight:700">' + (r.action||'-') + '</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="tbl-empty">Chargez les creances</td></tr>';
+}
+
+// ── Rapport de Caisse ──────────────────────────────────────────
+
+function chargerRapportsCaisse() {
+    tableLoader('rc-tbody', 6);
+    apiGet('/api/comptabilite/rapport-caisse', function(d) {
+        var tbody = document.getElementById('rc-tbody');
+        if (!tbody) return;
+        if (!d.rapports || !d.rapports.length) { tableVide('rc-tbody', 6, 'Aucun rapport'); return; }
+        tbody.innerHTML = d.rapports.map(function(r) {
+            return '<tr>' +
+                   '<td>' + fmt.date(r.date_rapport) + '</td>' +
+                   '<td>' + (r.commercial||'-') + '</td>' +
+                   '<td style="color:var(--gold)">' + fmt.money(r.total_ventes||0) + '</td>' +
+                   '<td style="color:var(--green)">' + fmt.money(r.total_encaisse||0) + '</td>' +
+                   '<td style="color:var(--red)">' + fmt.money(r.total_credit||0) + '</td>' +
+                   '<td>' + badge(r.statut||'brouillon','info') + '</td></tr>';
+        }).join('');
+    });
+}
+
+// ── Reaction au changement de periode globale ────────────────────
+// Memes raisons que dans commercial.js : sans ce listener, le Grand
+// Livre et les Creances continuent d'afficher les chiffres de l'ancienne
+// periode apres avoir clique "Appliquer" sur la barre de periode.
+document.addEventListener('nexora:periode-changed', function() {
+    var active = document.querySelector('#content .section.active');
+    if (!active) return;
+    var id = active.id || '';
+    if (id === 's-compta-dashboard') chargerDashCompta();
+    else if (id === 's-gl-vue')      chargerGL();
+    else if (id && id.indexOf('s-cr-') === 0) chargerCreances();
+});
+
+// ── Init ────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', function() {
+    chargerDashCompta();
+});
