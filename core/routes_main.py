@@ -111,7 +111,42 @@ def accueil():
         'sigle_societe': get_config('sigle_societe', ''),
         'devise':        get_config('devise', 'XAF'),
     }
-    return render_template('accueil.html', user=user, modules=modules, config=cfg)
+    source_info = _get_source_info()
+    return render_template('accueil.html', user=user, modules=modules,
+                           config=cfg, source_info=source_info)
+
+
+def _get_source_info():
+    """Retourne les infos sur la source de donnees (nom DB/fichier + derniere MAJ cache)."""
+    import json
+    from datetime import datetime
+    source = get_config('source', 'sql')
+    if source == 'excel':
+        path      = get_config('excel_path', '')
+        name      = os.path.basename(path) if path else 'Fichier Excel'
+        src_type  = 'Excel'
+        cache_key = 'excel_' + path
+    else:
+        db   = get_config('sage_database', '')
+        srv  = get_config('sage_server', '')
+        name = db if db else ('Sage SQL Server' + (' — ' + srv if srv else ''))
+        src_type  = 'Sage SQL'
+        cache_key = 'sql_grand_livre'
+
+    last_update = None
+    try:
+        cache_file = os.path.join(os.path.dirname(__file__), '..', 'Data', 'sage_cache.json')
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+            entry = cache.get(cache_key)
+            if entry and entry.get('ts'):
+                dt = datetime.fromisoformat(entry['ts'])
+                last_update = dt.strftime('%d/%m/%Y %H:%M')
+    except Exception:
+        pass
+
+    return {'type': src_type, 'name': name, 'last_update': last_update}
 
 
 @bp.route('/acces-refuse')

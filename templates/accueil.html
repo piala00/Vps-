@@ -35,6 +35,18 @@ body{background:var(--bg);min-height:100vh;padding:0}
 .mod-card .mod-badge{display:inline-block;margin-top:8px;padding:2px 8px;
   border-radius:20px;background:rgba(26,50,99,.08);
   color:var(--navy);font-size:10px;font-weight:700}
+.source-bar{
+  display:inline-flex;align-items:center;gap:8px;
+  background:white;border:1.5px solid var(--border);
+  border-radius:8px;padding:7px 14px;margin-top:12px;
+  font-size:12px;
+}
+.source-bar .src-dot{width:8px;height:8px;border-radius:50%;
+  background:var(--green,#22c55e);flex-shrink:0}
+.source-bar .src-type{font-weight:800;color:var(--navy)}
+.source-bar .src-name{color:var(--text);font-weight:600}
+.source-bar .src-sep{color:var(--border)}
+.source-bar .src-ts{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -60,6 +72,19 @@ body{background:var(--bg);min-height:100vh;padding:0}
   <div class="welcome">
     <h2>Bonjour, {{ user.prenom or user.nom }} 👋</h2>
     <p>Choisissez un module pour commencer</p>
+    <div class="source-bar">
+      <span class="src-dot"></span>
+      <span class="src-type">{{ source_info.type }}</span>
+      <span class="src-sep">·</span>
+      <span class="src-name">{{ source_info.name or '—' }}</span>
+      {% if source_info.last_update %}
+      <span class="src-sep">·</span>
+      <span class="src-ts">Mise à jour : {{ source_info.last_update }}</span>
+      {% else %}
+      <span class="src-sep">·</span>
+      <span class="src-ts" style="color:#f59e0b">Aucune donnée chargée</span>
+      {% endif %}
+    </div>
   </div>
 
   <div class="modules-grid">
