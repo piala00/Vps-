@@ -60,7 +60,7 @@ def mouvements_client(db, ct_num, apres: str | None, jusqua: str | None, statuts
     if statuts:
         sql += f" AND statut IN ({','.join('?'*len(statuts))})"
         p += list(statuts)
-    return db.query(sql + " ORDER BY date_piece, CASE WHEN nature IN ('REGLEMENT','ACOMPTE','ANNULATION_RECU') THEN 1 ELSE 0 END, id", p)
+    return db.query(sql + " ORDER BY date_piece, CASE WHEN nature IN ('REGLEMENT','ACOMPTE') THEN 1 ELSE 0 END, id", p)
 
 
 def fiche_client(db, ct_num: str, date_fin: date | None = None) -> Fiche:

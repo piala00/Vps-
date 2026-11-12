@@ -50,7 +50,7 @@ def test_reel_jour01_montants(cfg):
 def test_reel_avoir_fvcb_et_bc_seul(cfg):
     r = analyser(cfg, "01", REEL, {})
     av = next(m for m in r.factures if m.reference_piece == "FVCB000502")
-    assert (av.nature, av.sens, av.montant) == ("AVOIR", "C", 125000)
+    assert (av.nature, av.sens, av.montant) == ("AVOIR", "D", -125000)       # debit, signe conserve
     refs = {m.reference_piece for m in r.factures}
     assert "BCCB033581" not in refs                          # BC seul (BP) : aucune creance
     # BC33525 : 5 factures distinctes sur le meme BC
@@ -72,10 +72,12 @@ def test_reel_meme_numero_pour_deux_clients(cfg):
 def test_reel_recus_negatifs_annulent_le_recu_errone(cfg):
     """Recu negatif = contre-passation du recu fait sur un compte errone (meme client, meme montant)."""
     r = analyser(cfg, "14", REEL, {})
-    ann = {m.reference_piece: m for m in r.reglements if m.nature == "ANNULATION_RECU"}
+    ann = {m.reference_piece: m for m in r.reglements if m.montant < 0}
+    assert all(m.nature == "REGLEMENT" and m.sens == "C" for m in r.reglements)
     assert set(ann) == {"7RCB028975", "7RCB028976"}
-    assert ann["7RCB028975"].reference_liee == "7RCB028907" and ann["7RCB028975"].sens == "D"
-    assert ann["7RCB028976"].reference_liee == "7RCB028853" and ann["7RCB028976"].montant == 7000000
+    assert ann["7RCB028975"].reference_liee == "7RCB028907"
+    assert (ann["7RCB028975"].sens, ann["7RCB028975"].montant) == ("C", -3500000)   # credit, signe conserve
+    assert ann["7RCB028976"].reference_liee == "7RCB028853" and ann["7RCB028976"].montant == -7000000
     assert not any(a.gravite == "BLOQUANT" and "RECUS" == a.section for a in r.anomalies)
     assert r.stats["controle_totaux"]["recus_F"]["ecart_non_explique"] == 0
     assert r.stats["controle_totaux"]["recus_F"]["retenu"] == 93400750          # = TOTAL DE VERSEMENTS
@@ -84,7 +86,7 @@ def test_reel_recus_negatifs_annulent_le_recu_errone(cfg):
 def test_recu_negatif_sans_original_avertit(cfg):
     r = analyser(cfg, "02")
     a = next(m for m in r.reglements if m.reference_piece == "7RCB0462")
-    assert a.nature == "ANNULATION_RECU" and a.reference_liee == ""
+    assert (a.nature, a.sens, a.montant, a.reference_liee) == ("REGLEMENT", "C", -5000, "")
     assert any("7RCB0462" in x.motif and x.gravite == "AVERTISSEMENT" for x in r.anomalies)
 
 
@@ -131,9 +133,21 @@ def test_acomptes_desactivables(cfg):
     assert analyser(cfg).acomptes == []
 
 
-def test_avoir_negatif_pas_de_double_inversion(cfg):
-    av = next(m for m in analyser(cfg).factures if m.reference_piece == "FRCB0001")
-    assert (av.nature, av.sens, av.montant) == ("AVOIR", "C", 50000)
+def test_regle_des_signes(cfg):
+    """Regle GTC : factures (retours / avoirs compris) au debit, recus et acomptes au credit,
+    toujours avec le signe du rapport."""
+    r = analyser(cfg)
+    av = next(m for m in r.factures if m.reference_piece == "FRCB0001")
+    assert (av.nature, av.sens, av.montant) == ("AVOIR", "D", -50000)
+    assert all(m.sens == "D" for m in r.factures)
+    assert all(m.sens == "C" for m in r.acomptes + r.reglements)
+
+
+def test_reel_regle_des_signes_sur_le_mois(cfg):
+    for f in ("01", "03", "12", "14"):
+        r = analyser(cfg, f, REEL, {})
+        assert all(m.sens == "D" for m in r.factures) and all(m.sens == "C" for m in r.acomptes + r.reglements)
+        assert all(m.montant < 0 for m in r.factures if m.nature == "AVOIR")
 
 
 def test_type_non_parametre_bloquant(cfg):

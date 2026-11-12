@@ -49,15 +49,25 @@ class Database:
                           "version INTEGER PRIMARY KEY, nom TEXT, applique_le TEXT)")
         done = {r[0] for r in self.conn.execute("SELECT version FROM schema_migrations")}
         applied = []
-        for num, name, sql in _migrations():
-            if num in done:
-                continue
-            with self.transaction():
-                for stmt in _split_sql(sql):
-                    self.conn.execute(stmt)
-                self.conn.execute("INSERT INTO schema_migrations VALUES (?,?,?)",
-                                  (num, name, now_iso()))
-            applied.append(name)
+        a_faire = [m for m in _migrations() if m[0] not in done]
+        if not a_faire:
+            return applied
+        # Procedure SQLite pour reconstruire une table : contraintes de cle etrangere suspendues
+        # pendant la migration (hors transaction), puis verifiees avant de les reactiver.
+        self.conn.execute("PRAGMA foreign_keys = OFF")
+        try:
+            for num, name, sql in a_faire:
+                with self.transaction():
+                    for stmt in _split_sql(sql):
+                        self.conn.execute(stmt)
+                    viol = self.conn.execute("PRAGMA foreign_key_check").fetchall()
+                    if viol:
+                        raise RuntimeError(f"Migration {name} : {len(viol)} violation(s) de cle etrangere")
+                    self.conn.execute("INSERT INTO schema_migrations VALUES (?,?,?)",
+                                      (num, name, now_iso()))
+                applied.append(name)
+        finally:
+            self.conn.execute("PRAGMA foreign_keys = ON")
         return applied
 
     # -- transactions -------------------------------------------------------------

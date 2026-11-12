@@ -41,7 +41,7 @@ class Mouvement:
     type_document: str = ""
     notes: str = ""
     colonne: str = ""
-    reference_liee: str = ""    # recu annule par une ANNULATION_RECU
+    reference_liee: str = ""    # recu annule par un recu negatif
 
     def to_dict(self):
         return asdict(self)
@@ -253,11 +253,12 @@ class ParseurRapport:
                 base["acheteur_detail"] = mode
             if acompte:
                 # Acompte encaisse a la commande (colonne ACOMPTE) : reglement du client.
+                # Encaissement : toujours au CREDIT du compte client, signe conserve.
                 note = "" if acpt.get("confirme") else "traitement des acomptes non confirme"
                 if acompte < 0:
-                    note = (note + " ; acompte negatif (remboursement)").strip(" ;")
-                m = Mouvement(nature="ACOMPTE", reference_piece=num, montant=abs(acompte),
-                              sens="C" if acompte > 0 else "D", colonne=col_acpt, notes=note, **base)
+                    note = (note + " ; acompte negatif").strip(" ;")
+                m = Mouvement(nature="ACOMPTE", reference_piece=num, montant=acompte,
+                              sens="C", colonne=col_acpt, notes=note, **base)
                 res.acomptes.append(m)
                 st["acomptes"] += 1
             if not factures:
@@ -288,21 +289,16 @@ class ParseurRapport:
                     f"Type de document '{prefixe}' non parametre (nature/sens inconnus)",
                     _row_text(row), "Parametrer le type dans rapport.types_documents"))
                 continue
-            nature, sens = regle["nature"], regle["sens"]
+            # Regle comptable GTC : toute facture (y compris facture retour / d'avoir) est passee au
+            # DEBIT du compte client en CONSERVANT son signe. Aucune inversion de colonne.
+            nature, sens = regle["nature"], "D"
             notes = "" if regle.get("confirme") else f"regle {prefixe} non confirmee"
-            if montant < 0:
-                # Montant negatif : avoir/retour. Si le type est deja parametre en AVOIR,
-                # le signe n'est qu'une presentation : on ne l'inverse pas une 2e fois.
-                montant = -montant
-                if nature != "AVOIR":
-                    nature = "AVOIR"
-                    sens = "C" if sens == "D" else "D"
-                    notes = (notes + " ; montant negatif dans le rapport").strip(" ;")
-            elif nature == "AVOIR":
-                notes = (notes + " ; avoir de montant POSITIF dans le rapport").strip(" ;")
-                res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "AVERTISSEMENT",
+            if nature == "AVOIR" and montant > 0:
+                res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "INFO",
                     f"Avoir {num} de montant positif (habituellement negatif)", _row_text(row),
-                    "Verifier le signe"))
+                    "Montant repris tel quel au debit"))
+            elif nature != "AVOIR" and montant < 0:
+                notes = (notes + " ; facture de montant negatif").strip(" ;")
             res.factures.append(Mouvement(nature=nature, reference_piece=num, montant=montant, sens=sens,
                                           colonne=col, notes=notes, **base))
             st["avoirs" if nature == "AVOIR" else "factures"] += 1
@@ -353,8 +349,7 @@ class ParseurRapport:
         tv = normaliser(self.r.get("libelle_total_ventes", "TOTAL VENTES"))
         for col in self.r["colonnes_facture"] + ([acpt_col] if acpt_col else []):
             d = segment(rows[:fin_docs], 0, col, tv)
-            d["retenu"] = sum((m.montant if m.sens == ("C" if m.nature == "ACOMPTE" else "D") else -m.montant)
-                              for m in res.factures + res.acomptes if m.colonne == col)
+            d["retenu"] = sum(m.montant for m in res.factures + res.acomptes if m.colonne == col)
             out[f"documents_{col}"] = d
         if idx_recus is not None:
             col = self.r["colonne_montant_recu"]
@@ -365,7 +360,7 @@ class ParseurRapport:
                 if fin in normaliser(_row_text(row)):
                     break
             d = segment(seg, idx_recus + 1, col, fin)
-            d["retenu"] = sum(m.montant if m.sens == "C" else -m.montant for m in res.reglements)
+            d["retenu"] = sum(m.montant for m in res.reglements)
             out[f"recus_{col}"] = d
         libelles = {"H": "ventes comptant", "I": "ventes a terme", "F": "acomptes / recouvrements"}
         for k, v in out.items():
@@ -426,30 +421,27 @@ class ParseurRapport:
                 continue
             sens = "C"
             nature = "REGLEMENT"
-            if montant < 0:
-                # Recu negatif = contre-passation d'un recu fait sur un compte errone : il annule
-                # le recu positif de meme montant du meme compte (le bon compte recoit en general
-                # un nouveau recu positif). Lien recherche apres lecture de la section.
-                nature, sens, montant = "ANNULATION_RECU", "D", -montant
+            # Recu : toujours au CREDIT du compte client, signe conserve. Un recu negatif
+            # contre-passe un recu fait sur un compte errone (lien recherche plus bas).
             m = Mouvement(nature=nature, reference_piece=num, client_libelle=client,
                           montant=montant, sens=sens, mode_reference=_texte(_cell(row, "E")),
                           feuille=feuille, ligne=ligne, type_document=prefixe_document(num), colonne=col_m)
             if normaliser(client) in self.collectifs:
                 m.acheteur_detail = m.mode_reference
             res.reglements.append(m)
-            st["annulations_recus" if nature == "ANNULATION_RECU" else "reglements"] += 1
+            st["annulations_recus" if montant < 0 else "reglements"] += 1
 
     def _lier_annulations(self, res: ResultatPreparation):
         """Rattache chaque recu negatif au recu positif qu'il annule (meme client, meme montant,
         dans la journee). A defaut, avertissement : le recu annule est peut-etre d'un jour
         precedent (le lien sera recherche a l'import) ; les recus de meme montant faits le meme
         jour sur d'autres comptes sont cites comme reaffectations possibles."""
-        positifs = [m for m in res.reglements if m.nature == "REGLEMENT"]
+        positifs = [m for m in res.reglements if m.montant > 0]
         deja = set()
-        for a in [m for m in res.reglements if m.nature == "ANNULATION_RECU"]:
-            orig = next((p for p in positifs if id(p) not in deja and p.montant == a.montant
+        for a in [m for m in res.reglements if m.montant < 0]:
+            orig = next((p for p in positifs if id(p) not in deja and p.montant == -a.montant
                          and normaliser(p.client_libelle) == normaliser(a.client_libelle)), None)
-            autres = [p for p in positifs if p.montant == a.montant and p is not orig
+            autres = [p for p in positifs if p.montant == -a.montant and p is not orig
                       and normaliser(p.client_libelle) != normaliser(a.client_libelle)]
             reaff = (" ; reaffectation possible : " + ", ".join(f"{p.reference_piece} ({p.client_libelle})"
                                                                 for p in autres)) if autres else ""

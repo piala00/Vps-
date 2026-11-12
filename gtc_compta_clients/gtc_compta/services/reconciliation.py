@@ -56,62 +56,67 @@ def clients_a_rapprocher(db, date_arrete: date) -> list[str]:
 
 
 def apparier(mvts: list, ecritures: list[SageEntry]):
-    """Retourne (paires, ecarts). Gere references non uniques et ecritures agregees."""
+    """Retourne (paires, ecarts). Comparaison sur l'EFFET SIGNE sur le solde (debit +, credit -),
+    ce qui rend l'appariement independant de la representation : un avoir passe au debit avec un
+    montant negatif (regle GTC) equivaut a un credit positif dans Sage. Gere les references non
+    uniques et les ecritures agregees."""
     paires, ecarts = [], []
     restant_e = {e.ec_no: e for e in ecritures}
     restant_m = []
     for m in mvts:                                   # 1) lien explicite par EC_No
         if m["sage_ec_no"] and m["sage_ec_no"] in restant_e:
             e = restant_e.pop(m["sage_ec_no"])
-            if e.montant == m["montant"] and e.sens == m["sens"]:
+            if e.signe == _s(m["montant"], m["sens"]):
                 paires.append((m["id"], [e.ec_no]))
             else:
                 ecarts.append({"type": "MONTANT_DIFFERENT", "movement_id": m["id"], "sage_ec_no": e.ec_no,
                                "montant_erp": _s(m["montant"], m["sens"]), "montant_sage": e.signe,
-                               "description": f"{m['reference_piece']} : montant/sens different"})
+                               "description": f"{m['reference_piece']} : effet sur le solde different"})
         else:
             restant_m.append(m)
-    par_ref = defaultdict(list)                      # 2) par reference de piece et sens
+    par_ref = defaultdict(list)                      # 2) par reference de piece, meme signe d'effet
     for e in restant_e.values():
         for ref in {normaliser_reference(e.reference_piece), normaliser_reference(e.numero_piece)} - {""}:
-            par_ref[(ref, e.sens)].append(e)
+            par_ref[ref].append(e)
     pris: set[int] = set()
     non_apparies = []
     for m in restant_m:
+        effet = _s(m["montant"], m["sens"])
         refs = [normaliser_reference(m["reference_piece"])]
         if m["nature"] == "ACOMPTE" and m["bc_origine"]:
             refs.append(normaliser_reference(m["bc_origine"]))     # acompte rattache au BC
         cands = []
         for r_ in refs:
-            cands += [e for e in par_ref.get((r_, m["sens"]), []) if e.ec_no not in pris and e not in cands]
+            cands += [e for e in par_ref.get(r_, []) if e.ec_no not in pris and e not in cands
+                      and (e.signe > 0) == (effet > 0)]          # une facture n'apparie pas un reglement
         if not cands:
             non_apparies.append(m)
             continue
-        exact = next((e for e in cands if e.montant == m["montant"]), None)
+        exact = next((e for e in cands if e.signe == effet), None)
         choix = [exact] if exact else cands               # ecritures agregees / eclatees
-        total = sum(e.montant for e in choix)
+        total = sum(e.signe for e in choix)
         pris.update(e.ec_no for e in choix)
-        if total == m["montant"]:
+        if total == effet:
             paires.append((m["id"], [e.ec_no for e in choix]))
         else:
             ecarts.append({"type": "MONTANT_DIFFERENT", "movement_id": m["id"],
-                           "sage_ec_no": choix[0].ec_no, "montant_erp": _s(m["montant"], m["sens"]),
-                           "montant_sage": sum(e.signe for e in choix),
-                           "description": f"{m['reference_piece']} : ERP {m['montant']} / Sage {total}"})
-    # 3) Repli prudent (acomptes / reglements dont la reference Sage differe) : meme date,
-    #    meme sens, meme montant, et correspondance UNIQUE des deux cotes. Trace dans la preuve.
+                           "sage_ec_no": choix[0].ec_no, "montant_erp": effet, "montant_sage": total,
+                           "description": f"{m['reference_piece']} : ERP {effet} / Sage {total} (effet sur le solde)"})
+    # 3) Repli prudent (acomptes / reglements dont la reference Sage differe) : meme date, meme
+    #    effet sur le solde, et correspondance UNIQUE des deux cotes. Trace dans la preuve.
     libres = [e for e in restant_e.values() if e.ec_no not in pris]
     for m in non_apparies:
-        cle = (m["date_piece"], m["sens"], m["montant"])
-        cs = [e for e in libres if (e.date_ecriture.isoformat(), e.sens, e.montant) == cle]
-        jumeaux = [x for x in non_apparies if (x["date_piece"], x["sens"], x["montant"]) == cle]
-        if len(cs) == 1 and len(jumeaux) == 1 and m["nature"] in ("ACOMPTE", "REGLEMENT", "ANNULATION_RECU"):
+        effet = _s(m["montant"], m["sens"])
+        cle = (m["date_piece"], effet)
+        cs = [e for e in libres if (e.date_ecriture.isoformat(), e.signe) == cle]
+        jumeaux = [x for x in non_apparies if (x["date_piece"], _s(x["montant"], x["sens"])) == cle]
+        if len(cs) == 1 and len(jumeaux) == 1 and m["nature"] in ("ACOMPTE", "REGLEMENT"):
             pris.add(cs[0].ec_no)
             libres.remove(cs[0])
             paires.append((m["id"], [cs[0].ec_no], "DATE_SENS_MONTANT"))
             continue
         ecarts.append({"type": "ERP_ABSENT_SAGE", "movement_id": m["id"], "sage_ec_no": None,
-                       "montant_erp": _s(m["montant"], m["sens"]), "montant_sage": None,
+                       "montant_erp": effet, "montant_sage": None,
                        "description": f"{m['nature']} {m['reference_piece']} du {m['date_piece']} "
                                       "absent de Sage a la date d'arrete"})
     for e in restant_e.values():

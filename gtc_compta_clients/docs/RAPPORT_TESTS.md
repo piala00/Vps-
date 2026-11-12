@@ -1,7 +1,7 @@
 # Rapport de tests
 
 Exécution : `python -m pytest -q`, Python 3.12, Linux (environnement de développement), le 12/11/2026.
-**Résultat : 77 tests réussis, 0 échec.**
+**Résultat : 81 tests réussis, 0 échec.**
 
 Le parseur est testé sur une **copie anonymisée du rapport réel** (jours 01, 03, 12 et 14 de
 `10 RC OCT.xlsx`), avec les chiffres de référence du classeur : comptages, totaux `TOTAL VENTES` /
@@ -36,6 +36,9 @@ avec le vrai Sage reste à établir.
   retenu + exclu + bloqué (aucun montant oublié) ;
 - 8 lignes bloquantes sur le mois (n° de BC portant une facture) ; les 4 reçus négatifs sont traités comme
   annulations de reçus (3 liés automatiquement, 1 en alerte) ; même n° de facture pour deux clients signalé.
+
+Contrôle croisé avec la feuille RECAP : RECOUVREMENTS extraits = 3 942 549 420 = RECAP ; ventes comptant et
+à terme des feuilles = RECAP ; colonne ACOMPTE de RECAP erronée les 04/10 et 21/10 (voir MAPPING_RAPPORT.md).
 
 Volume (base SQLite) : import du mois complet (7 737 mouvements, 26 lots) en 0,4 s. Le réimport des mêmes
 données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée (2 414 lignes) est calculée en 16 ms.
@@ -77,6 +80,9 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 - [OK] tests/test_flux.py::test_permissions
 - [OK] tests/test_flux.py::test_fichier_correspondances_export_import
 - [OK] tests/test_flux.py::test_annulation_recu_liee_jour_precedent
+- [OK] tests/test_flux.py::test_import_refuse_sens_contraire_a_la_regle
+- [OK] tests/test_flux.py::test_appariement_independant_de_la_representation_sage
+- [OK] tests/test_flux.py::test_migration_004_convertit_les_anciens_signes
 - [OK] tests/test_modules.py::test_cas9_bc_deja_inclus_pas_double_compte
 - [OK] tests/test_modules.py::test_cas9_bc_non_inclus_ajoute_une_fois
 - [OK] tests/test_modules.py::test_cas10_facture_echue_selon_politique
@@ -117,7 +123,8 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 - [OK] tests/test_parser.py::test_cas2_bc_plus_facture_compte_une_fois
 - [OK] tests/test_parser.py::test_acompte_et_facture_comptant
 - [OK] tests/test_parser.py::test_acomptes_desactivables
-- [OK] tests/test_parser.py::test_avoir_negatif_pas_de_double_inversion
+- [OK] tests/test_parser.py::test_regle_des_signes
+- [OK] tests/test_parser.py::test_reel_regle_des_signes_sur_le_mois
 - [OK] tests/test_parser.py::test_type_non_parametre_bloquant
 - [OK] tests/test_parser.py::test_compte_collectif_ventilation_analytique
 - [OK] tests/test_parser.py::test_client_sans_correspondance_signale

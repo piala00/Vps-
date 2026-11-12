@@ -1,5 +1,16 @@
 # Journal d'avancement
 
+## Cycle 3 (12/11/2026) : règle des signes de la comptabilité
+- Règle appliquée partout (parseur, VBA, import, fiche, impression, rapprochement) : factures (retours et
+  avoirs compris) au débit avec leur signe ; reçus et acomptes au crédit avec leur signe.
+- Migration 004 : montants signés, conversion des données déjà enregistrées, migrations sûres vis-à-vis
+  des clés étrangères.
+- Rapprochement sur l'effet signé : indépendant de la façon dont Sage stocke un avoir.
+- Contrôle : RECOUVREMENTS du mois = 3 942 549 420, identique à RECAP ; deux erreurs relevées dans la
+  colonne ACOMPTE de RECAP (04/10 et 21/10).
+- 81 tests.
+
+
 ## Cycle 2 (12/11/2026) : analyse du rapport réel `10 RC OCT.xlsx`
 
 ### Terminé (avec preuve)
@@ -20,7 +31,7 @@
 
 ### Questions pour la comptabilité (bloquent la mise en production)
 1. Les **acomptes** (colonne F) sont-ils passés dans Sage au crédit du client ? Avec quelle référence ?
-2. Les **FVCB** : quelle nature d'avoir ?
+2. ~~Les FVCB~~ : réglé (débit avec leur signe, comme toute facture).
 3. ~~Reçus négatifs~~ : **réglé**. Il s'agit d'annulations de reçus faits sur un compte erroné (règle implémentée).
    Reste à vérifier : `7RCB030477` (ALH OUMAROU BOUBAKARY) a-t-il le même compte Sage que « OUMAROU BOUBAKARY » ?
 4. **COMPTE DE LIAISON**, **VENTE PROMOTIONNELLE**, **SOURCE DU PAYS RETOUR** : quels comptes Sage ?

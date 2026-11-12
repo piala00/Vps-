@@ -10,6 +10,7 @@ from gtc_compta.sage.base import SageEntry
 from gtc_compta.services import clients as svc_clients
 from gtc_compta.services import imports, reconciliation as reco
 from gtc_compta.services.auth import AccesRefuse, Utilisateur
+from gtc_compta.db import Database
 from gtc_compta.services.ledger import fiche_client
 
 from .conftest import CORR, DEMO, J1
@@ -62,6 +63,8 @@ def test_cas4_solde_progressif(base, user, cfg):
     assert f.solde_garanti and f.solde_ouverture == 1400000
     assert [(l.piece, l.solde) for l in f.lignes] == [("FACB0201", 1900000), ("FRCB0001", 1850000),
                                                      ("7RCB0451", 1550000)]
+    av = f.lignes[1]
+    assert (av.debit, av.credit) == (-50000, 0)                 # avoir : debit negatif
 
 
 def test_solde_non_garanti_sans_ouverture(db, user, sage, cfg):
@@ -195,15 +198,65 @@ def test_annulation_recu_liee_jour_precedent(base, user, cfg):
     imports.importer_lot(base, user, [ligne("7RCB100", "CL002", "QUINCAILLERIE BETA", 80000, "C", "REGLEMENT", 1)],
                          "j1", "1")
     rap = imports.importer_lot(base, user, [
-        ligne("7RCB101", "CL002", "QUINCAILLERIE BETA", 80000, "D", "ANNULATION_RECU", 2),
+        ligne("7RCB101", "CL002", "QUINCAILLERIE BETA", -80000, "C", "REGLEMENT", 2),
         ligne("7RCB102", "CL001", "ETS ALPHA", 80000, "C", "REGLEMENT", 2)], "j2", "2")
     assert rap.inseres == 2
     m = base.one("SELECT * FROM normalized_movements WHERE reference_piece='7RCB101'")
     assert m["reference_liee"] == "7RCB100" and "Annulation recu 7RCB100" in m["libelle"]
+    assert (m["sens"], m["montant"]) == ("C", -80000)
+    lignes = {l.piece: l for l in fiche_client(base, "CL002", date(2026, 10, 2)).lignes}
+    assert (lignes["7RCB101"].debit, lignes["7RCB101"].credit) == (0, -80000)   # credit negatif
     assert fiche_client(base, "CL002", date(2026, 10, 2)).solde_final == 0           # les deux recus s'annulent
     assert fiche_client(base, "CL001", date(2026, 10, 2)).solde_final == 1400000 - 80000
     # un second recu negatif ne peut pas annuler le meme recu
-    imports.importer_lot(base, user, [ligne("7RCB103", "CL002", "QUINCAILLERIE BETA", 80000, "D",
-                                            "ANNULATION_RECU", 3)], "j3", "3")
+    imports.importer_lot(base, user, [ligne("7RCB103", "CL002", "QUINCAILLERIE BETA", -80000, "C",
+                                            "REGLEMENT", 3)], "j3", "3")
     assert base.scalar("SELECT reference_liee FROM normalized_movements WHERE reference_piece='7RCB103'") is None
     assert base.scalar("SELECT COUNT(*) FROM alertes WHERE type='ANNULATION_RECU_A_VERIFIER'") == 1
+
+
+def test_import_refuse_sens_contraire_a_la_regle(base, user):
+    l = {"format_version": "GTC-EXPORT-1", "id_import": "S", "agence": "BERTOUA", "date_rapport": "2026-10-01",
+         "type_mouvement": "AVOIR", "reference_piece": "FRCB9", "code_tiers": "CL001", "nom_client": "ETS ALPHA",
+         "acheteur_detail": "", "montant": 5000, "sens": "C", "bc_origine": "", "mode_reference": "",
+         "source_feuille": "x", "source_ligne": 1}
+    rap = imports.importer_lot(base, user, [l], "s", "s")
+    assert rap.inseres == 0 and "contraire a la regle" in rap.rejets[0][1]
+
+
+def test_appariement_independant_de_la_representation_sage(base, user, cfg, sage):
+    """L'avoir FRCB0001 est au debit negatif dans l'ERP ; qu'il soit en credit positif (demo) ou en
+    debit negatif dans Sage, la fiche est rapprochee."""
+    from dataclasses import replace
+    sage.ecritures = [replace(e, sens="D", montant=-e.montant) if e.numero_piece == "FRCB0001" else e
+                      for e in sage.ecritures]
+    importer(base, user, cfg)
+    assert next(r for r in reco.rapprocher(base, user, sage, J1) if r.ct_num == "CL001").statut == "VALIDE"
+
+
+def test_migration_004_convertit_les_anciens_signes(tmp_path):
+    """Une base creee avec l'ancienne convention (avoirs et recus negatifs inverses) est convertie."""
+    import sqlite3
+    from gtc_compta.db import database as dbm
+    p = tmp_path / "ancienne.sqlite3"
+    anciennes = [m for m in dbm._migrations() if m[0] <= 3]
+    cn = sqlite3.connect(p)
+    cn.execute("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, nom TEXT, applique_le TEXT)")
+    for num, name, sql in anciennes:
+        for stmt in dbm._split_sql(sql):
+            cn.execute(stmt)
+        cn.execute("INSERT INTO schema_migrations VALUES (?,?,?)", (num, name, "x"))
+    cn.execute("INSERT INTO clients(ct_num, intitule) VALUES ('C1','X')")
+    for nat, ref, sens, mt in [("AVOIR", "FRCB1", "C", 500), ("ANNULATION_RECU", "7RCB2", "D", 800),
+                               ("FACTURE", "FACB3", "D", 900), ("REGLEMENT", "7RCB4", "C", 300)]:
+        cn.execute("INSERT INTO normalized_movements(agence, nature, reference_piece, ct_num, date_piece, sens, "
+                   "montant, source, cree_le, cree_par) VALUES ('B',?,?, 'C1', '2026-10-01', ?, ?, 'RAPPORT', 'x', 'x')",
+                   (nat, ref, sens, mt))
+    cn.commit()
+    cn.close()
+    d = Database(p)
+    rows = {r["reference_piece"]: (r["nature"], r["sens"], r["montant"])
+            for r in d.query("SELECT * FROM normalized_movements")}
+    assert rows == {"FRCB1": ("AVOIR", "D", -500), "7RCB2": ("REGLEMENT", "C", -800),
+                    "FACB3": ("FACTURE", "D", 900), "7RCB4": ("REGLEMENT", "C", 300)}
+    assert d.scalar("PRAGMA foreign_keys") == 1

@@ -127,7 +127,8 @@ Public Sub TrierEtPreparer()
             Else
                 If acpt <> 0 Then
                     ' Acompte encaisse a la commande : reglement du client
-                    EcrireMvt "REGLEMENTS", agence, dRap, "ACOMPTE", num, cli, Abs(CDbl(acpt)), IIf(acpt > 0, "C", "D"), Txt(wsC, r, "B"), Txt(wsC, r, "E"), pref, r, "acompte"
+                    ' Encaissement : toujours au CREDIT, signe conserve
+                    EcrireMvt "REGLEMENTS", agence, dRap, "ACOMPTE", num, cli, CDbl(acpt), "C", Txt(wsC, r, "B"), Txt(wsC, r, "E"), pref, r, "acompte"
                     nAcpt = nAcpt + 1
                 End If
                 If mts.Count = 0 Then
@@ -142,15 +143,11 @@ Public Sub TrierEtPreparer()
                 ElseIf Not gTypes.Exists(pref) Then
                     Anomalie r, "DOCUMENTS", "BLOQUANT", "Type de document '" & pref & "' non parametre", TexteLigne(wsC, r), "Parametrer le type (PARAMETRES)": nAno = nAno + 1
                 Else
+                    ' Regle GTC : toute facture (retours / avoirs compris) au DEBIT, signe conserve
                     regle = gTypes(pref)
-                    nature = Split(regle, "|")(0): sens = Split(regle, "|")(1)
+                    nature = Split(regle, "|")(0): sens = "D"
                     mt = mts(1): notes = ""
-                    If mt < 0 Then
-                        mt = -mt
-                        If nature <> "AVOIR" Then
-                            nature = "AVOIR": sens = IIf(sens = "D", "C", "D"): notes = "montant negatif dans le rapport"
-                        End If
-                    End If
+                    If mt < 0 And nature <> "AVOIR" Then notes = "facture de montant negatif"
                     EcrireMvt "FACTURES", agence, dRap, nature, num, cli, CDbl(mt), sens, Txt(wsC, r, "B"), Txt(wsC, r, "E"), pref, r, notes
                     nFac = nFac + 1
                 End If
@@ -183,8 +180,9 @@ Public Sub TrierEtPreparer()
                     ElseIf mt = 0 Or cli = "" Then
                         Anomalie r, "RECUS", "BLOQUANT", "Recu nul ou sans client", TexteLigne(wsC, r), "Traitement manuel": nAno = nAno + 1
                     ElseIf mt < 0 Then
-                        ' Recu negatif : contre-passation d'un recu fait sur un compte errone
-                        EcrireMvt "REGLEMENTS", agence, dRap, "ANNULATION_RECU", num, cli, -CDbl(mt), "D", "", Txt(wsC, r, "E"), Prefixe(num), r, "annulation de recu (compte errone)"
+                        ' Recu negatif : contre-passation d'un recu fait sur un compte errone,
+                        ' au CREDIT avec son signe negatif
+                        EcrireMvt "REGLEMENTS", agence, dRap, "REGLEMENT", num, cli, CDbl(mt), "C", "", Txt(wsC, r, "E"), Prefixe(num), r, "annulation de recu (compte errone)"
                         nAnnR = nAnnR + 1
                     Else
                         EcrireMvt "REGLEMENTS", agence, dRap, "REGLEMENT", num, cli, CDbl(mt), "C", "", Txt(wsC, r, "E"), Prefixe(num), r, ""

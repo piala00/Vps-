@@ -45,7 +45,7 @@ quelques requêtes `ON CONFLICT` / `INSERT OR IGNORE`.
 | `client_manual_fields` | zone, délai, notes, contacts, WhatsApp/Telegram : **jamais écrasés par la synchro** |
 | `client_aliases` | correspondances **vérifiées** libellé du rapport → code tiers |
 | `import_batches`, `raw_import_rows`, `import_conflicts` | lots, lignes brutes et résultat ligne à ligne, conflits |
-| `normalized_movements` | mouvements (montant entier, sens D/C, statut PROVISOIRE/VALIDE/ANNULE, provenance complète, `sage_ec_no`) ; index unique métier `(agence, nature, référence, client)` hors annulés ; unicité de `sage_ec_no` |
+| `normalized_movements` (migration 004) | mouvements (montant entier **signé**, colonne D/C selon la règle GTC : factures au débit, reçus/acomptes au crédit, statut PROVISOIRE/VALIDE/ANNULE, provenance complète, `sage_ec_no`) ; index unique métier `(agence, nature, référence, client)` hors annulés ; unicité de `sage_ec_no` |
 | `opening_balances` | soldes d'ouverture importés de Sage à une date de référence |
 | `daily_reconciliations` | contrôle par client et par date : soldes, écart, empreinte Sage, preuve JSON, validation |
 | `sage_accounting_entries_snapshot` | écritures Sage capturées lors du contrôle |

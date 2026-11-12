@@ -88,7 +88,7 @@ def preparer_lot(db, ct: str) -> LotClient:
     if apres:
         sql += " AND m.date_piece > ?"
         p.append(apres)
-    rows = db.query(sql + " ORDER BY m.date_piece, CASE WHEN m.nature IN ('REGLEMENT','ACOMPTE','ANNULATION_RECU') THEN 1 ELSE 0 END, m.id", p)
+    rows = db.query(sql + " ORDER BY m.date_piece, CASE WHEN m.nature IN ('REGLEMENT','ACOMPTE') THEN 1 ELSE 0 END, m.id", p)
     if last and rows and rows[0]["date_piece"] < (last["periode_fin"] or ""):
         lot.retroactif = True
     for m in rows:
@@ -99,10 +99,11 @@ def preparer_lot(db, ct: str) -> LotClient:
                        "AND p.type='NORMAL' WHERE m.ct_num=? AND m.statut='ANNULE' AND NOT EXISTS "
                        "(SELECT 1 FROM printed_movements q WHERE q.movement_id=m.id AND q.type='ANNULATION')", (ct,))
     for m in annules:
+        # contre-passation dans la MEME colonne, signe inverse (regle des signes GTC)
         lot.lignes.append(LigneImpr(date.today().isoformat(), m["reference_piece"],
                                     f"ANNULATION {m['reference_piece']} ({m['motif'] or ''})"[:60],
-                                    m["montant"] if m["sens"] == "C" else 0,
-                                    m["montant"] if m["sens"] == "D" else 0, m["id"], "ANNULATION"))
+                                    -m["montant"] if m["sens"] == "D" else 0,
+                                    -m["montant"] if m["sens"] == "C" else 0, m["id"], "ANNULATION"))
     return lot
 
 

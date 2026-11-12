@@ -1,17 +1,24 @@
 # Règles métier et comptables implémentées
 
-## Montants et signes
+## Montants et signes : règle de la comptabilité GTC (12/11/2026)
+- **Toutes les factures** (FACB, et aussi les factures retour / d'avoir FRCB et FVCB) sont enregistrées au
+  **DÉBIT** du compte client **en conservant leur signe**. Un avoir est donc un débit négatif.
+- **Tous les reçus et acomptes** sont enregistrés au **CRÉDIT** du compte client **en conservant leur signe**.
+  Un reçu négatif (contre-passation d'un reçu fait sur un compte erroné) est donc un crédit négatif.
+- Aucune inversion de colonne n'est jamais faite. L'import rejette un mouvement qui serait dans la mauvaise
+  colonne (facture au crédit, reçu au débit).
+- Solde = Σ débits − Σ crédits ; solde > 0 : client débiteur.
 - Montants en **entiers FCFA**. Une cellule avec des centimes non nuls est signalée, jamais arrondie en silence.
-- Sens `D` : augmente la créance client. Sens `C` : la diminue. Solde > 0 : client débiteur.
+- Rapprochement Sage : la comparaison porte sur l'**effet signé sur le solde** (débit +, crédit −). Un avoir
+  saisi dans Sage en débit négatif ou en crédit positif est donc apparié de la même façon.
 
 ## Mouvements extraits du rapport
-| Nature | Origine | Sens |
-|---|---|---|
-| FACTURE | `FACB` avec montant en H (comptant) ou I (à terme) | D |
-| AVOIR | `FRCB` / `FVCB` (montants négatifs) | C |
-| ACOMPTE | montant en F (ENTREE) sur toute pièce `FACB`/`BCCB`/`BLCB` | C (D si négatif) |
-| REGLEMENT | reçu `7RCB` (RECOUVREMENTS) | C |
-| ANNULATION_RECU | reçu `7RCB` **négatif** : contre-passation d'un reçu fait sur un compte erroné, liée au reçu annulé (même client, même montant) | D |
+| Nature | Origine | Colonne | Signe |
+|---|---|---|---|
+| FACTURE | `FACB` avec montant en H (comptant) ou I (à terme) | Débit | celui du rapport |
+| AVOIR | `FRCB` / `FVCB` | Débit | celui du rapport (négatif) |
+| ACOMPTE | montant en F (ENTREE) sur toute pièce `FACB`/`BCCB`/`BLCB` | Crédit | celui du rapport |
+| REGLEMENT | reçu `7RCB` (RECOUVREMENTS) ; un reçu **négatif** contre-passe un reçu fait sur un compte erroné et est lié au reçu annulé (même client, montant opposé) | Crédit | celui du rapport |
 
 ## Import
 - Unicité métier : (agence, nature, référence pièce, code tiers), hors mouvements annulés (index SQL unique).

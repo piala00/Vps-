@@ -30,17 +30,17 @@
       "FACB": {
         "nature": "FACTURE",
         "sens": "D",
-        "confirme": false
+        "confirme": true
       },
       "FRCB": {
         "nature": "AVOIR",
-        "sens": "C",
-        "confirme": false
+        "sens": "D",
+        "confirme": true
       },
       "FVCB": {
         "nature": "AVOIR",
-        "sens": "C",
-        "confirme": false
+        "sens": "D",
+        "confirme": true
       }
     },
     "prefixes_bons": [

@@ -33,6 +33,8 @@ DEFAULTS: dict = {
     "rapport": {
         # Regles etablies a partir du classeur reel "10 RC OCT.xlsx" (analyse du 12/11/2026).
         # "confirme": False = interpretation deduite du rapport, a confirmer par la comptabilite.
+        # Regle de la comptabilite (12/11/2026) : toutes les factures (y compris retours / avoirs)
+        # au DEBIT avec leur signe ; tous les recus et acomptes au CREDIT avec leur signe.
         # Colonnes : F = ACOMPTE (BC, "ENTREE"), G = BP (BC a credit), H = VENTE COMPTANT,
         # I = VENTE A TERME ("VAT") ; recus : F = RECOUVREMENTS (cf. feuille RECAP).
         "entete_recus": "RECUS DE VERSEMENTS",
@@ -41,9 +43,9 @@ DEFAULTS: dict = {
         "motif_document": r"^(?:\d+)?[A-Z]{2,5}\d*[-/ ]?\d+",
         "motif_recu": r"^(?:\d+)?RCB",
         "types_documents": {
-            "FACB": {"nature": "FACTURE", "sens": "D", "confirme": False},
-            "FRCB": {"nature": "AVOIR", "sens": "C", "confirme": False},
-            "FVCB": {"nature": "AVOIR", "sens": "C", "confirme": False}
+            "FACB": {"nature": "FACTURE", "sens": "D", "confirme": True},
+            "FRCB": {"nature": "AVOIR", "sens": "D", "confirme": True},
+            "FVCB": {"nature": "AVOIR", "sens": "D", "confirme": True}
         },
         "prefixes_bons": ["BCCB", "BLCB"],
         "valeurs_annulee": ["ANNULEE", "ANNULE"],
