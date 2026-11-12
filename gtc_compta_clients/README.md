@@ -27,7 +27,7 @@ Le détail se trouve dans [docs/JOURNAL_AVANCEMENT.md](docs/JOURNAL_AVANCEMENT.m
 ## Installation (poste de développement ou Windows)
 ```bat
 python -m pip install -r requirements-dev.txt
-python -m pytest -q                 :: 81 tests
+python -m pytest -q                 :: 82 tests
 python tools\analyser_rapport.py "10 RC OCT.xlsx"   :: controle d'un rapport reel (lecture seule)
 python tools\make_demo.py           :: données fictives
 python tools\demo_setup.py          :: environnement de démonstration complet

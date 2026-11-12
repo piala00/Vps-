@@ -17,7 +17,7 @@
 |---|---|---|---|
 | FACTURE | `FACB` avec montant en H (comptant) ou I (à terme) | Débit | celui du rapport |
 | AVOIR | `FRCB` / `FVCB` | Débit | celui du rapport (négatif) |
-| ACOMPTE | montant en F (ENTREE) sur toute pièce `FACB`/`BCCB`/`BLCB` | Crédit | celui du rapport |
+| ACOMPTE (imputé) | facture **comptant** (colonne H) : l'acompte du BC est imputé sur la facture à la mise à jour comptable. Même pièce, même montant que la facture. Les colonnes BC (F, G) ne sont jamais exploitées | Crédit | celui de la facture |
 | REGLEMENT | reçu `7RCB` (RECOUVREMENTS) ; un reçu **négatif** contre-passe un reçu fait sur un compte erroné et est lié au reçu annulé (même client, montant opposé) | Crédit | celui du rapport |
 
 ## Import

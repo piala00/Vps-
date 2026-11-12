@@ -1,5 +1,15 @@
 # Journal d'avancement
 
+## Cycle 4 (12/11/2026) : bons de commande et acomptes
+- Règle de la comptabilité : rien n'est comptabilisé au stade du BC (colonnes F et G non exploitées). Seules
+  les factures (H, I) et les règlements passent à la mise à jour comptable.
+- Facture comptant (H) : l'acompte du BC est imputé sur la facture. L'ERP enregistre facture (débit) +
+  acompte imputé (crédit) du même montant. Factures en compte / BP (I) : dues jusqu'aux reçus.
+- Rapport réel : 2 491 acomptes imputés, toutes les factures comptant soldées, CLIENTS DETAILS BTA net nul ;
+  totaux 31/31 cohérents. VBA et modèle de classeur alignés. 82 tests.
+- À constater au premier rapprochement réel : la référence et le journal de l'acompte imputé dans Sage.
+
+
 ## Cycle 3 (12/11/2026) : règle des signes de la comptabilité
 - Règle appliquée partout (parseur, VBA, import, fiche, impression, rapprochement) : factures (retours et
   avoirs compris) au débit avec leur signe ; reçus et acomptes au crédit avec leur signe.
@@ -30,7 +40,7 @@
   précédent ; 3/4 liés automatiquement en octobre, le 4e en alerte. 77 tests.
 
 ### Questions pour la comptabilité (bloquent la mise en production)
-1. Les **acomptes** (colonne F) sont-ils passés dans Sage au crédit du client ? Avec quelle référence ?
+1. ~~Les acomptes~~ : réglé (imputés sur la facture comptant ; référence Sage à constater au rapprochement).
 2. ~~Les FVCB~~ : réglé (débit avec leur signe, comme toute facture).
 3. ~~Reçus négatifs~~ : **réglé**. Il s'agit d'annulations de reçus faits sur un compte erroné (règle implémentée).
    Reste à vérifier : `7RCB030477` (ALH OUMAROU BOUBAKARY) a-t-il le même compte Sage que « OUMAROU BOUBAKARY » ?

@@ -35,8 +35,8 @@ DEFAULTS: dict = {
         # "confirme": False = interpretation deduite du rapport, a confirmer par la comptabilite.
         # Regle de la comptabilite (12/11/2026) : toutes les factures (y compris retours / avoirs)
         # au DEBIT avec leur signe ; tous les recus et acomptes au CREDIT avec leur signe.
-        # Colonnes : F = ACOMPTE (BC, "ENTREE"), G = BP (BC a credit), H = VENTE COMPTANT,
-        # I = VENTE A TERME ("VAT") ; recus : F = RECOUVREMENTS (cf. feuille RECAP).
+        # Colonnes : F = ACOMPTE (BC, "ENTREE"), G = BP (BC a credit) -> non comptabilises ;
+        # H = VENTE COMPTANT, I = VENTE A TERME ("VAT", factures EN COMPTE / BP) ; recus : F = RECOUVREMENTS.
         "entete_recus": "RECUS DE VERSEMENTS",
         "libelle_total_ventes": "TOTAL VENTES",
         "libelle_total_recus": "TOTAL DE VERSEMENTS",
@@ -51,7 +51,10 @@ DEFAULTS: dict = {
         "valeurs_annulee": ["ANNULEE", "ANNULE"],
         "colonnes_facture": ["H", "I"],
         "colonnes_bc": ["F", "G"],
-        "acomptes": {"integrer": True, "colonne": "F", "confirme": False},
+        # Colonnes F/G (bon de commande) : jamais de mouvement. Facture COMPTANT (H) : l'acompte
+        # du BC est impute sur la facture a la mise a jour comptable -> facture (debit) + acompte
+        # impute (credit) du meme montant. "mode" : "solder_par_acompte" | "facture_seule".
+        "factures_comptant": {"mode": "solder_par_acompte", "colonnes": ["H"], "confirme": False},
         "colonne_montant_recu": "F",
         "mots_exclusion": ["TOTAL", "SOUS-TOTAL", "S/TOTAL", "REPORT", "VERSEMENT CAISSE",
                             "VERSEMENT BANQUE", "LIAISON", "CAISSE CENTRALE", "SOLDE"],

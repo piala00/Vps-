@@ -22,7 +22,7 @@ def analyser(cfg, feuille="01", fichier=None, corr=CORR):
 # Rapport REEL (anonymise) : chiffres de reference etablis sur 10 RC OCT.xlsx
 # ---------------------------------------------------------------------------------------
 @pytest.mark.parametrize("feuille,fact,avoirs,acomptes,recus,annulees", [
-    ("01", 124, 1, 90, 23, 8), ("03", 164, 5, 131, 38, 8), ("12", 245, 2, 157, 62, 9), ("14", 178, 29, 96, 28, 1)])
+    ("01", 124, 1, 84, 23, 8), ("03", 164, 5, 83, 38, 8), ("12", 245, 2, 154, 62, 9), ("14", 178, 29, 91, 28, 1)])
 def test_reel_comptages(cfg, feuille, fact, avoirs, acomptes, recus, annulees):
     s = analyser(cfg, feuille, REEL, {}).stats
     assert (s["factures"], s["avoirs"], s["acomptes"], s["reglements"], s["annulees"]) == \
@@ -40,11 +40,22 @@ def test_reel_totaux_du_rapport_et_aucun_montant_oublie(cfg, feuille):
 def test_reel_jour01_montants(cfg):
     r = analyser(cfg, "01", REEL, {})
     ctl = r.stats["controle_totaux"]
+    assert set(ctl) == {"documents_H", "documents_I", "recus_F"}   # colonnes BC (F, G) non exploitees
     assert ctl["documents_H"]["retenu"] == 12009800          # TOTAL VENTES comptant
     assert ctl["documents_I"]["retenu"] == 37652250          # TOTAL VENTES a terme (avoir FVCB deduit)
-    assert ctl["documents_F"]["retenu"] == 13060400          # ACOMPTE (RECAP)
     assert ctl["recus_F"]["retenu"] == 118987700             # TOTAL DE VERSEMENTS / RECOUVREMENTS
+    assert sum(m.montant for m in r.acomptes) == 12009800    # acomptes imputes = factures comptant
     assert r.date_rapport == date(2026, 10, 1) and r.ligne_entete_recus == 170
+
+
+def test_reel_colonnes_bon_de_commande_jamais_exploitees(cfg):
+    """BCCB033708 : acompte de 3 500 encaisse au stade du BC (colonne F) -> aucun mouvement.
+    Les acomptes n'apparaissent qu'imputes sur une facture comptant (meme piece, meme montant)."""
+    r = analyser(cfg, "01", REEL, {})
+    assert not any(m.reference_piece.startswith(("BCCB", "BLCB")) for m in r.mouvements)
+    fact_h = {(m.reference_piece, m.montant) for m in r.factures if m.colonne == "H"}
+    assert {(m.reference_piece, m.montant) for m in r.acomptes} == fact_h
+    assert not any(m.colonne == "I" for m in r.acomptes)        # facture en compte / BP : pas d'acompte
 
 
 def test_reel_avoir_fvcb_et_bc_seul(cfg):
@@ -57,11 +68,10 @@ def test_reel_avoir_fvcb_et_bc_seul(cfg):
     assert sum(1 for m in r.factures if m.bc_origine == "BC33525") == 5
 
 
-def test_reel_bc_avec_montant_facture_bloque_sans_perdre_acompte(cfg):
+def test_reel_bc_avec_montant_facture_bloque(cfg):
     r = analyser(cfg, "03", REEL, {})
     assert any("BCCB034029" in a.motif and a.gravite == "BLOQUANT" for a in r.anomalies)
-    assert any(m.reference_piece == "BCCB034029" and m.nature == "ACOMPTE" for m in r.acomptes)
-    assert not any(m.reference_piece == "BCCB034029" for m in r.factures)
+    assert not any(m.reference_piece == "BCCB034029" for m in r.mouvements)
 
 
 def test_reel_meme_numero_pour_deux_clients(cfg):
@@ -122,14 +132,16 @@ def test_cas2_bc_plus_facture_compte_une_fois(cfg):
     assert r.stats["bc_seuls_ignores"] == 1                      # BCCB0101
 
 
-def test_acompte_et_facture_comptant(cfg):
+def test_facture_comptant_soldee_par_acompte_impute(cfg):
     r = analyser(cfg)
     beta = [(m.nature, m.sens, m.montant) for m in r.mouvements if m.ct_num == "CL002"]
     assert sorted(beta) == [("ACOMPTE", "C", 120000), ("FACTURE", "D", 120000)]
+    alpha = [m.nature for m in r.mouvements if m.ct_num == "CL001"]
+    assert "ACOMPTE" not in alpha                           # facture en compte : pas d'acompte
 
 
-def test_acomptes_desactivables(cfg):
-    cfg["rapport"]["acomptes"]["integrer"] = False
+def test_mode_facture_seule(cfg):
+    cfg["rapport"]["factures_comptant"]["mode"] = "facture_seule"
     assert analyser(cfg).acomptes == []
 
 

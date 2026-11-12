@@ -59,9 +59,11 @@
       "F",
       "G"
     ],
-    "acomptes": {
-      "integrer": true,
-      "colonne": "F",
+    "factures_comptant": {
+      "mode": "solder_par_acompte",
+      "colonnes": [
+        "H"
+      ],
       "confirme": false
     },
     "colonne_montant_recu": "F",

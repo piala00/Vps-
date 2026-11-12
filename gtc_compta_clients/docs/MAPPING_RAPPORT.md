@@ -26,9 +26,9 @@ Analyse du 12/11/2026 : 32 feuilles (`01` à `31`, `RECAP`), 31 jours. Outils :
 | C | (n° document) | `FACB…` facture, `FRCB…` / `FVCB…` avoirs, `BCCB…` bon de commande, `BLCB…` bon de livraison | type |
 | D | NOMS ET PRENOMS | client | correspondance vérifiée → code tiers |
 | E | REFRENCES | `EN COMPTE` (1, 2), `COMPTANT`, `ANNULEE`, `BP/<agent>`, `CASH/<agent>`, acheteur réel pour `CLIENTS DETAILS BTA` | mode / acheteur |
-| F | BON DE COMMANDE – ENTREE | **ACOMPTE** (encaissement à la commande) | **ACOMPTE au crédit, signe conservé** |
-| G | BON DE COMMANDE – BP | BC « bon pour » (à crédit) | ignoré (pas de créance) |
-| H | FACTURE – COMPTANT | VENTE COMPTANT | facture au débit, signe conservé |
+| F | BON DE COMMANDE – ENTREE | ACOMPTE (encaissement à la commande) | **non exploité** : rien n'est comptabilisé au stade du BC |
+| G | BON DE COMMANDE – BP | BC « bon pour » (à crédit) | **non exploité** |
+| H | FACTURE – COMPTANT | VENTE COMPTANT | facture au débit **+ acompte imputé au crédit** (même montant), signe conservé |
 | I | FACTURE – VAT | VENTE À TERME | facture au débit, signe conservé (avoirs négatifs) |
 
 RECAP : `RECETTE = ACOMPTE + RECOUVREMENTS` (01/10 : 13 060 400 + 118 987 700 = 132 048 100).
@@ -43,19 +43,42 @@ reprend celle du 20/10 (32 789 775 au lieu de 6 738 250). Total RECAP 435 334 25
 | Constat | Volume | Règle appliquée |
 |---|---|---|
 | H et I jamais renseignés sur la même ligne | 0 cas | un seul montant facture par ligne |
-| `FACB` avec F = H (acompte et facture comptant le même jour) | 1 988 | 1 ACOMPTE (crédit) + 1 FACTURE (débit) |
-| `FACB` avec H seul (acompte encaissé un jour précédent sur le `BCCB`) | 541 | FACTURE seule |
+| `FACB` avec F = H (acompte et facture comptant le même jour) | 1 988 | FACTURE (débit) + acompte imputé (crédit) : solde net nul |
+| `FACB` avec H seul (acompte encaissé un jour précédent sur le `BCCB`) | 541 | FACTURE (débit) + acompte imputé (crédit) le jour de la facture |
+| acompte (F) avec facture à terme (I) sur la même ligne | 0 | — (les acomptes ne concernent que les ventes comptant) |
 | `FACB` avec G = I (BC à crédit facturé) | 680 | FACTURE seule (G ignoré) |
-| `BCCB` / `BLCB` sans montant facture | 1 350 | BC/BL seuls ignorés ; leur colonne F = acompte |
+| `BCCB` / `BLCB` sans montant facture | 1 350 | ignorés (aucun mouvement, y compris leur acompte en F) |
 | `FRCB` (60) et `FVCB` (59) | 119 | **toujours négatifs** : AVOIR au **débit négatif** (règle GTC) |
 | lignes `ANNULEE` | 106 | ignorées (bloquant si un montant est présent) |
 | factures à montant nul (`AVARIE`, `BONUS`, `AN`…) | 27 | aucune écriture, information |
 | `COMPTE DE LIAISON` | ~60 | hors périmètre (liaison interne) |
-| n° `BCCB` portant un montant facture | 8 | **bloquant** : le n° de facture manque ; l'acompte de la ligne est conservé |
+| n° `BCCB` portant un montant facture | 8 | **bloquant** : le n° de facture manque |
 | même n° de facture pour 2 clients (`FACB039522` le 12/10) | 1 | avertissement + conflit enregistré à l'import |
 | reçus `7RCB` négatifs | 4 | **annulation d'un reçu fait sur un compte erroné** (règle confirmée par la comptabilité) : reçu au **crédit négatif**, lié au reçu annulé ; 3/4 liés automatiquement, 1 en alerte |
 | reçus | 913 | tous `7RCB`, montant en F (RECOUVREMENTS) |
 | libellés clients distincts | ~213 | fichier de correspondances à compléter |
+
+## Bons de commande et acomptes (règle confirmée par la comptabilité le 12/11/2026)
+- Tant qu'un montant est dans les colonnes BON DE COMMANDE (F « ENTREE » = acompte, G « BP »), **rien
+  n'est comptabilisé** dans Sage : seules les **factures** et les **règlements** passent à la mise à jour
+  comptable. Les colonnes F et G ne sont donc **jamais** transformées en mouvements.
+- Dans Sage Gestion commerciale, le BC est transformé en BL puis en facture au magasin. À la mise à jour
+  comptable, l'acompte encaissé sur le BC est **imputé sur la facture** et les deux montants s'annulent sur le
+  compte client.
+- Dans le rapport, les acomptes ne concernent que les ventes **comptant** (colonne H) : 0 cas d'acompte
+  avec une facture à terme (I). Pour chaque facture comptant, l'ERP enregistre donc la facture au débit et
+  l'**acompte imputé** au crédit, du même montant et à la date de la facture. Le paramètre
+  `rapport.factures_comptant.mode` vaut `solder_par_acompte` ; `facture_seule` le désactive.
+- Les factures **en compte / BP** (colonne I, « VAT ») restent dues jusqu'aux reçus `7RCB`.
+- Octobre : 2 491 acomptes imputés (309 821 225), aucune facture comptant non soldée. Le compte collectif
+  CLIENTS DETAILS BTA a une variation nette nulle sur le mois.
+
+Recherche documentaire (12/11/2026) : la documentation publique confirme le principe comptable général
+(acompte reçu porté au crédit du client ou du compte 4191, puis soldé par la facture définitive) et, pour
+Sage 100, que l'acompte est rattaché au bon de commande puis imputé sur la facture de vente, les
+règlements étant comptabilisés par la « mise à jour comptable des règlements ». L'aide en ligne Sage 100
+et le forum Sage n'étaient pas accessibles depuis l'environnement de développement : la référence et le
+journal exacts de l'écriture d'acompte seront constatés lors du premier rapprochement réel.
 
 ## Reçus négatifs (règle confirmée le 12/11/2026)
 Quand un reçu a été fait sur un compte erroné, le caissier fait un reçu du **même montant avec un signe
@@ -86,9 +109,9 @@ Pour chaque colonne H, I et F (acomptes) et pour la colonne F des reçus :
    Un montant non interprété fait apparaître une anomalie bloquante.
 
 ## Points restant à confirmer par la comptabilité
-1. **Acomptes (colonne F)** : sont-ils bien passés dans Sage au crédit du compte du client, et avec quelle
-   référence (n° de BC, de reçu, autre) ? Le traitement est activé (`rapport.acomptes.integrer`), et le
-   rapprochement Sage confirmera ou infirmera la règle dès les premiers jours.
+1. ~~Acomptes (colonne F)~~ : **réglé**. Voir « Bons de commande et acomptes » ci-dessous. Reste à vérifier
+   au premier rapprochement réel la **référence** sous laquelle Sage passe l'acompte imputé (n° de facture,
+   de BC ou de règlement). L'appariement essaie les trois, puis date et montant.
 2. ~~Sens des `FVCB`~~ : réglé. Comme toute facture, ils vont au débit avec leur signe (négatif).
 3. **`COMPTE DE LIAISON`** : exclusion confirmée ? Existe-t-il un compte 411 correspondant dans Sage ?
 4. **`VENTE PROMOTIONNELLE`**, **`SOURCE DU PAYS RETOUR`** : comptes clients Sage réels ?

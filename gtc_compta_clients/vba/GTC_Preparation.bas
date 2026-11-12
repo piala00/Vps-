@@ -24,7 +24,7 @@ Private gColsFacture As Variant
 Private gColsBC As Variant
 Private gColRecu As String
 Private gVidesFin As Long
-Private gAcompteCol As String
+Private gColsComptant As Collection
 Private gBons As Collection
 Private gAnnulees As Collection
 
@@ -103,34 +103,25 @@ Public Sub TrierEtPreparer()
         Else
             Set mts = New Collection
             Dim ok As Boolean: ok = True
+            Dim colFac As String: colFac = ""
             For i = LBound(gColsFacture) To UBound(gColsFacture)
                 mt = Montant(wsC.Range(gColsFacture(i) & r).Value, ok)
                 If Not ok Then Exit For
-                If Not IsEmpty(mt) Then If mt <> 0 Then mts.Add mt
+                If Not IsEmpty(mt) Then If mt <> 0 Then mts.Add mt: colFac = gColsFacture(i)
             Next i
-            Dim acpt As Variant: acpt = 0
-            If ok And gAcompteCol <> "" Then
-                acpt = Montant(wsC.Range(gAcompteCol & r).Value, ok)
-                If IsEmpty(acpt) Then acpt = 0
-            End If
+            ' Colonnes BON DE COMMANDE (acompte, BP) : jamais de mouvement (rien n'est comptabilise au BC)
             pref = Prefixe(num)
             If Not ok Then
                 Anomalie r, "DOCUMENTS", "BLOQUANT", "Montant illisible", TexteLigne(wsC, r), "Corriger le montant": nAno = nAno + 1
             ElseIf EstDansListe(Norm(Txt(wsC, r, "E")), gAnnulees) Then
-                If mts.Count > 0 Or acpt <> 0 Then
-                    Anomalie r, "DOCUMENTS", "BLOQUANT", "Ligne marquee ANNULEE mais portant un montant", TexteLigne(wsC, r), "Verifier l'annulation": nAno = nAno + 1
+                If mts.Count > 0 Then
+                    Anomalie r, "DOCUMENTS", "BLOQUANT", "Ligne marquee ANNULEE mais portant un montant de facture", TexteLigne(wsC, r), "Verifier l'annulation": nAno = nAno + 1
                 Else
                     nAnn = nAnn + 1
                 End If
             ElseIf cli = "" Then
-                If mts.Count > 0 Or acpt <> 0 Then Anomalie r, "DOCUMENTS", "BLOQUANT", "Client absent (colonne D)", TexteLigne(wsC, r), "Renseigner le client": nAno = nAno + 1
+                If mts.Count > 0 Then Anomalie r, "DOCUMENTS", "BLOQUANT", "Client absent (colonne D)", TexteLigne(wsC, r), "Renseigner le client": nAno = nAno + 1
             Else
-                If acpt <> 0 Then
-                    ' Acompte encaisse a la commande : reglement du client
-                    ' Encaissement : toujours au CREDIT, signe conserve
-                    EcrireMvt "REGLEMENTS", agence, dRap, "ACOMPTE", num, cli, CDbl(acpt), "C", Txt(wsC, r, "B"), Txt(wsC, r, "E"), pref, r, "acompte"
-                    nAcpt = nAcpt + 1
-                End If
                 If mts.Count = 0 Then
                     If gTypes.Exists(pref) Then
                         Anomalie r, "DOCUMENTS", "INFO", "Facture " & num & " sans montant", TexteLigne(wsC, r), "Aucun mouvement cree"
@@ -150,6 +141,12 @@ Public Sub TrierEtPreparer()
                     If mt < 0 And nature <> "AVOIR" Then notes = "facture de montant negatif"
                     EcrireMvt "FACTURES", agence, dRap, nature, num, cli, CDbl(mt), sens, Txt(wsC, r, "B"), Txt(wsC, r, "E"), pref, r, notes
                     nFac = nFac + 1
+                    If EstDansListe(colFac, gColsComptant) Then
+                        ' Facture COMPTANT : l'acompte du BC est impute sur la facture a la mise a jour
+                        ' comptable ; facture et acompte s'annulent sur le compte client.
+                        EcrireMvt "REGLEMENTS", agence, dRap, "ACOMPTE", num, cli, CDbl(mt), "C", Txt(wsC, r, "B"), Txt(wsC, r, "E"), pref, r, "acompte impute sur facture comptant"
+                        nAcpt = nAcpt + 1
+                    End If
                 End If
             End If
         End If
@@ -196,7 +193,7 @@ Public Sub TrierEtPreparer()
     Application.ScreenUpdating = True
     ThisWorkbook.Worksheets("EXPORT_ERP").Activate
     MsgBox "Preparation terminee." & vbCrLf & _
-           "Factures/avoirs : " & nFac & vbCrLf & "Acomptes : " & nAcpt & vbCrLf & "Reglements : " & nReg & vbCrLf & "Annulations de recus : " & nAnnR & vbCrLf & _
+           "Factures/avoirs : " & nFac & vbCrLf & "Acomptes imputes (factures comptant) : " & nAcpt & vbCrLf & "Reglements : " & nReg & vbCrLf & "Annulations de recus : " & nAnnR & vbCrLf & _
            "Lignes annulees : " & nAnn & vbCrLf & _
            "BC/BL seuls ignores : " & nBC & vbCrLf & "Totaux exclus : " & nTot & vbCrLf & _
            "Hors perimetre exclus : " & nHors & vbCrLf & "Anomalies : " & nAno & vbCrLf & vbCrLf & _
@@ -242,7 +239,7 @@ Private Sub ChargerRegles(ws As Worksheet)
     Set gCollectifs = New Collection
     gEnteteRecus = "RECUS DE VERSEMENTS": gColRecu = "F": gVidesFin = 8
     gColsFacture = Array("H", "I"): gColsBC = Array("F", "G")
-    gAcompteCol = ""
+    Set gColsComptant = New Collection
     Set gBons = New Collection
     Set gAnnulees = New Collection
     last = DerniereLigne(ws)
@@ -257,7 +254,7 @@ Private Sub ChargerRegles(ws As Worksheet)
             Case "COLONNES_BC": gColsBC = Split(Replace(CStr(ws.Cells(r, 2).Value), " ", ""), ",")
             Case "COLONNE_MONTANT_RECU": gColRecu = Trim$(CStr(ws.Cells(r, 2).Value))
             Case "LIGNES_VIDES_FIN_SECTION": gVidesFin = CLng(ws.Cells(r, 2).Value)
-            Case "ACOMPTE_COLONNE": gAcompteCol = UCase$(Trim$(CStr(ws.Cells(r, 2).Value)))
+            Case "COLONNE_FACTURE_COMPTANT": gColsComptant.Add UCase$(Trim$(CStr(ws.Cells(r, 2).Value)))
             Case "PREFIXE_BON": gBons.Add UCase$(Trim$(CStr(ws.Cells(r, 2).Value)))
             Case "VALEUR_ANNULEE": gAnnulees.Add Norm(CStr(ws.Cells(r, 2).Value))
         End Select

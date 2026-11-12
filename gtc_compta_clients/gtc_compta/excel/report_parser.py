@@ -197,8 +197,11 @@ class ParseurRapport:
         feuille = res.feuille
         r = self.r
         cols_f = r["colonnes_facture"]
-        acpt = r.get("acomptes", {})
-        col_acpt = acpt.get("colonne") if acpt.get("integrer") else None
+        # Les colonnes BON DE COMMANDE (F acompte, G BP) ne sont jamais transformees en mouvements :
+        # rien n'est comptabilise dans Sage au stade du BC. Seules les colonnes FACTURE (H, I) et les
+        # recus le sont, lors de la mise a jour comptable.
+        fc = r.get("factures_comptant", {})
+        cols_comptant = set(fc.get("colonnes", [])) if fc.get("mode") == "solder_par_acompte" else set()
         bons = set(r.get("prefixes_bons", []))
         annules = {normaliser(v) for v in r.get("valeurs_annulee", ["ANNULEE"])}
         for i, row in enumerate(rows):
@@ -215,7 +218,7 @@ class ParseurRapport:
                 cle = "totaux_exclus" if "TOTAL" in normaliser(_row_text(row)) else "hors_perimetre_exclus"
                 st[cle] += 1
                 if cle == "hors_perimetre_exclus":
-                    for c in set(cols_f + ([col_acpt] if col_acpt else [])):
+                    for c in cols_f:
                         try:
                             st["montants_exclus"][c] += parse_montant(_cell(row, c)) or 0
                         except MontantInvalide:
@@ -227,23 +230,21 @@ class ParseurRapport:
                         "Ligne avec montant mais numero de document non reconnu",
                         _row_text(row), "Verifier la colonne C"))
                 continue
-            vals = self._montants(row, sorted(set(cols_f + ([col_acpt] if col_acpt else []))), res, ligne,
-                                  "DOCUMENTS")
+            vals = self._montants(row, cols_f, res, ligne, "DOCUMENTS")
             if vals is None:
                 continue
             factures = {c: vals[c] for c in cols_f if vals[c]}
-            acompte = vals.get(col_acpt, 0) if col_acpt else 0
             prefixe = prefixe_document(num)
             if normaliser(mode) in annules:
-                if factures or acompte:
+                if factures:
                     res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "BLOQUANT",
-                        "Ligne marquee ANNULEE mais portant un montant", _row_text(row),
+                        "Ligne marquee ANNULEE mais portant un montant de facture", _row_text(row),
                         "Verifier l'annulation avec le commercial"))
                 else:
                     st["annulees"] += 1
                 continue
             if not client:
-                if factures or acompte:
+                if factures:
                     res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "BLOQUANT",
                         "Client absent (colonne D)", _row_text(row), "Renseigner le client"))
                 continue
@@ -251,16 +252,6 @@ class ParseurRapport:
                         feuille=feuille, ligne=ligne, type_document=prefixe)
             if normaliser(client) in self.collectifs:
                 base["acheteur_detail"] = mode
-            if acompte:
-                # Acompte encaisse a la commande (colonne ACOMPTE) : reglement du client.
-                # Encaissement : toujours au CREDIT du compte client, signe conserve.
-                note = "" if acpt.get("confirme") else "traitement des acomptes non confirme"
-                if acompte < 0:
-                    note = (note + " ; acompte negatif").strip(" ;")
-                m = Mouvement(nature="ACOMPTE", reference_piece=num, montant=acompte,
-                              sens="C", colonne=col_acpt, notes=note, **base)
-                res.acomptes.append(m)
-                st["acomptes"] += 1
             if not factures:
                 if prefixe in bons:
                     st["bc_seuls_ignores"] += 1      # BC / BL seul : pas de creance facturee
@@ -302,6 +293,15 @@ class ParseurRapport:
             res.factures.append(Mouvement(nature=nature, reference_piece=num, montant=montant, sens=sens,
                                           colonne=col, notes=notes, **base))
             st["avoirs" if nature == "AVOIR" else "factures"] += 1
+            if col in cols_comptant:
+                # Facture COMPTANT : l'acompte encaisse sur le BC est impute sur la facture lors de la
+                # mise a jour comptable Sage ; facture et acompte s'annulent sur le compte client.
+                res.acomptes.append(Mouvement(
+                    nature="ACOMPTE", reference_piece=num, montant=montant, sens="C", colonne=col,
+                    notes="acompte impute sur facture comptant"
+                          + ("" if fc.get("confirme") else " (regle a verifier au rapprochement Sage)"),
+                    **base))
+                st["acomptes"] += 1
 
     def _controle_totaux(self, rows, fin_docs, idx_recus, res, st) -> dict:
         """Rapproche les montants extraits des lignes TOTAL du rapport lui-meme.
@@ -344,12 +344,10 @@ class ParseurRapport:
             return {"rapport": rapport, "lignes": lignes, "exclus": exclus, "bloques": bloques}
 
         out = {}
-        acpt = self.r.get("acomptes", {})
-        acpt_col = acpt.get("colonne") if acpt.get("integrer") else None
         tv = normaliser(self.r.get("libelle_total_ventes", "TOTAL VENTES"))
-        for col in self.r["colonnes_facture"] + ([acpt_col] if acpt_col else []):
+        for col in self.r["colonnes_facture"]:
             d = segment(rows[:fin_docs], 0, col, tv)
-            d["retenu"] = sum(m.montant for m in res.factures + res.acomptes if m.colonne == col)
+            d["retenu"] = sum(m.montant for m in res.factures if m.colonne == col)
             out[f"documents_{col}"] = d
         if idx_recus is not None:
             col = self.r["colonne_montant_recu"]
@@ -362,7 +360,7 @@ class ParseurRapport:
             d = segment(seg, idx_recus + 1, col, fin)
             d["retenu"] = sum(m.montant for m in res.reglements)
             out[f"recus_{col}"] = d
-        libelles = {"H": "ventes comptant", "I": "ventes a terme", "F": "acomptes / recouvrements"}
+        libelles = {"H": "ventes comptant", "I": "ventes a terme", "F": "recouvrements"}
         for k, v in out.items():
             nom = f"{k} ({libelles.get(k[-1], '')})"
             if v["rapport"] is not None and v["rapport"] != v["lignes"]:

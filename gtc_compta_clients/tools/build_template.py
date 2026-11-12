@@ -37,9 +37,11 @@ def build(cfg, dest: Path) -> Path:
         ws.append([k, v])
     for pref, t in r["types_documents"].items():
         ws.append(["TYPE_DOCUMENT", pref, t["nature"], t["sens"], "confirme" if t.get("confirme") else "A CONFIRMER"])
-    acpt = r.get("acomptes", {})
-    ws.append(["ACOMPTE_COLONNE", acpt.get("colonne", "") if acpt.get("integrer") else "",
-               "confirme" if acpt.get("confirme") else "A CONFIRMER"])
+    fc = r.get("factures_comptant", {})
+    if fc.get("mode") == "solder_par_acompte":
+        for c in fc.get("colonnes", []):
+            ws.append(["COLONNE_FACTURE_COMPTANT", c, "acompte impute sur la facture",
+                       "confirme" if fc.get("confirme") else "A CONFIRMER"])
     for pb in r.get("prefixes_bons", []):
         ws.append(["PREFIXE_BON", pb])
     for va in r.get("valeurs_annulee", []):
