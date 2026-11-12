@@ -1,7 +1,7 @@
 # Rapport de tests
 
 Exécution : `python -m pytest -q`, Python 3.12, Linux (environnement de développement), le 12/11/2026.
-**Résultat : 75 tests réussis, 0 échec.**
+**Résultat : 77 tests réussis, 0 échec.**
 
 Le parseur est testé sur une **copie anonymisée du rapport réel** (jours 01, 03, 12 et 14 de
 `10 RC OCT.xlsx`), avec les chiffres de référence du classeur : comptages, totaux `TOTAL VENTES` /
@@ -34,10 +34,10 @@ avec le vrai Sage reste à établir.
   27 factures à montant nul, liaisons et versements de caisse exclus ;
 - **31/31 jours** : le total du rapport est égal à la somme des lignes, et la somme des lignes est égale à
   retenu + exclu + bloqué (aucun montant oublié) ;
-- 12 lignes bloquantes sur le mois (8 n° de BC portant une facture, 4 reçus négatifs), 2 avertissements
-  (même n° de facture pour deux clients).
+- 8 lignes bloquantes sur le mois (n° de BC portant une facture) ; les 4 reçus négatifs sont traités comme
+  annulations de reçus (3 liés automatiquement, 1 en alerte) ; même n° de facture pour deux clients signalé.
 
-Volume (base SQLite) : import du mois complet (7 733 mouvements, 26 lots) en 0,4 s. Le réimport des mêmes
+Volume (base SQLite) : import du mois complet (7 737 mouvements, 26 lots) en 0,4 s. Le réimport des mêmes
 données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée (2 414 lignes) est calculée en 16 ms.
 
 ## Autres vérifications effectuées
@@ -76,6 +76,7 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 - [OK] tests/test_flux.py::test_correspondance_jamais_automatique_sur_ressemblance
 - [OK] tests/test_flux.py::test_permissions
 - [OK] tests/test_flux.py::test_fichier_correspondances_export_import
+- [OK] tests/test_flux.py::test_annulation_recu_liee_jour_precedent
 - [OK] tests/test_modules.py::test_cas9_bc_deja_inclus_pas_double_compte
 - [OK] tests/test_modules.py::test_cas9_bc_non_inclus_ajoute_une_fois
 - [OK] tests/test_modules.py::test_cas10_facture_echue_selon_politique
@@ -108,7 +109,8 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 - [OK] tests/test_parser.py::test_reel_avoir_fvcb_et_bc_seul
 - [OK] tests/test_parser.py::test_reel_bc_avec_montant_facture_bloque_sans_perdre_acompte
 - [OK] tests/test_parser.py::test_reel_meme_numero_pour_deux_clients
-- [OK] tests/test_parser.py::test_reel_recus_negatifs_bloques
+- [OK] tests/test_parser.py::test_reel_recus_negatifs_annulent_le_recu_errone
+- [OK] tests/test_parser.py::test_recu_negatif_sans_original_avertit
 - [OK] tests/test_parser.py::test_reel_liaisons_et_versements_exclus
 - [OK] tests/test_parser.py::test_cas1_seules_les_deux_sections_utiles
 - [OK] tests/test_parser.py::test_cas1_entete_recus_detectee_dynamiquement

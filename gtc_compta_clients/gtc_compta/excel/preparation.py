@@ -21,6 +21,7 @@ EXPORT_COLONNES = [
     "reference_piece", "code_tiers", "nom_client", "acheteur_detail", "montant", "sens",
     "bc_origine", "mode_reference", "source_feuille", "source_ligne", "empreinte_ligne",
 ]
+EXPORT_COLONNES_OPTIONNELLES = ["reference_liee"]   # recu annule (rempli par l application)
 FEUILLES = ["PARAMETRES", "COLLAGE", "FACTURES", "REGLEMENTS", "ANOMALIES", "EXPORT_ERP"]
 
 
@@ -93,6 +94,7 @@ def lignes_export(res: ResultatPreparation) -> list[dict]:
             "bc_origine": m.bc_origine, "mode_reference": m.mode_reference,
             "source_feuille": m.feuille, "source_ligne": m.ligne,
             "empreinte_ligne": empreinte_mouvement(res.agence, m),
+            "reference_liee": m.reference_liee,
         })
     return out
 
@@ -129,9 +131,9 @@ def ecrire_classeur_prepare(res: ResultatPreparation, rows_collage: list[list], 
     for a in res.anomalies:
         sa.append([a.feuille, a.ligne, a.section, a.gravite, a.motif, a.contenu, a.proposition, a.statut])
     se = wb.create_sheet("EXPORT_ERP")
-    se.append(EXPORT_COLONNES)
+    se.append(EXPORT_COLONNES + EXPORT_COLONNES_OPTIONNELLES)
     for l in lignes_export(res):
-        se.append([l[c] for c in EXPORT_COLONNES])
+        se.append([l[c] for c in EXPORT_COLONNES + EXPORT_COLONNES_OPTIONNELLES])
     for s in wb.worksheets:
         if s.title not in ("PARAMETRES", "COLLAGE"):
             for c in s[1]:
@@ -177,7 +179,7 @@ def _normaliser_ligne(d: dict) -> dict:
     if d.get("source_ligne") not in (None, ""):
         d["source_ligne"] = int(d["source_ligne"])
     for k in ("id_import", "agence", "type_mouvement", "reference_piece", "code_tiers", "nom_client",
-              "acheteur_detail", "sens", "bc_origine", "mode_reference", "source_feuille"):
+              "acheteur_detail", "sens", "bc_origine", "mode_reference", "source_feuille", "reference_liee"):
         val = d.get(k)
         if isinstance(val, float) and val.is_integer():
             val = int(val)

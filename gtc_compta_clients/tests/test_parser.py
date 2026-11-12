@@ -69,9 +69,23 @@ def test_reel_meme_numero_pour_deux_clients(cfg):
     assert sum(1 for a in r.anomalies if "FACB039522" in a.motif and "plusieurs clients" in a.motif) == 2
 
 
-def test_reel_recus_negatifs_bloques(cfg):
+def test_reel_recus_negatifs_annulent_le_recu_errone(cfg):
+    """Recu negatif = contre-passation du recu fait sur un compte errone (meme client, meme montant)."""
     r = analyser(cfg, "14", REEL, {})
-    assert {a.contenu.split()[1] for a in r.anomalies if "negatif" in a.motif} == {"7RCB028975", "7RCB028976"}
+    ann = {m.reference_piece: m for m in r.reglements if m.nature == "ANNULATION_RECU"}
+    assert set(ann) == {"7RCB028975", "7RCB028976"}
+    assert ann["7RCB028975"].reference_liee == "7RCB028907" and ann["7RCB028975"].sens == "D"
+    assert ann["7RCB028976"].reference_liee == "7RCB028853" and ann["7RCB028976"].montant == 7000000
+    assert not any(a.gravite == "BLOQUANT" and "RECUS" == a.section for a in r.anomalies)
+    assert r.stats["controle_totaux"]["recus_F"]["ecart_non_explique"] == 0
+    assert r.stats["controle_totaux"]["recus_F"]["retenu"] == 93400750          # = TOTAL DE VERSEMENTS
+
+
+def test_recu_negatif_sans_original_avertit(cfg):
+    r = analyser(cfg, "02")
+    a = next(m for m in r.reglements if m.reference_piece == "7RCB0462")
+    assert a.nature == "ANNULATION_RECU" and a.reference_liee == ""
+    assert any("7RCB0462" in x.motif and x.gravite == "AVERTISSEMENT" for x in r.anomalies)
 
 
 def test_reel_liaisons_et_versements_exclus(cfg):
@@ -144,7 +158,7 @@ def test_jour02_cas_bloquants(cfg):
     r = analyser(cfg, "02")
     assert any("differents" in a.motif for a in r.anomalies)                  # H et I incoherents
     assert any("BCCB0300" in a.motif for a in r.anomalies)                    # n° de BC + facture
-    assert any("negatif" in a.motif for a in r.anomalies)                     # recu negatif
+    assert any("Recu negatif" in a.motif for a in r.anomalies)                # recu negatif sans original
     assert next(m for m in r.factures if m.reference_piece == "FACB0210").montant == 1250000
     assert all(v["ecart_non_explique"] == 0 for v in r.stats["controle_totaux"].values())
 

@@ -33,7 +33,7 @@ Public Sub TrierEtPreparer()
     Dim wsC As Worksheet, wsP As Worksheet
     Dim dRap As Variant, agence As String
     Dim lastRow As Long, r As Long, idxRecus As Long
-    Dim nFac As Long, nReg As Long, nAno As Long, nBC As Long, nTot As Long, nHors As Long, nAcpt As Long, nAnn As Long
+    Dim nFac As Long, nReg As Long, nAno As Long, nBC As Long, nTot As Long, nHors As Long, nAcpt As Long, nAnn As Long, nAnnR As Long
     On Error GoTo Erreur
     Set wsC = ThisWorkbook.Worksheets("COLLAGE")
     Set wsP = ThisWorkbook.Worksheets("PARAMETRES")
@@ -180,8 +180,12 @@ Public Sub TrierEtPreparer()
                         Anomalie r, "RECUS", "BLOQUANT", "Montant illisible", TexteLigne(wsC, r), "Corriger le montant": nAno = nAno + 1
                     ElseIf IsEmpty(mt) Then
                         Anomalie r, "RECUS", "AVERTISSEMENT", "Recu sans montant", TexteLigne(wsC, r), "": nAno = nAno + 1
-                    ElseIf mt <= 0 Or cli = "" Then
-                        Anomalie r, "RECUS", "BLOQUANT", "Recu negatif ou sans client", TexteLigne(wsC, r), "Traitement manuel": nAno = nAno + 1
+                    ElseIf mt = 0 Or cli = "" Then
+                        Anomalie r, "RECUS", "BLOQUANT", "Recu nul ou sans client", TexteLigne(wsC, r), "Traitement manuel": nAno = nAno + 1
+                    ElseIf mt < 0 Then
+                        ' Recu negatif : contre-passation d'un recu fait sur un compte errone
+                        EcrireMvt "REGLEMENTS", agence, dRap, "ANNULATION_RECU", num, cli, -CDbl(mt), "D", "", Txt(wsC, r, "E"), Prefixe(num), r, "annulation de recu (compte errone)"
+                        nAnnR = nAnnR + 1
                     Else
                         EcrireMvt "REGLEMENTS", agence, dRap, "REGLEMENT", num, cli, CDbl(mt), "C", "", Txt(wsC, r, "E"), Prefixe(num), r, ""
                         nReg = nReg + 1
@@ -194,7 +198,7 @@ Public Sub TrierEtPreparer()
     Application.ScreenUpdating = True
     ThisWorkbook.Worksheets("EXPORT_ERP").Activate
     MsgBox "Preparation terminee." & vbCrLf & _
-           "Factures/avoirs : " & nFac & vbCrLf & "Acomptes : " & nAcpt & vbCrLf & "Reglements : " & nReg & vbCrLf & _
+           "Factures/avoirs : " & nFac & vbCrLf & "Acomptes : " & nAcpt & vbCrLf & "Reglements : " & nReg & vbCrLf & "Annulations de recus : " & nAnnR & vbCrLf & _
            "Lignes annulees : " & nAnn & vbCrLf & _
            "BC/BL seuls ignores : " & nBC & vbCrLf & "Totaux exclus : " & nTot & vbCrLf & _
            "Hors perimetre exclus : " & nHors & vbCrLf & "Anomalies : " & nAno & vbCrLf & vbCrLf & _

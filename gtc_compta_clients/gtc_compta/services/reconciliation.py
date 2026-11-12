@@ -105,7 +105,7 @@ def apparier(mvts: list, ecritures: list[SageEntry]):
         cle = (m["date_piece"], m["sens"], m["montant"])
         cs = [e for e in libres if (e.date_ecriture.isoformat(), e.sens, e.montant) == cle]
         jumeaux = [x for x in non_apparies if (x["date_piece"], x["sens"], x["montant"]) == cle]
-        if len(cs) == 1 and len(jumeaux) == 1 and m["nature"] in ("ACOMPTE", "REGLEMENT"):
+        if len(cs) == 1 and len(jumeaux) == 1 and m["nature"] in ("ACOMPTE", "REGLEMENT", "ANNULATION_RECU"):
             pris.add(cs[0].ec_no)
             libres.remove(cs[0])
             paires.append((m["id"], [cs[0].ec_no], "DATE_SENS_MONTANT"))

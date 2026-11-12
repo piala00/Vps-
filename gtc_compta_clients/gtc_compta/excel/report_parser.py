@@ -41,6 +41,7 @@ class Mouvement:
     type_document: str = ""
     notes: str = ""
     colonne: str = ""
+    reference_liee: str = ""    # recu annule par une ANNULATION_RECU
 
     def to_dict(self):
         return asdict(self)
@@ -118,7 +119,7 @@ class ParseurRapport:
     def analyser(self, rows: list[list], feuille: str, agence: str,
                  date_rapport: date | None) -> ResultatPreparation:
         res = ResultatPreparation(feuille=feuille, date_rapport=date_rapport, agence=agence)
-        st = {"lignes_lues": len(rows), "factures": 0, "avoirs": 0, "acomptes": 0, "reglements": 0,
+        st = {"lignes_lues": len(rows), "factures": 0, "avoirs": 0, "acomptes": 0, "reglements": 0, "annulations_recus": 0,
               "bc_seuls_ignores": 0, "annulees": 0, "factures_montant_nul": 0, "totaux_exclus": 0,
               "hors_perimetre_exclus": 0, "anomalies": 0,
               "montants_exclus": defaultdict(int)}
@@ -168,6 +169,7 @@ class ParseurRapport:
                         m.reference_piece, "Erreur de saisie probable : le rapprochement Sage indiquera "
                                            "la bonne affectation"))
 
+        self._lier_annulations(res)
         for m in res.mouvements:
             self._affecter_client(m, res)
         st["anomalies"] = len(res.anomalies)
@@ -363,7 +365,7 @@ class ParseurRapport:
                 if fin in normaliser(_row_text(row)):
                     break
             d = segment(seg, idx_recus + 1, col, fin)
-            d["retenu"] = sum(m.montant for m in res.reglements)
+            d["retenu"] = sum(m.montant if m.sens == "C" else -m.montant for m in res.reglements)
             out[f"recus_{col}"] = d
         libelles = {"H": "ventes comptant", "I": "ventes a terme", "F": "acomptes / recouvrements"}
         for k, v in out.items():
@@ -425,16 +427,42 @@ class ParseurRapport:
             sens = "C"
             nature = "REGLEMENT"
             if montant < 0:
-                res.anomalies.append(Anomalie(feuille, ligne, "RECUS", "BLOQUANT",
-                    "Recu de montant negatif (remboursement ?)", txt, "Traitement manuel"))
-                continue
+                # Recu negatif = contre-passation d'un recu fait sur un compte errone : il annule
+                # le recu positif de meme montant du meme compte (le bon compte recoit en general
+                # un nouveau recu positif). Lien recherche apres lecture de la section.
+                nature, sens, montant = "ANNULATION_RECU", "D", -montant
             m = Mouvement(nature=nature, reference_piece=num, client_libelle=client,
                           montant=montant, sens=sens, mode_reference=_texte(_cell(row, "E")),
                           feuille=feuille, ligne=ligne, type_document=prefixe_document(num), colonne=col_m)
             if normaliser(client) in self.collectifs:
                 m.acheteur_detail = m.mode_reference
             res.reglements.append(m)
-            st["reglements"] += 1
+            st["annulations_recus" if nature == "ANNULATION_RECU" else "reglements"] += 1
+
+    def _lier_annulations(self, res: ResultatPreparation):
+        """Rattache chaque recu negatif au recu positif qu'il annule (meme client, meme montant,
+        dans la journee). A defaut, avertissement : le recu annule est peut-etre d'un jour
+        precedent (le lien sera recherche a l'import) ; les recus de meme montant faits le meme
+        jour sur d'autres comptes sont cites comme reaffectations possibles."""
+        positifs = [m for m in res.reglements if m.nature == "REGLEMENT"]
+        deja = set()
+        for a in [m for m in res.reglements if m.nature == "ANNULATION_RECU"]:
+            orig = next((p for p in positifs if id(p) not in deja and p.montant == a.montant
+                         and normaliser(p.client_libelle) == normaliser(a.client_libelle)), None)
+            autres = [p for p in positifs if p.montant == a.montant and p is not orig
+                      and normaliser(p.client_libelle) != normaliser(a.client_libelle)]
+            reaff = (" ; reaffectation possible : " + ", ".join(f"{p.reference_piece} ({p.client_libelle})"
+                                                                for p in autres)) if autres else ""
+            if orig:
+                deja.add(id(orig))
+                a.reference_liee = orig.reference_piece
+                a.notes = f"annule le recu {orig.reference_piece}" + reaff
+            else:
+                a.notes = "recu annule non trouve dans la journee" + reaff
+                res.anomalies.append(Anomalie(res.feuille, a.ligne, "RECUS", "AVERTISSEMENT",
+                    f"Recu negatif {a.reference_piece} ({a.client_libelle}, {a.montant}) : aucun recu positif "
+                    f"de meme montant sur ce compte dans la journee" + reaff, a.reference_piece,
+                    "Le recu annule sera recherche dans les jours deja importes ; verifier le compte"))
 
     def _affecter_client(self, m: Mouvement, res: ResultatPreparation):
         ct = self.correspondances.get(normaliser(m.client_libelle))

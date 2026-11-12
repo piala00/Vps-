@@ -47,9 +47,30 @@ RECAP : `RECETTE = ACOMPTE + RECOUVREMENTS` (01/10 : 13 060 400 + 118 987 700 = 
 | `COMPTE DE LIAISON` | ~60 | hors périmètre (liaison interne) |
 | n° `BCCB` portant un montant facture | 8 | **bloquant** : le n° de facture manque ; l'acompte de la ligne est conservé |
 | même n° de facture pour 2 clients (`FACB039522` le 12/10) | 1 | avertissement + conflit enregistré à l'import |
-| reçus `7RCB` négatifs | 4 | **bloquant** (remboursement ? annulation ?), traitement manuel |
+| reçus `7RCB` négatifs | 4 | **annulation d'un reçu fait sur un compte erroné** (règle confirmée par la comptabilité) : mouvement ANNULATION_RECU au débit, lié au reçu annulé ; 3/4 liés automatiquement, 1 en alerte |
 | reçus | 913 | tous `7RCB`, montant en F (RECOUVREMENTS) |
 | libellés clients distincts | ~213 | fichier de correspondances à compléter |
+
+## Reçus négatifs (règle confirmée le 12/11/2026)
+Quand un reçu a été fait sur un compte erroné, le caissier fait un reçu du **même montant avec un signe
+négatif** sur ce même compte. Les deux reçus s'annulent à la comptabilisation, et un nouveau reçu positif
+est en général fait sur le compte de la bonne personne.
+
+Traitement :
+- le reçu négatif devient un mouvement **ANNULATION_RECU** au **débit** du compte écrit dans le rapport ;
+- il est lié au reçu positif qu'il annule : même client, même montant, du jour ou d'un jour déjà importé, pas
+  déjà annulé. Un reçu ne peut être annulé qu'une fois ;
+- sans reçu d'origine, une alerte `ANNULATION_RECU_A_VERIFIER` est créée (reçu antérieur au démarrage, ou
+  libellé client différent). Les reçus de même montant faits le même jour sur d'autres comptes sont
+  cités comme réaffectations possibles.
+
+Octobre 2026 :
+| Reçu négatif | Annule | Réaffectation possible (même jour, même montant) |
+|---|---|---|
+| 7RCB028975 (14/10, 3 500 000) | 7RCB028907 (même jour) | 7RCB028847 |
+| 7RCB028976 (14/10, 7 000 000) | 7RCB028853 (même jour) | 7RCB028851 |
+| 7RCB030438 (27/10, 8 100 000) | 7RCB030328 (26/10) | — |
+| 7RCB030477 (27/10, 965 950) | **non trouvé** sur « ALH OUMAROU BOUBAKARY » | 7RCB030347 « OUMAROU BOUBAKARY » : même compte Sage ? |
 
 ## Contrôle de complétude (pour chaque jour)
 Pour chaque colonne H, I et F (acomptes) et pour la colonne F des reçus :
@@ -62,6 +83,5 @@ Pour chaque colonne H, I et F (acomptes) et pour la colonne F des reçus :
    référence (n° de BC, de reçu, autre) ? Le traitement est activé (`rapport.acomptes.integrer`), et le
    rapprochement Sage confirmera ou infirmera la règle dès les premiers jours.
 2. **Sens des `FVCB`** : il s'agit d'avoirs, mais de quelle nature (remise, ristourne, avoir sur facture) ?
-3. **Reçus négatifs** : remboursement au client, ou annulation d'un reçu ?
-4. **`COMPTE DE LIAISON`** : exclusion confirmée ? Existe-t-il un compte 411 correspondant dans Sage ?
-5. **`VENTE PROMOTIONNELLE`**, **`SOURCE DU PAYS RETOUR`** : comptes clients Sage réels ?
+3. **`COMPTE DE LIAISON`** : exclusion confirmée ? Existe-t-il un compte 411 correspondant dans Sage ?
+4. **`VENTE PROMOTIONNELLE`**, **`SOURCE DU PAYS RETOUR`** : comptes clients Sage réels ?

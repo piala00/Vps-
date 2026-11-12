@@ -183,3 +183,27 @@ def test_fichier_correspondances_export_import(db, user, sage, cfg, tmp_path):
     ok, err = svc_clients.importer_correspondances_xlsx(db, user, tmp_path / "c.xlsx")
     assert ok == 1 and len(err) == 1 and "CL777" in err[0]
     assert svc_clients.correspondances(db)["ETS ALPHA"] == "CL001"
+
+
+def test_annulation_recu_liee_jour_precedent(base, user, cfg):
+    """Recu fait sur le mauvais compte le 01/10, contre-passe le 02/10 et refait sur le bon compte."""
+    def ligne(ref, ct, nom, mt, sens, nature, jour):
+        return {"format_version": "GTC-EXPORT-1", "id_import": f"J{jour}", "agence": "BERTOUA",
+                "date_rapport": f"2026-10-{jour:02d}", "type_mouvement": nature, "reference_piece": ref,
+                "code_tiers": ct, "nom_client": nom, "acheteur_detail": "", "montant": mt, "sens": sens,
+                "bc_origine": "", "mode_reference": "", "source_feuille": "x", "source_ligne": 1}
+    imports.importer_lot(base, user, [ligne("7RCB100", "CL002", "QUINCAILLERIE BETA", 80000, "C", "REGLEMENT", 1)],
+                         "j1", "1")
+    rap = imports.importer_lot(base, user, [
+        ligne("7RCB101", "CL002", "QUINCAILLERIE BETA", 80000, "D", "ANNULATION_RECU", 2),
+        ligne("7RCB102", "CL001", "ETS ALPHA", 80000, "C", "REGLEMENT", 2)], "j2", "2")
+    assert rap.inseres == 2
+    m = base.one("SELECT * FROM normalized_movements WHERE reference_piece='7RCB101'")
+    assert m["reference_liee"] == "7RCB100" and "Annulation recu 7RCB100" in m["libelle"]
+    assert fiche_client(base, "CL002", date(2026, 10, 2)).solde_final == 0           # les deux recus s'annulent
+    assert fiche_client(base, "CL001", date(2026, 10, 2)).solde_final == 1400000 - 80000
+    # un second recu negatif ne peut pas annuler le meme recu
+    imports.importer_lot(base, user, [ligne("7RCB103", "CL002", "QUINCAILLERIE BETA", 80000, "D",
+                                            "ANNULATION_RECU", 3)], "j3", "3")
+    assert base.scalar("SELECT reference_liee FROM normalized_movements WHERE reference_piece='7RCB103'") is None
+    assert base.scalar("SELECT COUNT(*) FROM alertes WHERE type='ANNULATION_RECU_A_VERIFIER'") == 1

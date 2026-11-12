@@ -107,7 +107,7 @@ def _importer_ligne(db, user, bid, l, ts, vus):
     if not db.one("SELECT 1 FROM clients WHERE ct_num=?", (ct,)):
         return "REJET", f"Code tiers {ct} absent du referentiel"
     nature = l["type_mouvement"]
-    if nature not in ("FACTURE", "AVOIR", "REGLEMENT", "ACOMPTE"):
+    if nature not in ("FACTURE", "AVOIR", "REGLEMENT", "ACOMPTE", "ANNULATION_RECU"):
         return "REJET", f"Type de mouvement inconnu : {nature}"
     sens = l["sens"]
     if sens not in ("D", "C"):
@@ -133,22 +133,50 @@ def _importer_ligne(db, user, bid, l, ts, vus):
                    "VALUES (?,?,?,?,?)", (bid, ex["id"], "montant/sens", f"{ex['montant']} {ex['sens']}",
                                           f"{montant} {sens}"))
         return "CONFLIT", f"Mouvement #{ex['id']} existe avec un montant/sens different"
+    lien, avert_lien = None, ""
+    if nature == "ANNULATION_RECU":
+        lien, avert_lien = _recu_annule(db, agence, ct, montant, l.get("reference_liee") or "", l["date_rapport"])
     autre = db.one("SELECT id, ct_num FROM normalized_movements WHERE agence=? AND nature=? AND reference_piece=? "
                    "AND ct_num<>? AND statut<>'ANNULE' LIMIT 1", (agence, nature, ref, ct))
     db.execute(
         "INSERT INTO normalized_movements(agence, nature, reference_piece, ct_num, date_piece, sens, montant, "
         "libelle, bc_origine, mode_reference, acheteur_detail, source, batch_id, source_fichier, source_feuille, "
-        "source_ligne, statut, cree_le, cree_par) VALUES (?,?,?,?,?,?,?,?,?,?,?, 'RAPPORT', ?,?,?,?, "
-        "'PROVISOIRE', ?, ?)",
+        "source_ligne, statut, cree_le, cree_par, reference_liee) VALUES (?,?,?,?,?,?,?,?,?,?,?, 'RAPPORT', ?,?,?,?, "
+        "'PROVISOIRE', ?, ?, ?)",
         (agence, nature, ref, ct, l["date_rapport"], sens, montant,
-         f"{nature.title()} {ref}" + (f" - {l['acheteur_detail']}" if l.get("acheteur_detail") else ""),
+         (f"Annulation recu {lien} (compte errone)" if nature == "ANNULATION_RECU" and lien else
+          "Annulation recu (recu annule non identifie)" if nature == "ANNULATION_RECU" else f"{nature.title()} {ref}")
+         + (f" - {l['acheteur_detail']}" if l.get("acheteur_detail") else ""),
          l.get("bc_origine") or None, l.get("mode_reference") or None, l.get("acheteur_detail") or None,
-         bid, l.get("source_fichier") or None, l.get("source_feuille"), l.get("source_ligne"), ts, user.login))
+         bid, l.get("source_fichier") or None, l.get("source_feuille"), l.get("source_ligne"), ts, user.login, lien))
+    if avert_lien:
+        db.execute("INSERT INTO alertes(cree_le, type, ct_num, message) VALUES (?,?,?,?)",
+                   (ts, "ANNULATION_RECU_A_VERIFIER", ct, f"{ref} : {avert_lien}"))
+        return "INSERE", avert_lien
     if autre:
         db.execute("INSERT INTO import_conflicts(batch_id, movement_id, champ, valeur_existante, valeur_importee) "
                    "VALUES (?,?,?,?,?)", (bid, autre["id"], "client (meme numero de piece)", autre["ct_num"], ct))
         return "INSERE", f"Attention : numero {ref} deja utilise pour le client {autre['ct_num']}"
     return "INSERE", ""
+
+
+def _recu_annule(db, agence, ct, montant, ref_indiquee, date_piece):
+    """Recu positif annule par un recu negatif : meme client, meme montant, anterieur ou du jour,
+    pas deja annule. Retourne (reference, avertissement)."""
+    deja = "SELECT 1 FROM normalized_movements a WHERE a.nature='ANNULATION_RECU' AND a.statut<>'ANNULE' " \
+           "AND a.ct_num=m.ct_num AND a.reference_liee=m.reference_piece"
+    base = ("SELECT m.reference_piece FROM normalized_movements m WHERE m.agence=? AND m.ct_num=? "
+            "AND m.nature='REGLEMENT' AND m.statut<>'ANNULE' AND m.montant=? AND m.date_piece<=? "
+            f"AND NOT EXISTS ({deja})")
+    if ref_indiquee:
+        r = db.one(base + " AND m.reference_piece=?", (agence, ct, montant, date_piece, ref_indiquee))
+        if r:
+            return r[0], ""
+    r = db.query(base + " ORDER BY m.date_piece DESC, m.id DESC", (agence, ct, montant, date_piece))
+    if r:
+        return r[0][0], ""
+    return None, ("recu negatif sans recu positif de meme montant sur ce compte dans les donnees importees : "
+                  "verifier le compte (recu anterieur au demarrage, ou erreur de compte)")
 
 
 def corriger_mouvement(db, user: Utilisateur, movement_id: int, motif: str,

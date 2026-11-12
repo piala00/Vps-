@@ -11,6 +11,7 @@
 | AVOIR | `FRCB` / `FVCB` (montants négatifs) | C |
 | ACOMPTE | montant en F (ENTREE) sur toute pièce `FACB`/`BCCB`/`BLCB` | C (D si négatif) |
 | REGLEMENT | reçu `7RCB` (RECOUVREMENTS) | C |
+| ANNULATION_RECU | reçu `7RCB` **négatif** : contre-passation d'un reçu fait sur un compte erroné, liée au reçu annulé (même client, même montant) | D |
 
 ## Import
 - Unicité métier : (agence, nature, référence pièce, code tiers), hors mouvements annulés (index SQL unique).

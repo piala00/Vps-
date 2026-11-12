@@ -14,13 +14,15 @@
 - Module VBA aligné sur les mêmes règles. **Contrôle croisé** macro/application à l'import.
 - Correspondances clients en masse : fichier à compléter généré depuis le rapport (avec suggestions à
   vérifier), puis import contrôlé.
-- Jeu de test anonymisé issu du rapport réel ; 75 tests ; essai de volume sur le mois complet.
+- Jeu de test anonymisé issu du rapport réel ; essai de volume sur le mois complet.
+- Reçus négatifs (règle donnée par la comptabilité) : annulation liée au reçu erroné, y compris d'un jour
+  précédent ; 3/4 liés automatiquement en octobre, le 4e en alerte. 77 tests.
 
 ### Questions pour la comptabilité (bloquent la mise en production)
 1. Les **acomptes** (colonne F) sont-ils passés dans Sage au crédit du client ? Avec quelle référence ?
 2. Les **FVCB** : quelle nature d'avoir ?
-3. Les **reçus négatifs** (`7RCB028975` -3 500 000, `7RCB028976` -7 000 000, `7RCB030438` -8 100 000,
-   `7RCB030477` -965 950) : remboursement ou annulation ?
+3. ~~Reçus négatifs~~ : **réglé**. Il s'agit d'annulations de reçus faits sur un compte erroné (règle implémentée).
+   Reste à vérifier : `7RCB030477` (ALH OUMAROU BOUBAKARY) a-t-il le même compte Sage que « OUMAROU BOUBAKARY » ?
 4. **COMPTE DE LIAISON**, **VENTE PROMOTIONNELLE**, **SOURCE DU PAYS RETOUR** : quels comptes Sage ?
 5. Les 8 lignes `BCCB` portant un montant de facture : quelle est la règle de correction attendue des commerciaux ?
 
