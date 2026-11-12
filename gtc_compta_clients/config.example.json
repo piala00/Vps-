@@ -46,8 +46,15 @@
     },
     "prefixes_bons": [
       "BCCB",
-      "BLCB"
+      "BLCB",
+      "PLCB"
     ],
+    "prefixes_tronques": {
+      "FAC": "FACB",
+      "FRC": "FRCB",
+      "FVC": "FVCB"
+    },
+    "motif_recu_tronque": "^\\d*RC\\d",
     "valeurs_annulee": [
       "ANNULEE",
       "ANNULE"

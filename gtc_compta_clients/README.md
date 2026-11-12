@@ -12,7 +12,7 @@ A4 recto verso.
 | Élément | État |
 |---|---|
 | Fondations, base SQLite, migrations, audit, rôles | fait, testé |
-| Parseur du rapport + classeur de préparation (traitement Python de secours) | fait, **validé sur trois mois réels (août, septembre, octobre 2026)** (contrôle de complétude des totaux) |
+| Parseur du rapport + classeur de préparation (traitement Python de secours) | fait, **validé sur sept mois réels (avril → octobre 2026), 214 journées** (contrôle de complétude des totaux) |
 | Module VBA `.bas` + script de construction du `.xlsm` | écrit, **non exécuté** (pas d'Excel dans l'environnement de développement) |
 | Import idempotent, ventilation, soldes progressifs, corrections tracées | fait, testé |
 | Rapprochement Sage, écarts, reprise option A/B, rétroactivité | fait, testé avec un **Sage fictif** |
@@ -27,7 +27,7 @@ Le détail se trouve dans [docs/JOURNAL_AVANCEMENT.md](docs/JOURNAL_AVANCEMENT.m
 ## Installation (poste de développement ou Windows)
 ```bat
 python -m pip install -r requirements-dev.txt
-python -m pytest -q                 :: 106 tests
+python -m pytest -q                 :: 123 tests
 python tools\analyser_rapport.py "10 RC OCT.xlsx"   :: controle d'un rapport reel (lecture seule)
 python tools\verifier_mois.py "09 RC SEPT.xlsx" "10 RC OCT.xlsx" --sortie VERIFICATION.xlsx   :: tous les mois
 python tools\make_demo.py           :: données fictives
@@ -58,6 +58,7 @@ Classeur macro : `python tools\build_template.py`, puis sous Windows avec Excel 
 - [Architecture et modèle de données](docs/ARCHITECTURE.md)
 - [Mapping du rapport commercial (établi sur le rapport réel)](docs/MAPPING_RAPPORT.md)
 - [Règles métier et comptables](docs/REGLES_METIER.md)
+- [Catalogue des erreurs de CR (7 mois)](docs/CATALOGUE_ERREURS_CR.md)
 - [Adaptateur Sage et requêtes à vérifier](docs/SAGE_ADAPTATEUR.md)
 - [Classeur de préparation .xlsm](docs/CLASSEUR_PREPARATION.md)
 - [Rapport de tests](docs/RAPPORT_TESTS.md)

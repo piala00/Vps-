@@ -87,6 +87,8 @@ class Accueil(Page):
             ("En attente Sage / bloquees", stats.get("EN_ATTENTE_SAGE", 0) + stats.get("BLOQUE", 0), ROUGE),
             ("Clients", db.scalar("SELECT COUNT(*) FROM clients", default=0), BLEU),
             ("Fiches a imprimer", len(q), BLEU),
+            ("Anomalies CR ouvertes (impact solde)",
+             db.scalar("SELECT COUNT(*) FROM anomalies_cr WHERE statut='OUVERTE' AND impact_solde=1", default=0), ROUGE),
         ]
         for i, (lib, val, col) in enumerate(cartes):
             c = ctk.CTkFrame(grid, fg_color="white", corner_radius=8, border_width=1, border_color="#D0D7E2")
@@ -343,8 +345,23 @@ class Import(Page):
             ("i", "Inseres", 70, "e"), ("d", "Deja pres.", 80, "e"), ("c", "Conflits", 70, "e"), ("r", "Rejets", 70, "e")],
             height=12)
         self.t_lots.pack(fill="both", expand=True)
+        onglet = tabs.add("Anomalies CR a traiter")
+        self.t_acr = Table(onglet, [("d", "Date", 90, "w"), ("code", "Type d'erreur", 200, "w"),
+                                    ("cli", "Client (rapport)", 200, "w"), ("ct", "Code", 70, "w"),
+                                    ("ref", "Piece", 110, "w"), ("mt", "Montant", 100, "e"),
+                                    ("motif", "Motif", 420, "w"), ("lig", "Feuille/ligne", 90, "w")], height=9)
+        self.t_acr.pack(fill="both", expand=True)
+        ba = ctk.CTkFrame(onglet, fg_color="transparent")
+        ba.pack(fill="x", pady=4)
+        okc, mc = self.autorise("corriger_mouvement")
+        bouton(ba, "Integrer la facture corrigee...", self.integrer_facture, couleur=VERT, actif=okc, motif=mc).pack(side="left")
+        bouton(ba, "Reintegrer les lignes rejetees", self.reintegrer, actif=self.user.peut("importer"),
+               motif="Reserve aux roles autorises (importer)").pack(side="left", padx=6)
+        bouton(ba, "Marquer resolue...", lambda: self.clore_anomalie(False), couleur="#455A64", actif=okc, motif=mc).pack(side="left", padx=6)
+        bouton(ba, "Ignorer (sans incidence)...", lambda: self.clore_anomalie(True), couleur=ROUGE, actif=okc, motif=mc).pack(side="left", padx=6)
         self.lignes = None
         self.charger_lots()
+        self.charger_anomalies()
 
     def charger_lots(self):
         self.t_lots.remplir(imports.lots(self.db), lambda r: (r["id"], _fd(r["date_rapport"]), r["fichier"], r["operateur"],
@@ -416,15 +433,26 @@ class Import(Page):
                 "Le resultat de la macro differe du traitement de controle :\n- " + "\n- ".join(self.differences[:15])
                 + "\n\nImporter malgre tout le resultat de la macro ?", "Controle croise"):
             return
+        res = getattr(self, "res", None)
+        if res is not None and res.date_feuille and res.date_rapport and res.date_feuille != res.date_rapport:
+            if not confirmer(f"ATTENTION : la feuille collee est datee du {res.date_feuille:%d/%m/%Y} (cellule A4) mais la "
+                             f"date du rapport est le {res.date_rapport:%d/%m/%Y}.\n\nSi la mauvaise journee a ete collee, "
+                             "tous les mouvements seraient enregistres a une date fausse.\n\nConfirmez-vous que la "
+                             f"feuille est bien celle du {res.date_rapport:%d/%m/%Y} (erreur de date dans le modele) ?",
+                             "Date de la feuille"):
+                return
+            self.db.audit(self.user.login, "DATE_FEUILLE_FORCEE", self.fichier,
+                          {"date_imprimee": res.date_feuille.isoformat(), "date_rapport": res.date_rapport.isoformat()})
         if not confirmer(f"Importer {len(self.lignes)} mouvement(s) en zone PROVISOIRE puis lancer le rapprochement "
                          "Sage du jour ?"):
             return
         lignes, fichier = self.lignes, self.fichier
         bons = prep.bons_export(self.res) if getattr(self, "res", None) else []
+        anos = prep.anomalies_export(self.res) if getattr(self, "res", None) else []
 
         def travail():
             rap = imports.importer_lot(self.db, self.user, lignes, fichier, imports.empreinte_fichier(fichier),
-                                       bons=bons)
+                                       bons=bons, anomalies=anos)
             d = date.fromisoformat(lignes[0]["date_rapport"])
             res = [] if rap.deja_importe else reco.rapprocher(self.db, self.user, self.sage, d)
             return rap, res
@@ -442,8 +470,49 @@ class Import(Page):
             self.btn_import.configure(state="disabled", fg_color="#9E9E9E")
             self.lignes = None
             self.charger_lots()
+            self.charger_anomalies()
 
         self.app.tache("Import et rapprochement", travail, fini)
+
+    def charger_anomalies(self):
+        from ..services import anomalies as reg_ano
+        rows = reg_ano.lister(self.db, "OUVERTE", impact=True)
+        self.t_acr.remplir(rows, lambda r: (_fd(r["date_rapport"]), r["code"], r["client_libelle"], r["ct_num"] or "?",
+                                            r["reference"], fmt_fcfa(r["montant"]), r["motif"][:140],
+                                            f"{r['feuille'] or ''}/{r['ligne'] or ''}"),
+                           tag=lambda r: "BLOQUANT" if r["gravite"] == "BLOQUANT" else "AVERTISSEMENT")
+
+    def integrer_facture(self):
+        from ..services import anomalies as reg_ano
+        a = self.t_acr.selection()
+        if not a:
+            return erreur("Selectionner une anomalie (n° de bon a la place de la facture, facture sans numero...).")
+        num = demander_texte(self, "Facture corrigee", f"N° de la facture Sage pour la ligne {a['reference'] or ''} "
+                                                         f"({a['client_libelle']}, {fmt_fcfa(a['montant'])}) :")
+        if not num:
+            return
+        ct = a["ct_num"] or demander_texte(self, "Client", "Code tiers Sage du client :")
+        if ct and self.app.action(reg_ano.integrer_facture_corrigee, self.db, self.user, a["id"], num, ct) is not None:
+            info(f"Facture {num.upper()} integree dans la fiche {ct} (provisoire, a rapprocher avec Sage).")
+            self.charger_anomalies()
+
+    def reintegrer(self):
+        from ..services import anomalies as reg_ano
+        r = self.app.action(reg_ano.reintegrer_rejets, self.db, self.user)
+        if r:
+            info(f"{r['integrees']} ligne(s) reintegree(s) ; {r['toujours_rejetees']} toujours sans code tiers "
+                 "(creer les correspondances dans Clients).")
+            self.charger_anomalies()
+
+    def clore_anomalie(self, ignorer):
+        from ..services import anomalies as reg_ano
+        a = self.t_acr.selection()
+        if not a:
+            return erreur("Selectionner une anomalie.")
+        motif = demander_texte(self, "Motif", "Motif (verification effectuee, correction faite...) :")
+        if motif and self.app.action(reg_ano.ignorer if ignorer else reg_ano.marquer_resolue, self.db, self.user,
+                                     a["id"], motif) is None:
+            self.charger_anomalies()
 
     def historique_bc(self):
         """Charge les acomptes / BP des BC d'un rapport mensuel anterieur (aucun mouvement cree)."""
@@ -522,13 +591,18 @@ class Fiches(Page):
         self.fiche = f
         r = self.db.one("SELECT statut, date_arrete FROM daily_reconciliations WHERE ct_num=? AND obsolete=0 "
                         "ORDER BY date_arrete DESC LIMIT 1", (ct,))
+        from ..services import anomalies as reg_ano
+        n_ano, mt_ano = reg_ano.resume_client(self.db, ct)
         garanti = "" if f.solde_garanti else "   ATTENTION : solde d'ouverture absent, solde NON garanti"
+        if n_ano:
+            garanti += (f"   ATTENTION : {n_ano} anomalie(s) CR non resolue(s) ({fmt_fcfa(mt_ano)} FCFA) peuvent "
+                        "affecter ce solde (Preparation / Imports > Anomalies CR)")
         self.entete.configure(text=(
             f"{f.intitule} ({f.ct_num})  zone {f.zone or '-'}   |   Solde anterieur au {_fd(f.date_ouverture) if f.date_ouverture else '-'} : "
             f"{fmt_fcfa(f.solde_ouverture)}   |   Debit {fmt_fcfa(f.total_debit)}  Credit {fmt_fcfa(f.total_credit)}   |   "
             f"Solde final : {fmt_fcfa(f.solde_final)} FCFA{garanti}\n"
             f"Dernier rapprochement Sage : {r[0] + ' au ' + _fd(r[1]) if r else 'aucun'}"),
-            text_color=ROUGE if not f.solde_garanti else "black")
+            text_color=ROUGE if (not f.solde_garanti or n_ano) else "black")
         self.table.remplir(f.lignes, lambda l: (_fd(l.date), l.piece, l.libelle, fmt_fcfa(l.debit) if l.debit else "",
                                                 fmt_fcfa(l.credit) if l.credit else "", fmt_fcfa(l.solde), l.statut, l.source),
                            tag=lambda l: "A_RAPPROCHER" if l.statut == "PROVISOIRE" else None)

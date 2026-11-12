@@ -205,3 +205,12 @@ def bons_export(res: ResultatPreparation) -> list[dict]:
     """Registre des bons de commande de la journee (acompte F, BP G) : information de controle."""
     d = res.date_rapport.isoformat() if res.date_rapport else ""
     return [dict(b, date_rapport=d, agence=res.agence) for b in res.bons]
+
+
+def anomalies_export(res: ResultatPreparation) -> list[dict]:
+    """Anomalies de la journee, a conserver dans le registre des anomalies CR."""
+    d = res.date_rapport.isoformat() if res.date_rapport else ""
+    return [{"agence": res.agence, "date_rapport": d, "feuille": a.feuille, "ligne": a.ligne, "code": a.code,
+             "gravite": a.gravite, "impact_solde": a.impact_solde, "motif": a.motif, "contenu": a.contenu,
+             "client": a.client, "reference": a.reference, "montant": a.montant, "colonne": a.colonne}
+            for a in res.anomalies]

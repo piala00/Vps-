@@ -1,4 +1,4 @@
-# Mapping du rapport commercial : établi sur les classeurs réels d'août, septembre et octobre 2026
+# Mapping du rapport commercial : établi sur sept classeurs réels (avril → octobre 2026)
 
 Analyse du 12/11/2026 : 32 feuilles (`01` à `31`, `RECAP`), 31 jours. Outils :
 `tools/analyser_rapport.py` (statistiques, contrôle des totaux) et `tools/anonymiser_rapport.py`
@@ -25,6 +25,19 @@ erreurs de saisie :
 | FACB040560 (19/10, CLIENTS DETAILS BTA / ALH OGA, 26 000) | colonne B « BC3594 » : chiffre manquant ; l'acompte est sur BC35949 (17/10, même acheteur, même montant) |
 | FACB040798 (20/10, CLIENTS DETAILS BTA / KUETE, 18 000) | colonne B « BC36198 » = BC d'un autre client ; BC réel inconnu |
 | FACB041560 (26/10, COMPTE DE LIAISON, 36 450) | BC036855 en **BP** (aucun acompte) mais facture en colonne COMPTANT : probablement non soldée par acompte dans Sage (le rapprochement le signalera) |
+
+## Sept mois : avril → octobre 2026 (214 journées)
+Toutes les erreurs constatées, leur volume et leur traitement sont décrits dans
+[CATALOGUE_ERREURS_CR.md](CATALOGUE_ERREURS_CR.md). Points de structure nouveaux depuis avril :
+- **Date imprimée (A4) non fiable** : tout le rapport de mai porte des dates d'avril, et la feuille du 17/04 est
+  datée du 16/04. La date d'une journée est celle saisie par le comptable (PARAMETRES) ; un écart avec A4 est
+  bloquant sauf confirmation explicite. L'outil de vérification date chaque feuille d'après le mois du fichier
+  et le numéro de feuille.
+- Feuilles « 31 » des mois de 30 jours : restes du modèle (lignes BTF sans pièce), sans incidence.
+- Préfixes tronqués (`7RC`, `FRC`) : montant repris, n° Sage probable signalé. `PLCB` (préparation de
+  livraison) est un n° de bon, jamais une facture.
+- Facture ANNULEE compensée par sa facture retour ANNULEE : les deux sont reprises.
+- Même montant en COMPTANT et en VAT : une seule facture.
 
 ## Troisième mois : août 2026 et vérification août → octobre (93 feuilles)
 - 93/93 jours cohérents (total du rapport = lignes ; aucun montant non expliqué).

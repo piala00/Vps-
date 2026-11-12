@@ -48,7 +48,11 @@ DEFAULTS: dict = {
             "FRCB": {"nature": "AVOIR", "sens": "D", "confirme": True},
             "FVCB": {"nature": "AVOIR", "sens": "D", "confirme": True}
         },
-        "prefixes_bons": ["BCCB", "BLCB"],
+        # Numeros de bons (commande, livraison, preparation de livraison) : jamais une facture.
+        "prefixes_bons": ["BCCB", "BLCB", "PLCB"],
+        # Prefixes tronques constates (B oublie) : montant repris, anomalie NUMERO_MAL_SAISI.
+        "prefixes_tronques": {"FAC": "FACB", "FRC": "FRCB", "FVC": "FVCB"},
+        "motif_recu_tronque": r"^\d*RC\d",
         "valeurs_annulee": ["ANNULEE", "ANNULE"],
         "colonnes_facture": ["H", "I"],
         "colonnes_bc": ["F", "G"],

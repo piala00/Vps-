@@ -107,6 +107,9 @@ def verifier_recu_negatif_dans_sage(db, user: Utilisateur, sage, movement_id: in
 
 
 def _clore_alerte(db, m, motif):
+    db.execute("UPDATE anomalies_cr SET statut='RESOLUE', resolution=?, resolu_par='CONTROLE_SAGE', resolu_le=? "
+               "WHERE code='RECU_NEGATIF_SANS_ORIGINE' AND reference=? AND statut='OUVERTE'",
+               (motif, now_iso(), m["reference_piece"]))
     db.execute("UPDATE alertes SET statut='TRAITEE', message=message||? WHERE type='ANNULATION_RECU_A_VERIFIER' "
                "AND ct_num=? AND message LIKE ? AND statut='OUVERTE'",
                (f" [{now_iso()} : {motif}]", m["ct_num"], m["reference_piece"] + " :%"))

@@ -1,5 +1,21 @@
 # Journal d'avancement
 
+## Cycle 10 (12/11/2026) : registre des anomalies CR et vérification sur 7 mois
+- **Registre des anomalies CR** (migration 006) : chaque erreur de rapport pouvant fausser un solde est conservée
+  OUVERTE, affichée sur la fiche du client et au tableau de bord, puis traitée (intégration de la facture
+  corrigée, réintégration des lignes rejetées après correspondance, résolution ou abandon motivés, audit).
+- Contrôles entre jours et entre mois : pièce ressaisie un autre jour, même n° pour plusieurs clients,
+  montant différent pour une pièce connue, ligne rejetée.
+- Rapports d'avril à juillet : nouvelles erreurs reconnues (n° tronqués 7RC/FRC, PLCB, même montant en H et I,
+  facture annulée par avoir, commentaire à la place du client, dates du modèle de mai). Confirmation exigée à
+  l'import si la date imprimée diffère.
+- Avril → octobre : **214/214 journées cohérentes, aucun montant non expliqué** ; 12 erreurs de formule RECAP
+  (ACOMPTE, le 4 et le 21) ; catalogue des erreurs CR (docs/CATALOGUE_ERREURS_CR.md).
+- Anonymisation renforcée (toutes les lignes, colonnes B, D, E) : 0 nom réel dans les 7 jeux de test.
+  **Le jeu d'août poussé au commit 5d3571f contenait des noms réels** : corrigé ; purge de l'historique à
+  décider par GTC. 123 tests.
+
+
 ## Cycle 9 (12/11/2026) : août 2026, vérification sur 3 mois
 - `08 RC AOUT.xlsx` : 31/31 jours cohérents. Lignes de BC sans n° en colonne C (04/08, 06/08) reconnues
   comme BC seuls ; facture sans numéro rendue bloquante.

@@ -1,7 +1,7 @@
 # Rapport de tests
 
 Exécution : `python -m pytest -q`, Python 3.12, Linux (environnement de développement), le 12/11/2026.
-**Résultat : 106 tests réussis, 0 échec.**
+**Résultat : 123 tests réussis, 0 échec.**
 
 Le parseur est testé sur une **copie anonymisée du rapport réel** (jours 01, 03, 12 et 14 de
 `10 RC OCT.xlsx`), avec les chiffres de référence du classeur : comptages, totaux `TOTAL VENTES` /
@@ -48,6 +48,14 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 RECAP identique aux feuilles. Jeu anonymisé `tests/fixtures/RC_SEPT_2026_ANONYMISE.xlsx` (jours 09, 18, 24, 25).
 Import enchaîné septembre + octobre : 16 314 mouvements, 0 rejet, 0,9 s.
 
+## Vérification sur sept mois (avril → octobre 2026)
+`tools/verifier_mois.py` sur 7 rapports : **214/214 journées cohérentes, aucun montant non expliqué** ;
+12 écarts RECAP (colonne ACOMPTE, le 4 et le 21 de chaque mois) ; 32 feuilles à date imprimée fausse (mai) ;
+440 anomalies au registre, dont 177 avec impact sur un solde restées ouvertes à traiter. Détail :
+[CATALOGUE_ERREURS_CR.md](CATALOGUE_ERREURS_CR.md). Jeux anonymisés : avril (10, 24), mai (18, 29), juin (17, 23),
+juillet (11), août (04, 08, 11), septembre (09, 18, 24, 25), octobre (01, 03, 12, 14) : contrôle automatique
+d'absence de noms réels (2 430 noms vérifiés).
+
 ## Vérification multi-mois (août + septembre + octobre 2026)
 `tools/verifier_mois.py` sur 93 feuilles : 93/93 jours cohérents ; 6 écarts RECAP (tous dans la colonne
 ACOMPTE) ; 9/10 reçus négatifs liés ; 28 factures comptant signalées (16 BC de juillet, non fourni, et des
@@ -77,6 +85,23 @@ sans acompte connu sur leur BC (15 BC d'août, 8 erreurs de saisie réelles) ; 6
   anonymisé donne désormais exactement les mêmes résultats que les feuilles réelles.
 
 ## Liste détaillée
+- [OK] tests/test_anomalies.py::test_anomalies_du_rapport_conservees_jusqu_a_resolution
+- [OK] tests/test_anomalies.py::test_integration_d_une_facture_corrigee
+- [OK] tests/test_anomalies.py::test_meme_recu_saisi_deux_jours_meme_client
+- [OK] tests/test_anomalies.py::test_meme_numero_de_recu_pour_deux_clients_jours_differents
+- [OK] tests/test_anomalies.py::test_montant_different_pour_une_piece_deja_saisie
+- [OK] tests/test_anomalies.py::test_ligne_rejetee_puis_reintegree_apres_correspondance
+- [OK] tests/test_anomalies.py::test_anomalie_resolue_automatiquement_quand_l_import_lie_le_recu
+- [OK] tests/test_anomalies.py::test_ignorer_exige_un_motif
+- [OK] tests/test_anomalies.py::test_catalogue_couvre_toutes_les_anomalies_reelles
+- [OK] tests/test_anomalies.py::test_reel_avril_recus_au_numero_tronque_7RC
+- [OK] tests/test_anomalies.py::test_reel_avril_facture_annulee_compensee_par_avoir
+- [OK] tests/test_anomalies.py::test_reel_mai_avoir_au_prefixe_tronque_FRC
+- [OK] tests/test_anomalies.py::test_reel_mai_trois_numeros_de_facture_pour_deux_clients
+- [OK] tests/test_anomalies.py::test_reel_juin_facture_saisie_en_comptant_et_en_vat
+- [OK] tests/test_anomalies.py::test_reel_juin_commentaire_a_la_place_du_client
+- [OK] tests/test_anomalies.py::test_reel_juillet_numero_de_preparation_de_livraison
+- [OK] tests/test_anomalies.py::test_date_feuille_du_modele_non_mise_a_jour
 - [OK] tests/test_flux.py::test_import_et_rejet_client_non_mappe
 - [OK] tests/test_flux.py::test_cas3_reimport_zero_doublon
 - [OK] tests/test_flux.py::test_cas3_montant_modifie_conflit_sans_doublon

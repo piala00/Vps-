@@ -55,7 +55,8 @@ def completer_codes(lignes: list[dict], correspondances: dict[str, str]) -> int:
 
 
 def importer_lot(db, user: Utilisateur, lignes: list[dict], fichier: str,
-                 empreinte: str, feuille: str = "EXPORT_ERP", bons: list[dict] | None = None) -> RapportImport:
+                 empreinte: str, feuille: str = "EXPORT_ERP", bons: list[dict] | None = None,
+                 anomalies: list[dict] | None = None) -> RapportImport:
     exiger(user, "importer")
     if not lignes:
         raise ValueError("Aucune ligne a importer")
@@ -82,6 +83,11 @@ def importer_lot(db, user: Utilisateur, lignes: list[dict], fichier: str,
              lignes[0]["format_version"], user.login, ts))
         bid = cur.lastrowid
         rap.batch_id = bid
+        from . import anomalies as reg_ano
+        # Anomalies detectees dans la journee (conservees jusqu'a resolution)
+        alias = {r[0]: r[1] for r in db.query("SELECT libelle_normalise, ct_num FROM client_aliases")}
+        for a in anomalies or []:
+            reg_ano.enregistrer(db, bid, a, alias)
         vus = set()
         # Les recus negatifs (contre-passations) sont traites apres les recus positifs du lot, quel que
         # soit leur ordre dans le rapport, pour pouvoir etre lies au recu qu'ils annulent.
@@ -95,6 +101,7 @@ def importer_lot(db, user: Utilisateur, lignes: list[dict], fichier: str,
             db.execute("INSERT INTO raw_import_rows(batch_id, feuille, ligne, contenu_json, resultat, motif) "
                        "VALUES (?,?,?,?,?,?)", (bid, l.get("source_feuille"), l.get("source_ligne"),
                                                 json.dumps(l, default=str, ensure_ascii=False), res, motif))
+            _anomalie_import(db, bid, l, res, motif)
             if res == "INSERE":
                 rap.inseres += 1
             elif res == "DEJA_PRESENT":
@@ -106,6 +113,7 @@ def importer_lot(db, user: Utilisateur, lignes: list[dict], fichier: str,
         if bons:
             enregistrer_bons(db, bons, bid)
         rap.alertes_comptant = controler_factures_comptant(db, bid)
+        reg_ano._resoudre_automatiquement(db, bid)
         db.execute("UPDATE import_batches SET statut=?, nb_inseres=?, nb_deja_presents=?, nb_conflits=?, "
                    "nb_rejets=? WHERE id=?",
                    ("IMPORTE_AVEC_REJETS" if rap.rejets or rap.conflits else "IMPORTE",
@@ -145,11 +153,15 @@ def _importer_ligne(db, user, bid, l, ts, vus):
                 "AND statut<>'ANNULE' AND reference_piece=?", (agence, nature, ct, ref))
     if ex:
         if ex["montant"] == montant and ex["sens"] == sens:
+            if ex["date_piece"] != l["date_rapport"]:
+                return "DEJA_PRESENT", (f"AUTRE_JOUR:{ex['date_piece']}: piece deja saisie le {ex['date_piece']} "
+                                        f"(mouvement #{ex['id']})")
             return "DEJA_PRESENT", f"mouvement #{ex['id']}"
         db.execute("INSERT INTO import_conflicts(batch_id, movement_id, champ, valeur_existante, valeur_importee) "
                    "VALUES (?,?,?,?,?)", (bid, ex["id"], "montant/sens", f"{ex['montant']} {ex['sens']}",
                                           f"{montant} {sens}"))
-        return "CONFLIT", f"Mouvement #{ex['id']} existe avec un montant/sens different"
+        return "CONFLIT", (f"Mouvement #{ex['id']} du {ex['date_piece']} existe avec un montant different "
+                           f"({ex['montant']} au lieu de {montant})")
     lien, avert_lien = None, ""
     if nature == "REGLEMENT" and montant < 0:    # recu negatif : contre-passation d'un recu errone
         lien, avert_lien = _recu_annule(db, agence, ct, -montant, l.get("reference_liee") or "", l["date_rapport"])
@@ -174,8 +186,38 @@ def _importer_ligne(db, user, bid, l, ts, vus):
     if autre:
         db.execute("INSERT INTO import_conflicts(batch_id, movement_id, champ, valeur_existante, valeur_importee) "
                    "VALUES (?,?,?,?,?)", (bid, autre["id"], "client (meme numero de piece)", autre["ct_num"], ct))
-        return "INSERE", f"Attention : numero {ref} deja utilise pour le client {autre['ct_num']}"
+        return "INSERE", f"Attention : numero {ref} deja utilise pour le client {autre['ct_num']} (mouvement #{autre['id']})"
     return "INSERE", ""
+
+
+def _anomalie_import(db, bid, l, res, motif):
+    """Erreurs de CR qui n'apparaissent qu'en comparant avec les jours / mois deja importes."""
+    from . import anomalies as reg_ano
+    base = {"agence": l.get("agence", ""), "date_rapport": l.get("date_rapport", ""),
+            "feuille": l.get("source_feuille"), "ligne": l.get("source_ligne"), "client": l.get("nom_client"),
+            "ct_num": l.get("code_tiers") or None, "reference": str(l.get("reference_piece", "")),
+            "montant": l.get("montant"), "contenu": f"{l.get('type_mouvement')} {l.get('reference_piece')} "
+                                                     f"{l.get('nom_client')} {l.get('montant')}"}
+    deja = db.one("SELECT 1 FROM anomalies_cr WHERE batch_id=? AND reference=? AND code IN "
+                  "('NUMERO_PLUSIEURS_CLIENTS','DOUBLON_JOUR','CLIENT_SANS_CORRESPONDANCE')", (bid, base["reference"]))
+    if l.get("type_mouvement") == "ACOMPTE":
+        return                          # l'acompte impute suit sa facture : une seule anomalie par piece
+    if res == "DEJA_PRESENT" and motif.startswith("AUTRE_JOUR:"):
+        reg_ano.enregistrer(db, bid, dict(base, code="PIECE_SAISIE_DEUX_FOIS", gravite="AVERTISSEMENT",
+                                          impact_solde=False, motif=f"Piece {base['reference']} " + motif.split(": ", 1)[1]
+                                          + " : meme client, meme montant ; comptee une seule fois"))
+    elif res == "CONFLIT":
+        reg_ano.enregistrer(db, bid, dict(base, code="CONFLIT_MONTANT", gravite="BLOQUANT", impact_solde=True,
+                                          motif=f"Piece {base['reference']} deja saisie : {motif} ; montant importe "
+                                                "non integre"))
+    elif res == "INSERE" and motif.startswith("Attention : numero") and not deja:
+        reg_ano.enregistrer(db, bid, dict(base, code="NUMERO_PLUSIEURS_CLIENTS", gravite="AVERTISSEMENT",
+                                          impact_solde=True, motif=f"Numero {base['reference']} utilise pour plusieurs "
+                                          f"clients (jours differents) : {motif}"))
+    elif res == "REJET" and not deja and not motif.startswith("Doublon dans le lot"):
+        code = "CLIENT_SANS_CORRESPONDANCE" if motif.startswith("Code tiers") else "REJET_IMPORT"
+        reg_ano.enregistrer(db, bid, dict(base, code=code, gravite="BLOQUANT", impact_solde=True,
+                                          motif=f"Ligne rejetee a l'import : {motif}"))
 
 
 def _recu_annule(db, agence, ct, montant, ref_indiquee, date_piece):
@@ -334,8 +376,15 @@ def controler_factures_comptant(db, batch_id: int) -> int:
             continue
         deja = {k[1] for k in imputes}
         diag = _diagnostic_comptant(db, a["agence"], a, alias, deja, cle)
+        msg = f"{a['reference_piece']} : facture comptant de {a['montant']} du {a['date_piece']} - {diag}"
         db.execute("INSERT INTO alertes(cree_le, type, ct_num, message) VALUES (?,?,?,?)",
-                   (now_iso(), "FACTURE_COMPTANT_SANS_ACOMPTE", a["ct_num"],
-                    f"{a['reference_piece']} : facture comptant de {a['montant']} du {a['date_piece']} - {diag}"))
+                   (now_iso(), "FACTURE_COMPTANT_SANS_ACOMPTE", a["ct_num"], msg))
+        from . import anomalies as reg_ano
+        reg_ano.enregistrer(db, batch_id, {"agence": a["agence"], "date_rapport": a["date_piece"],
+                                           "feuille": a["source_feuille"], "ligne": a["source_ligne"],
+                                           "code": "FACTURE_COMPTANT_SANS_ACOMPTE", "gravite": "AVERTISSEMENT",
+                                           "impact_solde": True, "motif": "Facture comptant sans acompte connu : " + diag,
+                                           "ct_num": a["ct_num"], "reference": a["reference_piece"],
+                                           "montant": a["montant"], "colonne": "H"})
         n += 1
     return n
