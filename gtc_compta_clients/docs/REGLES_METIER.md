@@ -4,6 +4,14 @@
 - Montants en **entiers FCFA**. Une cellule avec des centimes non nuls est signalée, jamais arrondie en silence.
 - Sens `D` : augmente la créance client. Sens `C` : la diminue. Solde > 0 : client débiteur.
 
+## Mouvements extraits du rapport
+| Nature | Origine | Sens |
+|---|---|---|
+| FACTURE | `FACB` avec montant en H (comptant) ou I (à terme) | D |
+| AVOIR | `FRCB` / `FVCB` (montants négatifs) | C |
+| ACOMPTE | montant en F (ENTREE) sur toute pièce `FACB`/`BCCB`/`BLCB` | C (D si négatif) |
+| REGLEMENT | reçu `7RCB` (RECOUVREMENTS) | C |
+
 ## Import
 - Unicité métier : (agence, nature, référence pièce, code tiers), hors mouvements annulés (index SQL unique).
 - Même lot réimporté : rejeté en entier. Même mouvement dans un autre fichier : « déjà présent ». Montant ou
@@ -23,8 +31,12 @@
 1. Solde Sage à la date de référence, écritures entre la référence et l'arrêté, solde Sage à l'arrêté.
    Contrôle de cohérence : solde de référence + écritures = solde à l'arrêté, sinon `EN_ATTENTE_SAGE`.
 2. Sage injoignable ou extraction incomplète (nombre de lignes ≠ COUNT) : `EN_ATTENTE_SAGE`, **jamais rapproché**.
-3. Appariement : par EC_No déjà lié, puis par référence normalisée (`EC_RefPiece` ou `EC_Piece`) et sens.
-   Les écritures multiples de même référence (agrégées ou éclatées) sont sommées.
+3. Appariement, dans l'ordre :
+   a) par EC_No déjà lié ;
+   b) par référence normalisée (`EC_RefPiece` ou `EC_Piece`) et sens. Pour un acompte, le n° de BC
+      d'origine est aussi essayé. Les écritures multiples de même référence sont sommées ;
+   c) repli **pour les acomptes et règlements uniquement** : même date, même sens, même montant, avec une
+      correspondance **unique des deux côtés**. La méthode `DATE_SENS_MONTANT` est inscrite dans la preuve.
 4. Écarts : `SAGE_ABSENT_ERP`, `ERP_ABSENT_SAGE`, `MONTANT_DIFFERENT`, `RETROACTIF` (solde Sage de référence modifié).
 5. `RAPPROCHE` **uniquement si** écart nul **et** aucune ligne non appariée. La validation automatique n'a
    lieu que si l'utilisateur a le droit de valider. Elle passe les mouvements en VALIDE et enregistre

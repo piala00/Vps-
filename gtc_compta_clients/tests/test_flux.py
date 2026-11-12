@@ -163,3 +163,23 @@ def test_permissions(base):
     op = Utilisateur("x", "x", "operateur")
     with pytest.raises(AccesRefuse):
         svc_clients.definir_correspondance(base, op, "A", "CL001")
+
+
+def test_fichier_correspondances_export_import(db, user, sage, cfg, tmp_path):
+    from openpyxl import load_workbook
+    svc_clients.synchroniser_clients(db, user, sage, cfg["rapport"]["comptes_collectifs"])
+    n = svc_clients.exporter_libelles_a_completer(db, cfg["rapport"], DEMO / "RC_DEMO_SYNTHETIQUE.xlsx",
+                                                  tmp_path / "c.xlsx")
+    assert n == 6                                      # 5 clients connus + NOUVEAU CLIENT X
+    wb = load_workbook(tmp_path / "c.xlsx")
+    ws = wb["CORRESPONDANCES"]
+    for row in ws.iter_rows(min_row=2):
+        if row[0].value == "ETS ALPHA":
+            assert row[1].value is None and row[5].value == "CL001"   # suggestion seulement
+            row[1].value = "CL001"
+        if row[0].value == "NOUVEAU CLIENT X":
+            row[1].value = "CL777"
+    wb.save(tmp_path / "c.xlsx")
+    ok, err = svc_clients.importer_correspondances_xlsx(db, user, tmp_path / "c.xlsx")
+    assert ok == 1 and len(err) == 1 and "CL777" in err[0]
+    assert svc_clients.correspondances(db)["ETS ALPHA"] == "CL001"

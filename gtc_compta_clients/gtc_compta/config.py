@@ -31,19 +31,28 @@ DEFAULTS: dict = {
         "journal_report_nouveau": "RAN",
     },
     "rapport": {
-        # Toutes ces regles sont PROVISOIRES tant que le classeur reel n'a pas ete analyse.
+        # Regles etablies a partir du classeur reel "10 RC OCT.xlsx" (analyse du 12/11/2026).
+        # "confirme": False = interpretation deduite du rapport, a confirmer par la comptabilite.
+        # Colonnes : F = ACOMPTE (BC, "ENTREE"), G = BP (BC a credit), H = VENTE COMPTANT,
+        # I = VENTE A TERME ("VAT") ; recus : F = RECOUVREMENTS (cf. feuille RECAP).
         "entete_recus": "RECUS DE VERSEMENTS",
+        "libelle_total_ventes": "TOTAL VENTES",
+        "libelle_total_recus": "TOTAL DE VERSEMENTS",
         "motif_document": r"^(?:\d+)?[A-Z]{2,5}\d*[-/ ]?\d+",
         "motif_recu": r"^(?:\d+)?RCB",
         "types_documents": {
             "FACB": {"nature": "FACTURE", "sens": "D", "confirme": False},
-            "FVCB": {"nature": "FACTURE", "sens": "D", "confirme": False}
+            "FRCB": {"nature": "AVOIR", "sens": "C", "confirme": False},
+            "FVCB": {"nature": "AVOIR", "sens": "C", "confirme": False}
         },
+        "prefixes_bons": ["BCCB", "BLCB"],
+        "valeurs_annulee": ["ANNULEE", "ANNULE"],
         "colonnes_facture": ["H", "I"],
         "colonnes_bc": ["F", "G"],
+        "acomptes": {"integrer": True, "colonne": "F", "confirme": False},
         "colonne_montant_recu": "F",
         "mots_exclusion": ["TOTAL", "SOUS-TOTAL", "S/TOTAL", "REPORT", "VERSEMENT CAISSE",
-                            "VERSEMENT BANQUE", "LIAISON", "CAISSE CENTRALE"],
+                            "VERSEMENT BANQUE", "LIAISON", "CAISSE CENTRALE", "SOLDE"],
         "comptes_collectifs": ["CLIENTS DETAILS BTA"],
         "correspondance_auto_intitule_exact": False,
         "lignes_vides_fin_section": 8

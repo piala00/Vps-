@@ -1,5 +1,30 @@
 # Journal d'avancement
 
+## Cycle 2 (12/11/2026) : analyse du rapport réel `10 RC OCT.xlsx`
+
+### Terminé (avec preuve)
+- Inventaire complet des 31 jours, mapping réel documenté ([MAPPING_RAPPORT.md](MAPPING_RAPPORT.md)).
+- Colonnes confirmées par la feuille RECAP : F = ACOMPTE, G = BP, H = vente comptant, I = vente à terme,
+  reçus F = RECOUVREMENTS.
+- Parseur adapté : acomptes, avoirs FRCB/FVCB, n° de BC portant une facture, ANNULEE, factures à montant nul,
+  date de la feuille (A4), même n° pour deux clients, reçus négatifs.
+- **Contrôle de complétude automatique** sur chaque journée (totaux du rapport et montants
+  retenus/exclus/bloqués) : 31/31 jours cohérents.
+- Rapprochement : appariement des acomptes par n° de BC, puis repli prudent date/sens/montant (unique et tracé).
+- Module VBA aligné sur les mêmes règles. **Contrôle croisé** macro/application à l'import.
+- Correspondances clients en masse : fichier à compléter généré depuis le rapport (avec suggestions à
+  vérifier), puis import contrôlé.
+- Jeu de test anonymisé issu du rapport réel ; 75 tests ; essai de volume sur le mois complet.
+
+### Questions pour la comptabilité (bloquent la mise en production)
+1. Les **acomptes** (colonne F) sont-ils passés dans Sage au crédit du client ? Avec quelle référence ?
+2. Les **FVCB** : quelle nature d'avoir ?
+3. Les **reçus négatifs** (`7RCB028975` -3 500 000, `7RCB028976` -7 000 000, `7RCB030438` -8 100 000,
+   `7RCB030477` -965 950) : remboursement ou annulation ?
+4. **COMPTE DE LIAISON**, **VENTE PROMOTIONNELLE**, **SOURCE DU PAYS RETOUR** : quels comptes Sage ?
+5. Les 8 lignes `BCCB` portant un montant de facture : quelle est la règle de correction attendue des commerciaux ?
+
+
 ## Cycle 1 (12/11/2026) : P0 partiel, P1, P2, P3 et P4 sur données fictives
 
 ### Terminé (avec preuve)
@@ -18,7 +43,7 @@
 ### Bloqué : en attente d'éléments de GTC
 | Élément manquant | Impact |
 |---|---|
-| Classeur réel `10 RC OCT.xlsx` | mapping non vérifié (H/I, préfixes, sens des FRCB, comptant) |
+| ~~Classeur réel `10 RC OCT.xlsx`~~ | **reçu et analysé (cycle 2)** |
 | Accès en lecture seule à Sage 100 V11 (Bertoua) | requêtes non vérifiées, mode `sql` non recetté |
 | Copies d'écran Sage « Solvabilité » sur quelques clients | formule de risque non établie |
 | Photos ou scans recto verso de la fiche papier | modèle d'impression provisoire |
@@ -26,8 +51,8 @@
 | Lien Sage ↔ PDF des factures | indexation de dossiers seulement |
 
 ### Décisions ouvertes (configuration sûre appliquée en attendant)
-1. Sens comptable de chaque type de document : seuls FACB/FVCB sont pré-paramétrés en débit, à confirmer.
-   Tout autre type est bloquant.
+1. Sens comptable des types de document : FACB en débit, FRCB/FVCB en avoir (déduit du rapport réel,
+   à confirmer). Tout autre type est bloquant.
 2. Politique des factures échues : « signaler » (n'impose rien).
 3. Plafond à 0 dans Sage (illimité ou interdit ?) : DONNEES_INSUFFISANTES.
 4. Tolérance de date entre le rapport et l'écriture Sage (pièce saisie le lendemain) : aucune ; l'écart est montré.
@@ -36,7 +61,7 @@
 7. Authentification des utilisateurs : utilisateur défini dans `config.json` (à remplacer).
 
 ### Prochaines étapes
-1. Analyser le vrai rapport : produire le mapping définitif, puis ajouter des tests sur une copie anonymisée d'une vraie journée.
+1. ~~Analyser le vrai rapport~~ (fait au cycle 2). Compléter les correspondances clients (fichier généré).
 2. Sur site : `tools/verifier_sage.py`, recette des soldes, ajustement des requêtes.
 3. Établir la formule de solvabilité par concordance.
 4. Construire et recetter le `.xlsm`, compiler l'exécutable, tester le duplex sur l'imprimante réelle.

@@ -132,9 +132,9 @@
    "ct_num": "CL002",
    "journal": "VTE",
    "date_ecriture": "2026-10-01",
-   "numero_piece": "FVCB0301",
-   "reference_piece": "FVCB0301",
-   "libelle": "Facture FVCB0301",
+   "numero_piece": "FACB0301",
+   "reference_piece": "FACB0301",
+   "libelle": "Facture FACB0301",
    "sens": "D",
    "montant": 120000
   },
@@ -143,9 +143,9 @@
    "ct_num": "CL002",
    "journal": "CAI",
    "date_ecriture": "2026-10-01",
-   "numero_piece": "RCB0452",
-   "reference_piece": "RCB0452",
-   "libelle": "Reglement",
+   "numero_piece": "RC0452",
+   "reference_piece": "BC0102",
+   "libelle": "Acompte sur commande BC0102",
    "sens": "C",
    "montant": 120000
   },
@@ -188,9 +188,9 @@
    "ct_num": "CL099",
    "journal": "CAI",
    "date_ecriture": "2026-10-01",
-   "numero_piece": "7RCB0453",
-   "reference_piece": "7RCB0453",
-   "libelle": "Reglement detail",
+   "numero_piece": "RC0453",
+   "reference_piece": "",
+   "libelle": "Acompte detail",
    "sens": "C",
    "montant": 35000
   }

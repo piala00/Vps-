@@ -76,20 +76,19 @@ def apparier(mvts: list, ecritures: list[SageEntry]):
         for ref in {normaliser_reference(e.reference_piece), normaliser_reference(e.numero_piece)} - {""}:
             par_ref[(ref, e.sens)].append(e)
     pris: set[int] = set()
+    non_apparies = []
     for m in restant_m:
-        cands = [e for e in par_ref.get((normaliser_reference(m["reference_piece"]), m["sens"]), [])
-                 if e.ec_no not in pris]
+        refs = [normaliser_reference(m["reference_piece"])]
+        if m["nature"] == "ACOMPTE" and m["bc_origine"]:
+            refs.append(normaliser_reference(m["bc_origine"]))     # acompte rattache au BC
+        cands = []
+        for r_ in refs:
+            cands += [e for e in par_ref.get((r_, m["sens"]), []) if e.ec_no not in pris and e not in cands]
         if not cands:
-            ecarts.append({"type": "ERP_ABSENT_SAGE", "movement_id": m["id"], "sage_ec_no": None,
-                           "montant_erp": _s(m["montant"], m["sens"]), "montant_sage": None,
-                           "description": f"{m['nature']} {m['reference_piece']} du {m['date_piece']} "
-                                          "absent de Sage a la date d'arrete"})
+            non_apparies.append(m)
             continue
         exact = next((e for e in cands if e.montant == m["montant"]), None)
-        if exact:
-            choix = [exact]
-        else:
-            choix = cands                                # ecritures agregees / eclatees
+        choix = [exact] if exact else cands               # ecritures agregees / eclatees
         total = sum(e.montant for e in choix)
         pris.update(e.ec_no for e in choix)
         if total == m["montant"]:
@@ -99,6 +98,22 @@ def apparier(mvts: list, ecritures: list[SageEntry]):
                            "sage_ec_no": choix[0].ec_no, "montant_erp": _s(m["montant"], m["sens"]),
                            "montant_sage": sum(e.signe for e in choix),
                            "description": f"{m['reference_piece']} : ERP {m['montant']} / Sage {total}"})
+    # 3) Repli prudent (acomptes / reglements dont la reference Sage differe) : meme date,
+    #    meme sens, meme montant, et correspondance UNIQUE des deux cotes. Trace dans la preuve.
+    libres = [e for e in restant_e.values() if e.ec_no not in pris]
+    for m in non_apparies:
+        cle = (m["date_piece"], m["sens"], m["montant"])
+        cs = [e for e in libres if (e.date_ecriture.isoformat(), e.sens, e.montant) == cle]
+        jumeaux = [x for x in non_apparies if (x["date_piece"], x["sens"], x["montant"]) == cle]
+        if len(cs) == 1 and len(jumeaux) == 1 and m["nature"] in ("ACOMPTE", "REGLEMENT"):
+            pris.add(cs[0].ec_no)
+            libres.remove(cs[0])
+            paires.append((m["id"], [cs[0].ec_no], "DATE_SENS_MONTANT"))
+            continue
+        ecarts.append({"type": "ERP_ABSENT_SAGE", "movement_id": m["id"], "sage_ec_no": None,
+                       "montant_erp": _s(m["montant"], m["sens"]), "montant_sage": None,
+                       "description": f"{m['nature']} {m['reference_piece']} du {m['date_piece']} "
+                                      "absent de Sage a la date d'arrete"})
     for e in restant_e.values():
         if e.ec_no not in pris:
             ecarts.append({"type": "SAGE_ABSENT_ERP", "movement_id": None, "sage_ec_no": e.ec_no,
@@ -188,7 +203,8 @@ def _rapprocher_client(db, user, sage, ct, d: date, auto_valider) -> ResultatCli
                        "montant_erp, montant_sage, description) VALUES (?,?,?,?,?,?,?)",
                        (rid, x["type"], x["movement_id"], x["sage_ec_no"], x["montant_erp"],
                         x["montant_sage"], x["description"]))
-        for mid, ec_nos in paires:
+        for p in paires:
+            mid, ec_nos = p[0], p[1]
             for ec in ec_nos:
                 db.execute("INSERT OR IGNORE INTO movement_sage_links VALUES (?,?,?,?)", (mid, ec, rid, ts))
         db.audit(user.login, "RAPPROCHEMENT", ct, {"date": d.isoformat(), "statut": statut, "ecart": ecart,

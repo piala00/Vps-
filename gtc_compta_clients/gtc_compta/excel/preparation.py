@@ -116,9 +116,9 @@ def ecrire_classeur_prepare(res: ResultatPreparation, rows_collage: list[list], 
         wc.append(list(r))
     bold = Font(bold=True)
     fill = PatternFill("solid", fgColor="DDEBF7")
-    cols_m = ["ct_num", "client_libelle", "reference_piece", "bc_origine", "type_document",
+    cols_m = ["ct_num", "client_libelle", "nature", "reference_piece", "bc_origine", "type_document",
               "montant", "sens", "mode_reference", "acheteur_detail", "feuille", "ligne", "notes"]
-    for titre, items in (("FACTURES", res.factures), ("REGLEMENTS", res.reglements)):
+    for titre, items in (("FACTURES", res.factures), ("REGLEMENTS", res.acomptes + res.reglements)):
         s = wb.create_sheet(titre)
         s.append(cols_m)
         for m in items:
@@ -183,3 +183,17 @@ def _normaliser_ligne(d: dict) -> dict:
             val = int(val)
         d[k] = "" if val is None else str(val).strip()
     return d
+
+
+def comparer_exports(lignes_macro: list[dict], lignes_python: list[dict]) -> list[str]:
+    """Controle croise : le resultat de la macro VBA doit etre identique au traitement
+    Python des memes donnees COLLAGE. Retourne la liste des differences (vide = identique)."""
+    from collections import Counter
+
+    def cle(l):
+        return (l["type_mouvement"], str(l["reference_piece"]).strip().upper(), int(l["montant"]), l["sens"],
+                str(l["nom_client"]).strip().upper())
+    a, b = Counter(map(cle, lignes_macro)), Counter(map(cle, lignes_python))
+    diff = [f"uniquement macro : {k[0]} {k[1]} {k[4]} {k[2]} {k[3]}" for k in (a - b).elements()]
+    diff += [f"uniquement application : {k[0]} {k[1]} {k[4]} {k[2]} {k[3]}" for k in (b - a).elements()]
+    return diff

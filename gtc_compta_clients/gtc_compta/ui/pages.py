@@ -243,6 +243,10 @@ class FenetreCorrespondances(ctk.CTkToplevel):
         self.ct = champ(b, "Code tiers Sage", 120)
         bouton(b, "Suggestions", self.suggerer, width=110).pack(side="left", pady=(16, 0))
         bouton(b, "Enregistrer", self.enregistrer, couleur=VERT, width=110).pack(side="left", padx=6, pady=(16, 0))
+        b2 = ctk.CTkFrame(self, fg_color="transparent")
+        b2.pack(fill="x", padx=12, pady=(4, 0))
+        bouton(b2, "1. Generer le fichier a completer depuis un rapport...", self.exporter, couleur="#455A64").pack(side="left")
+        bouton(b2, "2. Importer le fichier complete...", self.importer, couleur="#455A64").pack(side="left", padx=6)
         self.sugg = Table(self, [("ct", "Code", 90, "w"), ("nom", "Intitule Sage", 400, "w"), ("s", "Similarite", 90, "e")],
                           height=5, on_double=lambda r: r and (self.ct.delete(0, "end"), self.ct.insert(0, r[0])))
         self.sugg.pack(fill="x", padx=12, pady=6)
@@ -255,6 +259,26 @@ class FenetreCorrespondances(ctk.CTkToplevel):
         self.t.remplir(self.db.query("SELECT a.*, c.intitule FROM client_aliases a JOIN clients c ON c.ct_num=a.ct_num "
                                      "ORDER BY a.libelle_original"),
                        lambda r: (r["libelle_original"], r["ct_num"], r["intitule"], r["verifie_par"], r["verifie_le"]))
+
+    def exporter(self):
+        src = filedialog.askopenfilename(title="Rapport commercial (lecture seule)", filetypes=[("Excel", "*.xlsx *.xlsm")])
+        if not src:
+            return
+        dest = self.page.ctx.data_dir / "exports" / f"CORRESPONDANCES_A_COMPLETER_{datetime.now():%Y%m%d_%H%M}.xlsx"
+        self.page.app.tache("Lecture du rapport", lambda: svc_clients.exporter_libelles_a_completer(
+            self.db, self.page.cfg["rapport"], src, dest), lambda n: (info(
+                f"{n} libelle(s) sans correspondance exporte(s) :\n{dest}\n\nRenseigner la colonne code_tiers_sage "
+                "(les suggestions sont a verifier), puis utiliser le bouton 2."), docs.ouvrir_fichier(dest)))
+
+    def importer(self):
+        p = filedialog.askopenfilename(title="Fichier de correspondances complete", filetypes=[("Excel", "*.xlsx")])
+        if not p:
+            return
+        r = self.page.app.action(svc_clients.importer_correspondances_xlsx, self.db, self.page.user, p)
+        if r:
+            ok, err = r
+            info(f"{ok} correspondance(s) enregistree(s)." + ("\n\nRejets :\n" + "\n".join(err[:20]) if err else ""))
+            self.charger()
 
     def suggerer(self):
         self.sugg.remplir(svc_clients.suggestions_correspondance(self.db, self.lib.get()), lambda r: r)
@@ -281,7 +305,7 @@ class Import(Page):
         self.btn_import = bouton(b, "2. Valider l'import", self.valider, couleur=VERT, actif=False,
                                  motif="Ouvrir d'abord un classeur et verifier l'apercu")
         self.btn_import.pack(side="left", padx=8)
-        self.info = ctk.CTkLabel(self, text="Aucun classeur charge.", anchor="w", justify="left")
+        self.info = ctk.CTkLabel(self, text="Aucun classeur charge.", anchor="w", justify="left", wraplength=1120)
         self.info.pack(fill="x", padx=16)
         tabs = ctk.CTkTabview(self, height=330)
         tabs.pack(fill="both", expand=True, padx=14, pady=4)
@@ -314,6 +338,7 @@ class Import(Page):
         if not p:
             return
         corr = svc_clients.correspondances(self.db)
+        self.differences = []
         if self.cfg["rapport"].get("correspondance_auto_intitule_exact"):
             corr = {**svc_clients.correspondances_auto_exactes(self.db), **corr}
 
@@ -323,11 +348,14 @@ class Import(Page):
                 source = "EXPORT_ERP (macro)"
             except prep.FormatExportInvalide:
                 lignes = []
-            res = None
+            res = prep.preparer_depuis_classeur(p, self.cfg["rapport"], corr, self.cfg["agence"])
             if not lignes:   # macros desactivees ou non executees : traitement Python equivalent
-                res = prep.preparer_depuis_classeur(p, self.cfg["rapport"], corr, self.cfg["agence"])
                 lignes = prep.lignes_export(res)
                 source = "COLLAGE traite par l'application (secours)"
+            else:            # controle croise macro / application sur les memes donnees
+                self.differences = prep.comparer_exports(lignes, prep.lignes_export(res))
+                if self.differences:
+                    source += f" - ATTENTION {len(self.differences)} difference(s) avec le traitement de controle"
             n = imports.completer_codes(lignes, corr)
             return p, lignes, res, source, n
 
@@ -344,21 +372,30 @@ class Import(Page):
         self.t_ano.remplir(anos, lambda a: (a.ligne, a.section, a.gravite, a.motif, a.contenu[:80], a.proposition),
                            tag=lambda a: a.gravite)
         sans = sum(1 for l in lignes if not l["code_tiers"])
-        tot = {k: sum(l["montant"] for l in lignes if l["type_mouvement"] == k) for k in ("FACTURE", "AVOIR", "REGLEMENT")}
+        tot = {k: sum(l["montant"] for l in lignes if l["type_mouvement"] == k)
+               for k in ("FACTURE", "AVOIR", "ACOMPTE", "REGLEMENT")}
         d = lignes[0]["date_rapport"] if lignes else "?"
         st = res.stats if res else {}
         self.info.configure(text=(
             f"Fichier : {Path(p).name}   |   Source : {source}   |   Date du rapport : {_fd(d)}\n"
             f"{len(lignes)} mouvement(s) : factures {fmt_fcfa(tot['FACTURE'])}  avoirs {fmt_fcfa(tot['AVOIR'])}  "
-            f"reglements {fmt_fcfa(tot['REGLEMENT'])}  |  {len(anos)} anomalie(s)  |  {sans} ligne(s) sans code tiers "
+            f"acomptes {fmt_fcfa(tot['ACOMPTE'])}  recouvrements {fmt_fcfa(tot['REGLEMENT'])}  |  {len(anos)} anomalie(s)  |  {sans} ligne(s) sans code tiers "
             f"(seront rejetees)  |  {n} code(s) completes par correspondances verifiees"
             + (f"\nBC/BL seuls ignores : {st.get('bc_seuls_ignores', 0)}  totaux exclus : {st.get('totaux_exclus', 0)}  "
-               f"hors perimetre exclus : {st.get('hors_perimetre_exclus', 0)}" if st else "")))
+               f"hors perimetre exclus : {st.get('hors_perimetre_exclus', 0)}  annulees : {st.get('annulees', 0)}  "
+               f"acomptes : {st.get('acomptes', 0)}" if st else "")
+            + ("\nControle des totaux du rapport : " + ("OK - tous les montants sont expliques" if st and all(
+                v.get("ecart_non_explique", 0) == 0 and (v["rapport"] is None or v["rapport"] == v["lignes"])
+                for v in st.get("controle_totaux", {}).values()) else "ECART - voir Anomalies") if st else "")))
         ok = bool(lignes) and lignes[0]["date_rapport"] and self.user.peut("importer")
         self.btn_import.configure(state="normal" if ok else "disabled", fg_color=VERT if ok else "#9E9E9E")
 
     def valider(self):
         if not self.lignes:
+            return
+        if getattr(self, "differences", None) and not confirmer(
+                "Le resultat de la macro differe du traitement de controle :\n- " + "\n- ".join(self.differences[:15])
+                + "\n\nImporter malgre tout le resultat de la macro ?", "Controle croise"):
             return
         if not confirmer(f"Importer {len(self.lignes)} mouvement(s) en zone PROVISOIRE puis lancer le rapprochement "
                          "Sage du jour ?"):

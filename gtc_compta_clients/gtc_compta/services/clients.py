@@ -138,3 +138,67 @@ def solde_ouverture(db, ct_num: str, date_max: date | None = None):
         sql += " AND date_reference <= ?"
         p.append(date_max.isoformat())
     return db.one(sql + " ORDER BY date_reference DESC LIMIT 1", p)
+
+
+# -- fichier de correspondances (completion en masse, verifiee par un comptable) -------------
+def exporter_libelles_a_completer(db, regles: dict, rapport, dest) -> int:
+    """Lit un rapport mensuel (lecture seule), liste les libelles clients sans correspondance
+    et propose une suggestion (a VERIFIER : la colonne code_tiers_sage reste vide)."""
+    from collections import Counter
+    from openpyxl import Workbook, load_workbook
+    from ..excel.report_parser import ParseurRapport
+    connus = correspondances(db)
+    wb = load_workbook(rapport, read_only=True, data_only=True)
+    occ, ex = Counter(), {}
+    try:
+        for n in wb.sheetnames:
+            rows = [list(r) for r in wb[n].iter_rows(values_only=True)]
+            res = ParseurRapport(regles, connus).analyser(rows, n, "", None)
+            for m in res.mouvements:
+                if not m.ct_num:
+                    k = normaliser(m.client_libelle)
+                    occ[k] += 1
+                    ex.setdefault(k, (m.client_libelle, n, m.reference_piece))
+    finally:
+        wb.close()
+    out = Workbook()
+    ws = out.active
+    ws.title = "CORRESPONDANCES"
+    ws.append(["libelle_rapport", "code_tiers_sage", "occurrences", "exemple_feuille", "exemple_piece",
+               "suggestion_code (a verifier)", "suggestion_intitule", "similarite"])
+    for k, c in occ.most_common():
+        lib, f, p = ex[k]
+        s = suggestions_correspondance(db, lib, 1)
+        ws.append([lib, None, c, f, p] + (list(s[0]) if s else [None, None, None]))
+    for col, w in zip("ABCDEFGH", (42, 18, 12, 14, 16, 22, 40, 11)):
+        ws.column_dimensions[col].width = w
+    out.save(dest)
+    return len(occ)
+
+
+def importer_correspondances_xlsx(db, user: Utilisateur, path) -> tuple[int, list[str]]:
+    """Importe les lignes dont code_tiers_sage est renseigne. Chaque code doit exister dans le
+    referentiel synchronise ; l'utilisateur qui importe est enregistre comme verificateur."""
+    from openpyxl import load_workbook
+    exiger(user, "correspondance_client")
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        ws = wb["CORRESPONDANCES"] if "CORRESPONDANCES" in wb.sheetnames else wb.active
+        it = ws.iter_rows(values_only=True)
+        ent = [str(c or "").strip().lower() for c in next(it)]
+        i_lib, i_ct = ent.index("libelle_rapport"), ent.index("code_tiers_sage")
+        lignes = [(r[i_lib], r[i_ct]) for r in it if r and r[i_lib] and r[i_ct]]
+    finally:
+        wb.close()
+    connus = {r[0] for r in db.query("SELECT ct_num FROM clients")}
+    ok, erreurs = 0, []
+    with db.transaction():
+        for lib, ct in lignes:
+            ct = str(ct).strip()
+            if ct not in connus:
+                erreurs.append(f"{lib} : code {ct} absent du referentiel Sage synchronise")
+                continue
+            definir_correspondance(db, user, str(lib), ct)
+            ok += 1
+        db.audit(user.login, "IMPORT_CORRESPONDANCES", str(path), {"importees": ok, "erreurs": len(erreurs)})
+    return ok, erreurs

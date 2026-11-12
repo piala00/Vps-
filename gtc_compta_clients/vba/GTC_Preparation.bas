@@ -13,7 +13,7 @@ Option Explicit
 
 Private Const FORMAT_VERSION As String = "GTC-EXPORT-1"
 Private Const ENTETE_EXPORT As String = "format_version|id_import|agence|date_rapport|type_mouvement|reference_piece|code_tiers|nom_client|acheteur_detail|montant|sens|bc_origine|mode_reference|source_feuille|source_ligne|empreinte_ligne"
-Private Const ENTETE_MVT As String = "ct_num|client_libelle|reference_piece|bc_origine|type_document|montant|sens|mode_reference|acheteur_detail|feuille|ligne|notes"
+Private Const ENTETE_MVT As String = "ct_num|client_libelle|nature|reference_piece|bc_origine|type_document|montant|sens|mode_reference|acheteur_detail|feuille|ligne|notes"
 Private Const ENTETE_ANO As String = "feuille|ligne|section|gravite|motif|contenu|proposition|statut"
 
 Private gTypes As Object        ' prefixe -> "NATURE|SENS"
@@ -24,13 +24,16 @@ Private gColsFacture As Variant
 Private gColsBC As Variant
 Private gColRecu As String
 Private gVidesFin As Long
+Private gAcompteCol As String
+Private gBons As Collection
+Private gAnnulees As Collection
 
 ' ----------------------------------------------------------------------------
 Public Sub TrierEtPreparer()
     Dim wsC As Worksheet, wsP As Worksheet
     Dim dRap As Variant, agence As String
     Dim lastRow As Long, r As Long, idxRecus As Long
-    Dim nFac As Long, nReg As Long, nAno As Long, nBC As Long, nTot As Long, nHors As Long
+    Dim nFac As Long, nReg As Long, nAno As Long, nBC As Long, nTot As Long, nHors As Long, nAcpt As Long, nAnn As Long
     On Error GoTo Erreur
     Set wsC = ThisWorkbook.Worksheets("COLLAGE")
     Set wsP = ThisWorkbook.Worksheets("PARAMETRES")
@@ -45,6 +48,20 @@ Public Sub TrierEtPreparer()
     If lastRow = 0 Then
         MsgBox "La feuille COLLAGE est vide : coller la feuille du jour.", vbExclamation, "GTC"
         Exit Sub
+    End If
+    Dim dFeuille As Variant, rr As Long, cc As Long
+    For rr = 1 To 8
+        For cc = 1 To 3
+            If IsDate(wsC.Cells(rr, cc).Value) And VarType(wsC.Cells(rr, cc).Value) = vbDate Then dFeuille = wsC.Cells(rr, cc).Value: Exit For
+        Next cc
+        If Not IsEmpty(dFeuille) Then Exit For
+    Next rr
+    If Not IsEmpty(dFeuille) Then
+        If CLng(CDate(dFeuille)) <> CLng(CDate(dRap)) Then
+            MsgBox "La feuille collee est datee du " & Format(dFeuille, "dd/mm/yyyy") & " mais la date du rapport saisie est le " & _
+                   Format(dRap, "dd/mm/yyyy") & "." & vbCrLf & "Verifier la journee collee.", vbCritical, "GTC"
+            Exit Sub
+        End If
     End If
     Application.ScreenUpdating = False
     Vider "FACTURES", ENTETE_MVT
@@ -80,7 +97,7 @@ Public Sub TrierEtPreparer()
         If num = "" And cli = "" Then
             If aMontant Then nTot = nTot + 1
         ElseIf EstExclu(wsC, r) Then
-            nTot = nTot + 1
+            If InStr(Norm(TexteLigne(wsC, r)), "TOTAL") > 0 Then nTot = nTot + 1 Else nHors = nHors + 1
         ElseIf Not EstDocument(num) Then
             If aMontant Then Anomalie r, "DOCUMENTS", "AVERTISSEMENT", "Ligne avec montant mais numero de document non reconnu", TexteLigne(wsC, r), "Verifier la colonne C": nAno = nAno + 1
         Else
@@ -91,26 +108,47 @@ Public Sub TrierEtPreparer()
                 If Not ok Then Exit For
                 If Not IsEmpty(mt) Then If mt <> 0 Then mts.Add mt
             Next i
+            Dim acpt As Variant: acpt = 0
+            If ok And gAcompteCol <> "" Then
+                acpt = Montant(wsC.Range(gAcompteCol & r).Value, ok)
+                If IsEmpty(acpt) Then acpt = 0
+            End If
+            pref = Prefixe(num)
             If Not ok Then
                 Anomalie r, "DOCUMENTS", "BLOQUANT", "Montant illisible", TexteLigne(wsC, r), "Corriger le montant": nAno = nAno + 1
-            ElseIf mts.Count = 0 Then
-                nBC = nBC + 1                                   ' BC/BL seul : pas de creance
-            ElseIf mts.Count > 1 And Not ToutesEgales(mts) Then
-                Anomalie r, "DOCUMENTS", "BLOQUANT", "Montants facture differents dans " & Join(gColsFacture, "/"), TexteLigne(wsC, r), "Determiner la colonne applicable": nAno = nAno + 1
+            ElseIf EstDansListe(Norm(Txt(wsC, r, "E")), gAnnulees) Then
+                If mts.Count > 0 Or acpt <> 0 Then
+                    Anomalie r, "DOCUMENTS", "BLOQUANT", "Ligne marquee ANNULEE mais portant un montant", TexteLigne(wsC, r), "Verifier l'annulation": nAno = nAno + 1
+                Else
+                    nAnn = nAnn + 1
+                End If
             ElseIf cli = "" Then
-                Anomalie r, "DOCUMENTS", "BLOQUANT", "Client absent (colonne D)", TexteLigne(wsC, r), "Renseigner le client": nAno = nAno + 1
+                If mts.Count > 0 Or acpt <> 0 Then Anomalie r, "DOCUMENTS", "BLOQUANT", "Client absent (colonne D)", TexteLigne(wsC, r), "Renseigner le client": nAno = nAno + 1
             Else
-                pref = Prefixe(num)
-                If Not gTypes.Exists(pref) Then
+                If acpt <> 0 Then
+                    ' Acompte encaisse a la commande : reglement du client
+                    EcrireMvt "REGLEMENTS", agence, dRap, "ACOMPTE", num, cli, Abs(CDbl(acpt)), IIf(acpt > 0, "C", "D"), Txt(wsC, r, "B"), Txt(wsC, r, "E"), pref, r, "acompte"
+                    nAcpt = nAcpt + 1
+                End If
+                If mts.Count = 0 Then
+                    If gTypes.Exists(pref) Then
+                        Anomalie r, "DOCUMENTS", "INFO", "Facture " & num & " sans montant", TexteLigne(wsC, r), "Aucun mouvement cree"
+                    End If
+                    nBC = nBC + 1                                   ' BC/BL seul : pas de creance
+                ElseIf mts.Count > 1 And Not ToutesEgales(mts) Then
+                    Anomalie r, "DOCUMENTS", "BLOQUANT", "Montants facture differents dans " & Join(gColsFacture, "/"), TexteLigne(wsC, r), "Determiner la colonne applicable": nAno = nAno + 1
+                ElseIf EstDansListe(pref, gBons) Then
+                    Anomalie r, "DOCUMENTS", "BLOQUANT", "Numero de bon (" & num & ") avec un montant de facture : numero de facture absent", TexteLigne(wsC, r), "Remplacer par le numero de la facture Sage": nAno = nAno + 1
+                ElseIf Not gTypes.Exists(pref) Then
                     Anomalie r, "DOCUMENTS", "BLOQUANT", "Type de document '" & pref & "' non parametre", TexteLigne(wsC, r), "Parametrer le type (PARAMETRES)": nAno = nAno + 1
                 Else
                     regle = gTypes(pref)
                     nature = Split(regle, "|")(0): sens = Split(regle, "|")(1)
                     mt = mts(1): notes = ""
                     If mt < 0 Then
-                        mt = -mt: notes = "montant negatif dans le rapport"
+                        mt = -mt
                         If nature <> "AVOIR" Then
-                            nature = "AVOIR": sens = IIf(sens = "D", "C", "D")
+                            nature = "AVOIR": sens = IIf(sens = "D", "C", "D"): notes = "montant negatif dans le rapport"
                         End If
                     End If
                     EcrireMvt "FACTURES", agence, dRap, nature, num, cli, CDbl(mt), sens, Txt(wsC, r, "B"), Txt(wsC, r, "E"), pref, r, notes
@@ -156,7 +194,8 @@ Public Sub TrierEtPreparer()
     Application.ScreenUpdating = True
     ThisWorkbook.Worksheets("EXPORT_ERP").Activate
     MsgBox "Preparation terminee." & vbCrLf & _
-           "Factures/avoirs : " & nFac & vbCrLf & "Reglements : " & nReg & vbCrLf & _
+           "Factures/avoirs : " & nFac & vbCrLf & "Acomptes : " & nAcpt & vbCrLf & "Reglements : " & nReg & vbCrLf & _
+           "Lignes annulees : " & nAnn & vbCrLf & _
            "BC/BL seuls ignores : " & nBC & vbCrLf & "Totaux exclus : " & nTot & vbCrLf & _
            "Hors perimetre exclus : " & nHors & vbCrLf & "Anomalies : " & nAno & vbCrLf & vbCrLf & _
            "Les codes tiers Sage sont completes par l'application lors de l'import.", vbInformation, "GTC"
@@ -201,6 +240,9 @@ Private Sub ChargerRegles(ws As Worksheet)
     Set gCollectifs = New Collection
     gEnteteRecus = "RECUS DE VERSEMENTS": gColRecu = "F": gVidesFin = 8
     gColsFacture = Array("H", "I"): gColsBC = Array("F", "G")
+    gAcompteCol = ""
+    Set gBons = New Collection
+    Set gAnnulees = New Collection
     last = DerniereLigne(ws)
     For r = 1 To last
         k = UCase$(Trim$(CStr(ws.Cells(r, 1).Value)))
@@ -213,6 +255,9 @@ Private Sub ChargerRegles(ws As Worksheet)
             Case "COLONNES_BC": gColsBC = Split(Replace(CStr(ws.Cells(r, 2).Value), " ", ""), ",")
             Case "COLONNE_MONTANT_RECU": gColRecu = Trim$(CStr(ws.Cells(r, 2).Value))
             Case "LIGNES_VIDES_FIN_SECTION": gVidesFin = CLng(ws.Cells(r, 2).Value)
+            Case "ACOMPTE_COLONNE": gAcompteCol = UCase$(Trim$(CStr(ws.Cells(r, 2).Value)))
+            Case "PREFIXE_BON": gBons.Add UCase$(Trim$(CStr(ws.Cells(r, 2).Value)))
+            Case "VALEUR_ANNULEE": gAnnulees.Add Norm(CStr(ws.Cells(r, 2).Value))
         End Select
     Next r
 End Sub
@@ -382,6 +427,13 @@ Private Function ToutesEgales(c As Collection) As Boolean
     Next i
 End Function
 
+Private Function EstDansListe(v As String, c As Collection) As Boolean
+    Dim m As Variant
+    For Each m In c
+        If v = m Then EstDansListe = True: Exit Function
+    Next m
+End Function
+
 Private Function EstCollectif(cli As String) As Boolean
     Dim m As Variant
     For Each m In gCollectifs
@@ -403,7 +455,7 @@ Private Sub EcrireMvt(feuille As String, agence As String, dRap As Variant, natu
     If EstCollectif(cli) Then ach = modeRef
     Set ws = ThisWorkbook.Worksheets(feuille)
     n = DerniereLigne(ws) + 1
-    ws.Range("A" & n).Resize(1, 12).Value = Array("", cli, num, bc, pref, mt, sens, modeRef, ach, "COLLAGE", r, notes)
+    ws.Range("A" & n).Resize(1, 13).Value = Array("", cli, nature, num, bc, pref, mt, sens, modeRef, ach, "COLLAGE", r, notes)
     Set we = ThisWorkbook.Worksheets("EXPORT_ERP")
     n = DerniereLigne(we) + 1
     we.Range("A" & n).Resize(1, 16).Value = Array(FORMAT_VERSION, "", agence, Format(dRap, "yyyy-mm-dd"), nature, num, "", _

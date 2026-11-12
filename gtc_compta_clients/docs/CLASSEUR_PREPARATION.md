@@ -24,6 +24,11 @@ mais doit être recetté sous Windows : voir le plan de recette ci-dessous.
 Le classeur ne connaît pas les codes tiers Sage. L'application les complète à l'import à partir des
 correspondances vérifiées, et les lignes non reconnues sont rejetées avec un motif.
 
+## Contrôle croisé
+Quand le classeur a été traité par la macro, l'application retraite elle-même la feuille `COLLAGE` et compare
+les deux résultats. Toute différence est affichée avant l'import et demande une confirmation explicite.
+La macro contrôle aussi que la date imprimée en A4 de la feuille collée correspond à la date saisie.
+
 ## Secours si les macros sont désactivées
 Si `EXPORT_ERP` est vide, l'application traite elle-même la feuille `COLLAGE` avec les mêmes règles (Python).
 Le bouton « Créer un classeur de préparation depuis une feuille du rapport » produit aussi un classeur

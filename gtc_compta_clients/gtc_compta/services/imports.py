@@ -107,7 +107,7 @@ def _importer_ligne(db, user, bid, l, ts, vus):
     if not db.one("SELECT 1 FROM clients WHERE ct_num=?", (ct,)):
         return "REJET", f"Code tiers {ct} absent du referentiel"
     nature = l["type_mouvement"]
-    if nature not in ("FACTURE", "AVOIR", "REGLEMENT"):
+    if nature not in ("FACTURE", "AVOIR", "REGLEMENT", "ACOMPTE"):
         return "REJET", f"Type de mouvement inconnu : {nature}"
     sens = l["sens"]
     if sens not in ("D", "C"):
@@ -133,6 +133,8 @@ def _importer_ligne(db, user, bid, l, ts, vus):
                    "VALUES (?,?,?,?,?)", (bid, ex["id"], "montant/sens", f"{ex['montant']} {ex['sens']}",
                                           f"{montant} {sens}"))
         return "CONFLIT", f"Mouvement #{ex['id']} existe avec un montant/sens different"
+    autre = db.one("SELECT id, ct_num FROM normalized_movements WHERE agence=? AND nature=? AND reference_piece=? "
+                   "AND ct_num<>? AND statut<>'ANNULE' LIMIT 1", (agence, nature, ref, ct))
     db.execute(
         "INSERT INTO normalized_movements(agence, nature, reference_piece, ct_num, date_piece, sens, montant, "
         "libelle, bc_origine, mode_reference, acheteur_detail, source, batch_id, source_fichier, source_feuille, "
@@ -142,6 +144,10 @@ def _importer_ligne(db, user, bid, l, ts, vus):
          f"{nature.title()} {ref}" + (f" - {l['acheteur_detail']}" if l.get("acheteur_detail") else ""),
          l.get("bc_origine") or None, l.get("mode_reference") or None, l.get("acheteur_detail") or None,
          bid, l.get("source_fichier") or None, l.get("source_feuille"), l.get("source_ligne"), ts, user.login))
+    if autre:
+        db.execute("INSERT INTO import_conflicts(batch_id, movement_id, champ, valeur_existante, valeur_importee) "
+                   "VALUES (?,?,?,?,?)", (bid, autre["id"], "client (meme numero de piece)", autre["ct_num"], ct))
+        return "INSERE", f"Attention : numero {ref} deja utilise pour le client {autre['ct_num']}"
     return "INSERE", ""
 
 

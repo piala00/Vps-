@@ -88,7 +88,7 @@ def preparer_lot(db, ct: str) -> LotClient:
     if apres:
         sql += " AND m.date_piece > ?"
         p.append(apres)
-    rows = db.query(sql + " ORDER BY m.date_piece, CASE m.nature WHEN 'REGLEMENT' THEN 1 ELSE 0 END, m.id", p)
+    rows = db.query(sql + " ORDER BY m.date_piece, CASE WHEN m.nature IN ('REGLEMENT','ACOMPTE') THEN 1 ELSE 0 END, m.id", p)
     if last and rows and rows[0]["date_piece"] < (last["periode_fin"] or ""):
         lot.retroactif = True
     for m in rows:

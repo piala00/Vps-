@@ -22,6 +22,8 @@
   },
   "rapport": {
     "entete_recus": "RECUS DE VERSEMENTS",
+    "libelle_total_ventes": "TOTAL VENTES",
+    "libelle_total_recus": "TOTAL DE VERSEMENTS",
     "motif_document": "^(?:\\d+)?[A-Z]{2,5}\\d*[-/ ]?\\d+",
     "motif_recu": "^(?:\\d+)?RCB",
     "types_documents": {
@@ -30,12 +32,25 @@
         "sens": "D",
         "confirme": false
       },
+      "FRCB": {
+        "nature": "AVOIR",
+        "sens": "C",
+        "confirme": false
+      },
       "FVCB": {
-        "nature": "FACTURE",
-        "sens": "D",
+        "nature": "AVOIR",
+        "sens": "C",
         "confirme": false
       }
     },
+    "prefixes_bons": [
+      "BCCB",
+      "BLCB"
+    ],
+    "valeurs_annulee": [
+      "ANNULEE",
+      "ANNULE"
+    ],
     "colonnes_facture": [
       "H",
       "I"
@@ -44,6 +59,11 @@
       "F",
       "G"
     ],
+    "acomptes": {
+      "integrer": true,
+      "colonne": "F",
+      "confirme": false
+    },
     "colonne_montant_recu": "F",
     "mots_exclusion": [
       "TOTAL",
@@ -53,7 +73,8 @@
       "VERSEMENT CAISSE",
       "VERSEMENT BANQUE",
       "LIAISON",
-      "CAISSE CENTRALE"
+      "CAISSE CENTRALE",
+      "SOLDE"
     ],
     "comptes_collectifs": [
       "CLIENTS DETAILS BTA"

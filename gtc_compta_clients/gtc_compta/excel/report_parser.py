@@ -12,7 +12,8 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, field, asdict
-from datetime import date
+from collections import defaultdict
+from datetime import date, datetime
 
 from ..money import MontantInvalide, parse_montant
 from ..text import normaliser, normaliser_reference
@@ -39,6 +40,7 @@ class Mouvement:
     ligne: int = 0
     type_document: str = ""
     notes: str = ""
+    colonne: str = ""
 
     def to_dict(self):
         return asdict(self)
@@ -54,6 +56,7 @@ class Anomalie:
     contenu: str
     proposition: str = ""
     statut: str = "OUVERTE"
+    colonnes: tuple = ()        # colonnes de montant bloquees (vide = toute la ligne)
 
 
 @dataclass
@@ -63,13 +66,15 @@ class ResultatPreparation:
     agence: str
     factures: list[Mouvement] = field(default_factory=list)
     reglements: list[Mouvement] = field(default_factory=list)
+    acomptes: list[Mouvement] = field(default_factory=list)
     anomalies: list[Anomalie] = field(default_factory=list)
     stats: dict = field(default_factory=dict)
     ligne_entete_recus: int | None = None
+    date_feuille: date | None = None
 
     @property
     def mouvements(self) -> list[Mouvement]:
-        return self.factures + self.reglements
+        return self.factures + self.acomptes + self.reglements
 
     @property
     def bloquant(self) -> bool:
@@ -113,9 +118,20 @@ class ParseurRapport:
     def analyser(self, rows: list[list], feuille: str, agence: str,
                  date_rapport: date | None) -> ResultatPreparation:
         res = ResultatPreparation(feuille=feuille, date_rapport=date_rapport, agence=agence)
-        st = {"lignes_lues": len(rows), "factures": 0, "avoirs": 0, "reglements": 0,
-              "bc_seuls_ignores": 0, "totaux_exclus": 0, "hors_perimetre_exclus": 0,
-              "anomalies": 0}
+        st = {"lignes_lues": len(rows), "factures": 0, "avoirs": 0, "acomptes": 0, "reglements": 0,
+              "bc_seuls_ignores": 0, "annulees": 0, "factures_montant_nul": 0, "totaux_exclus": 0,
+              "hors_perimetre_exclus": 0, "anomalies": 0,
+              "montants_exclus": defaultdict(int)}
+
+        # Date imprimee en tete de feuille (cellule A4 dans le rapport reel)
+        res.date_feuille = next((v.date() if isinstance(v, datetime) else v
+                                 for r in rows[:8] for v in r[:3] if isinstance(v, (date, datetime))), None)
+        if res.date_rapport is None:
+            res.date_rapport = res.date_feuille
+        elif res.date_feuille and res.date_feuille != res.date_rapport:
+            res.anomalies.append(Anomalie(feuille, 0, "PARAMETRES", "BLOQUANT",
+                f"Date de la feuille collee ({res.date_feuille:%d/%m/%Y}) differente de la date du rapport "
+                f"({res.date_rapport:%d/%m/%Y})", "", "Verifier que la bonne journee a ete collee"))
 
         idx_recus = next((i for i, r in enumerate(rows)
                           if self.entete_recus in normaliser(_row_text(r))), None)
@@ -129,15 +145,28 @@ class ParseurRapport:
         self._section_documents(rows[:fin_docs], 0, res, st)
         if idx_recus is not None:
             self._section_recus(rows, idx_recus + 1, res, st)
+        st["controle_totaux"] = self._controle_totaux(rows, fin_docs, idx_recus, res, st)
+        st["montants_exclus"] = dict(st["montants_exclus"])
 
-        vus = {}
+        vus, par_ref = {}, {}
         for m in res.mouvements:
-            cle = (m.nature, normaliser_reference(m.reference_piece), m.client_libelle)
+            ref = normaliser_reference(m.reference_piece)
+            cle = (m.nature, ref, normaliser(m.client_libelle))
             if cle in vus:
                 res.anomalies.append(Anomalie(feuille, m.ligne, m.nature, "BLOQUANT",
                     f"Piece {m.reference_piece} en double (deja ligne {vus[cle]})",
                     m.reference_piece, "Supprimer le doublon ou corriger la reference"))
             vus[cle] = m.ligne
+            if m.nature != "ACOMPTE":
+                par_ref.setdefault((m.nature, ref), []).append(m)
+        for (_nat, _ref), ms in par_ref.items():
+            if len({normaliser(m.client_libelle) for m in ms}) > 1:
+                for m in ms:
+                    res.anomalies.append(Anomalie(feuille, m.ligne, m.nature, "AVERTISSEMENT",
+                        f"Numero {m.reference_piece} utilise pour plusieurs clients ("
+                        + ", ".join(sorted({x.client_libelle for x in ms})) + ")",
+                        m.reference_piece, "Erreur de saisie probable : le rapprochement Sage indiquera "
+                                           "la bonne affectation"))
 
         for m in res.mouvements:
             self._affecter_client(m, res)
@@ -150,52 +179,108 @@ class ParseurRapport:
         txt = normaliser(" ".join(_texte(_cell(row, c)) for c in "BCDE"))
         return any(re.search(r"(^|\W)" + re.escape(m) + r"(\W|$)", txt) for m in self.exclusions)
 
+    def _montants(self, row, cols, res, ligne, section):
+        """Montants des colonnes demandees ; None si un montant est illisible (anomalie posee)."""
+        out = {}
+        for c in cols:
+            try:
+                out[c] = parse_montant(_cell(row, c)) or 0
+            except MontantInvalide as exc:
+                res.anomalies.append(Anomalie(res.feuille, ligne, section, "BLOQUANT", f"Colonne {c} : {exc}",
+                                              _row_text(row), "Corriger le montant"))
+                return None
+        return out
+
     def _section_documents(self, rows, offset, res, st):
         feuille = res.feuille
+        r = self.r
+        cols_f = r["colonnes_facture"]
+        acpt = r.get("acomptes", {})
+        col_acpt = acpt.get("colonne") if acpt.get("integrer") else None
+        bons = set(r.get("prefixes_bons", []))
+        annules = {normaliser(v) for v in r.get("valeurs_annulee", ["ANNULEE"])}
         for i, row in enumerate(rows):
             ligne = offset + i + 1
             num = _texte(_cell(row, "C"))
             client = _texte(_cell(row, "D"))
-            montants_f = [_cell(row, c) for c in self.r["colonnes_facture"]]
-            montants_bc = [_cell(row, c) for c in self.r["colonnes_bc"]]
-            a_montant = any(_est_montant(v) for v in montants_f + montants_bc)
+            mode = _texte(_cell(row, "E"))
+            a_montant = any(_est_montant(_cell(row, c)) for c in r["colonnes_bc"] + cols_f)
             if not num and not client:
                 if a_montant:
                     st["totaux_exclus"] += 1
                 continue
             if self._est_exclu(row):
-                st["totaux_exclus"] += 1
+                cle = "totaux_exclus" if "TOTAL" in normaliser(_row_text(row)) else "hors_perimetre_exclus"
+                st[cle] += 1
+                if cle == "hors_perimetre_exclus":
+                    for c in set(cols_f + ([col_acpt] if col_acpt else [])):
+                        try:
+                            st["montants_exclus"][c] += parse_montant(_cell(row, c)) or 0
+                        except MontantInvalide:
+                            pass
                 continue
-            numn = normaliser_reference(num)
-            if not self.re_doc.match(numn):
-                # en-tetes de colonnes et libelles sans montant : ignores silencieusement
-                if a_montant:
+            if not self.re_doc.match(normaliser_reference(num)):
+                if a_montant:   # les en-tetes de colonnes sans montant sont ignores silencieusement
                     res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "AVERTISSEMENT",
                         "Ligne avec montant mais numero de document non reconnu",
                         _row_text(row), "Verifier la colonne C"))
                 continue
-            try:
-                vals_f = [parse_montant(v) for v in montants_f]
-            except MontantInvalide as exc:
-                res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "BLOQUANT",
-                    str(exc), _row_text(row), "Corriger le montant"))
+            vals = self._montants(row, sorted(set(cols_f + ([col_acpt] if col_acpt else []))), res, ligne,
+                                  "DOCUMENTS")
+            if vals is None:
                 continue
-            vals_f = [v for v in vals_f if v not in (None, 0)]
-            if not vals_f:
-                st["bc_seuls_ignores"] += 1      # BC / BL seul : pas de creance facturee
+            factures = {c: vals[c] for c in cols_f if vals[c]}
+            acompte = vals.get(col_acpt, 0) if col_acpt else 0
+            prefixe = prefixe_document(num)
+            if normaliser(mode) in annules:
+                if factures or acompte:
+                    res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "BLOQUANT",
+                        "Ligne marquee ANNULEE mais portant un montant", _row_text(row),
+                        "Verifier l'annulation avec le commercial"))
+                else:
+                    st["annulees"] += 1
                 continue
-            if len(set(vals_f)) > 1:
+            if not client:
+                if factures or acompte:
+                    res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "BLOQUANT",
+                        "Client absent (colonne D)", _row_text(row), "Renseigner le client"))
+                continue
+            base = dict(client_libelle=client, bc_origine=_texte(_cell(row, "B")), mode_reference=mode,
+                        feuille=feuille, ligne=ligne, type_document=prefixe)
+            if normaliser(client) in self.collectifs:
+                base["acheteur_detail"] = mode
+            if acompte:
+                # Acompte encaisse a la commande (colonne ACOMPTE) : reglement du client.
+                note = "" if acpt.get("confirme") else "traitement des acomptes non confirme"
+                if acompte < 0:
+                    note = (note + " ; acompte negatif (remboursement)").strip(" ;")
+                m = Mouvement(nature="ACOMPTE", reference_piece=num, montant=abs(acompte),
+                              sens="C" if acompte > 0 else "D", colonne=col_acpt, notes=note, **base)
+                res.acomptes.append(m)
+                st["acomptes"] += 1
+            if not factures:
+                if prefixe in bons:
+                    st["bc_seuls_ignores"] += 1      # BC / BL seul : pas de creance facturee
+                elif prefixe in r["types_documents"]:
+                    st["factures_montant_nul"] += 1
+                    res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "INFO",
+                        f"Facture {num} sans montant (reference : {mode or '-'})", _row_text(row),
+                        "Aucun mouvement cree ; verifier s'il s'agit d'une gratuite / avarie / bonus"))
+                else:
+                    st["bc_seuls_ignores"] += 1
+                continue
+            if len(set(factures.values())) > 1:
                 res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "BLOQUANT",
-                    "Montants facture differents dans " + "/".join(self.r["colonnes_facture"]),
+                    "Montants facture differents dans " + "/".join(cols_f),
                     _row_text(row), "Determiner la colonne de montant facture applicable"))
                 continue
-            montant = vals_f[0]
-            if not client:
+            col, montant = next(iter(factures.items()))
+            if prefixe in bons:
                 res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "BLOQUANT",
-                    "Client absent (colonne D)", _row_text(row), "Renseigner le client"))
+                    f"Numero de bon ({num}) avec un montant de facture en {col} : numero de facture absent",
+                    _row_text(row), "Remplacer par le numero de la facture Sage", colonnes=(col,)))
                 continue
-            prefixe = prefixe_document(num)
-            regle = self.r["types_documents"].get(prefixe)
+            regle = r["types_documents"].get(prefixe)
             if regle is None:
                 res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "BLOQUANT",
                     f"Type de document '{prefixe}' non parametre (nature/sens inconnus)",
@@ -207,19 +292,93 @@ class ParseurRapport:
                 # Montant negatif : avoir/retour. Si le type est deja parametre en AVOIR,
                 # le signe n'est qu'une presentation : on ne l'inverse pas une 2e fois.
                 montant = -montant
-                notes = (notes + " ; montant negatif dans le rapport").strip(" ;")
                 if nature != "AVOIR":
                     nature = "AVOIR"
                     sens = "C" if sens == "D" else "D"
-            mode = _texte(_cell(row, "E"))
-            m = Mouvement(nature=nature, reference_piece=num, client_libelle=client,
-                          montant=montant, sens=sens, bc_origine=_texte(_cell(row, "B")),
-                          mode_reference=mode, feuille=feuille, ligne=ligne,
-                          type_document=prefixe, notes=notes)
-            if normaliser(client) in self.collectifs:
-                m.acheteur_detail = mode
-            res.factures.append(m)
+                    notes = (notes + " ; montant negatif dans le rapport").strip(" ;")
+            elif nature == "AVOIR":
+                notes = (notes + " ; avoir de montant POSITIF dans le rapport").strip(" ;")
+                res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "AVERTISSEMENT",
+                    f"Avoir {num} de montant positif (habituellement negatif)", _row_text(row),
+                    "Verifier le signe"))
+            res.factures.append(Mouvement(nature=nature, reference_piece=num, montant=montant, sens=sens,
+                                          colonne=col, notes=notes, **base))
             st["avoirs" if nature == "AVOIR" else "factures"] += 1
+
+    def _controle_totaux(self, rows, fin_docs, idx_recus, res, st) -> dict:
+        """Rapproche les montants extraits des lignes TOTAL du rapport lui-meme.
+
+        rapport : montant de la ligne TOTAL du rapport (TOTAL VENTES / TOTAL DE VERSEMENTS) ;
+        lignes  : somme brute des lignes de detail de la colonne (lignes contenant TOTAL ignorees) ;
+        retenu  : somme signee des mouvements extraits ; exclus : lignes hors perimetre
+        (liaisons, caisse...) ; bloques : lignes en anomalie bloquante (traitement manuel).
+        Controles : rapport == lignes (coherence du rapport) et
+        lignes == retenu + exclus + bloques (aucun montant oublie par l'extraction)."""
+        bloquantes: dict[int, set] = {}
+        for a in res.anomalies:
+            if a.gravite == "BLOQUANT" and a.ligne > 0:
+                bloquantes.setdefault(a.ligne, set()).update(a.colonnes or {"*"})
+
+        def val(row, col):
+            try:
+                return parse_montant(_cell(row, col)) or 0
+            except MontantInvalide:
+                return 0
+
+        def segment(seg, offset, col, libelle_total):
+            lignes = exclus = bloques = 0
+            rapport = None
+            for k, row in enumerate(seg):
+                txt = normaliser(_row_text(row))
+                if "TOTAL" in txt:
+                    if rapport is None and libelle_total in normaliser(" ".join(_texte(_cell(row, c)) for c in "BCDE")):
+                        rapport = val(row, col)
+                    continue
+                v = val(row, col)
+                if not v:
+                    continue
+                lignes += v
+                bl = bloquantes.get(offset + k + 1, ())
+                if "*" in bl or col in bl:
+                    bloques += v
+                elif self._est_exclu(row):
+                    exclus += v
+            return {"rapport": rapport, "lignes": lignes, "exclus": exclus, "bloques": bloques}
+
+        out = {}
+        acpt = self.r.get("acomptes", {})
+        acpt_col = acpt.get("colonne") if acpt.get("integrer") else None
+        tv = normaliser(self.r.get("libelle_total_ventes", "TOTAL VENTES"))
+        for col in self.r["colonnes_facture"] + ([acpt_col] if acpt_col else []):
+            d = segment(rows[:fin_docs], 0, col, tv)
+            d["retenu"] = sum((m.montant if m.sens == ("C" if m.nature == "ACOMPTE" else "D") else -m.montant)
+                              for m in res.factures + res.acomptes if m.colonne == col)
+            out[f"documents_{col}"] = d
+        if idx_recus is not None:
+            col = self.r["colonne_montant_recu"]
+            fin = normaliser(self.r.get("libelle_total_recus", "TOTAL DE VERSEMENTS"))
+            seg = []
+            for row in rows[idx_recus + 1:]:
+                seg.append(row)
+                if fin in normaliser(_row_text(row)):
+                    break
+            d = segment(seg, idx_recus + 1, col, fin)
+            d["retenu"] = sum(m.montant for m in res.reglements)
+            out[f"recus_{col}"] = d
+        libelles = {"H": "ventes comptant", "I": "ventes a terme", "F": "acomptes / recouvrements"}
+        for k, v in out.items():
+            nom = f"{k} ({libelles.get(k[-1], '')})"
+            if v["rapport"] is not None and v["rapport"] != v["lignes"]:
+                res.anomalies.append(Anomalie(res.feuille, 0, "CONTROLE", "AVERTISSEMENT",
+                    f"{nom} : la ligne TOTAL du rapport ({v['rapport']}) differe de la somme des lignes "
+                    f"({v['lignes']})", "", "Verifier le total saisi dans le rapport"))
+            ecart = v["lignes"] - v["retenu"] - v["exclus"] - v["bloques"]
+            v["ecart_non_explique"] = ecart
+            if ecart:
+                res.anomalies.append(Anomalie(res.feuille, 0, "CONTROLE", "BLOQUANT",
+                    f"{nom} : {ecart} non explique entre les lignes du rapport et les mouvements extraits",
+                    "", "Signaler a l'administrateur : une ligne n'a pas ete interpretee"))
+        return out
 
     def _section_recus(self, rows, start, res, st):
         feuille = res.feuille
@@ -271,7 +430,7 @@ class ParseurRapport:
                 continue
             m = Mouvement(nature=nature, reference_piece=num, client_libelle=client,
                           montant=montant, sens=sens, mode_reference=_texte(_cell(row, "E")),
-                          feuille=feuille, ligne=ligne, type_document=prefixe_document(num))
+                          feuille=feuille, ligne=ligne, type_document=prefixe_document(num), colonne=col_m)
             if normaliser(client) in self.collectifs:
                 m.acheteur_detail = m.mode_reference
             res.reglements.append(m)

@@ -1,15 +1,18 @@
 # Rapport de tests
 
 Exécution : `python -m pytest -q`, Python 3.12, Linux (environnement de développement), le 12/11/2026.
-**Résultat : 56 tests réussis, 0 échec.**
+**Résultat : 75 tests réussis, 0 échec.**
 
-Ces tests utilisent des **données synthétiques** et un **Sage fictif**. Ils prouvent les règles
-implémentées, pas leur concordance avec le vrai rapport ni avec le vrai Sage.
+Le parseur est testé sur une **copie anonymisée du rapport réel** (jours 01, 03, 12 et 14 de
+`10 RC OCT.xlsx`), avec les chiffres de référence du classeur : comptages, totaux `TOTAL VENTES` /
+`TOTAL DE VERSEMENTS`, cas limites réels. Les parcours de bout en bout (import → rapprochement →
+impression) utilisent des données synthétiques de même structure et un **Sage fictif**. La concordance
+avec le vrai Sage reste à établir.
 
 ## Correspondance avec les critères d'acceptation (§16)
 | N° | Critère | Test(s) | État |
 |---|---|---|---|
-| 1 | Seules les deux sections utiles ; totaux et caisse exclus | `test_cas1_*` | OK (synthétique) |
+| 1 | Seules les deux sections utiles ; totaux et caisse exclus | `test_cas1_*`, `test_reel_*` | OK sur le **rapport réel** (31 jours analysés) |
 | 2 | BC + facture compté une fois ; BC seul sans créance | `test_cas2_*` | OK |
 | 3 | Réimport : zéro doublon | `test_cas3_reimport_zero_doublon`, `test_cas3_montant_modifie_conflit_sans_doublon` | OK |
 | 4 | Solde progressif exact | `test_cas4_solde_progressif`, `test_solde_non_garanti_sans_ouverture` | OK |
@@ -25,6 +28,18 @@ implémentées, pas leur concordance avec le vrai rapport ni avec le vrai Sage.
 | 14 | Écriture rétroactive : alerte | `test_cas14_*`, `test_correction_tracee_invalide_fiche` | OK |
 | 15 | Windows 10/11 : navigation, packaging, impression | — | **NON FAIT** (pas de poste Windows) |
 
+## Validation sur le rapport réel complet (31 jours, hors dépôt)
+`python tools/analyser_rapport.py "10 RC OCT.xlsx"` :
+- 4 178 factures, 119 avoirs, 2 523 acomptes, 913 reçus extraits ; 1 350 BC/BL seuls, 106 annulées,
+  27 factures à montant nul, liaisons et versements de caisse exclus ;
+- **31/31 jours** : le total du rapport est égal à la somme des lignes, et la somme des lignes est égale à
+  retenu + exclu + bloqué (aucun montant oublié) ;
+- 12 lignes bloquantes sur le mois (8 n° de BC portant une facture, 4 reçus négatifs), 2 avertissements
+  (même n° de facture pour deux clients).
+
+Volume (base SQLite) : import du mois complet (7 733 mouvements, 26 lots) en 0,4 s. Le réimport des mêmes
+données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée (2 414 lignes) est calculée en 16 ms.
+
 ## Autres vérifications effectuées
 - Interface réelle lancée sous Xvfb : les 10 modules s'affichent sans erreur (`tools/captures.py`, captures dans `docs/captures/`).
 - Spec PyInstaller : compilation réussie sous Linux. L'exécutable démarre et reste ouvert 12 s sans erreur.
@@ -37,6 +52,12 @@ implémentées, pas leur concordance avec le vrai rapport ni avec le vrai Sage.
 - Index PDF : numéro de pièce mal extrait d'un nom de fichier avec espaces. Corrigé.
 - Retour des tâches de fond vers Tk depuis un thread secondaire : remplacé par une file thread-safe.
 - Chevauchement de texte dans le pied de la fiche PDF : corrigé.
+- (cycle 2, rapport réel) Colonne F mal interprétée (montant de BC) alors qu'il s'agit d'ACOMPTES encaissés :
+  traitement ajouté, sinon chaque client payant comptant serait apparu débiteur à tort.
+- (cycle 2) `FVCB` paramétré en facture : ce sont des avoirs (119/119 négatifs). Corrigé.
+- (cycle 2) Même n° de facture pour deux clients non détecté : contrôle ajouté (rapport et import).
+- (cycle 2) Anonymiseur : libellé `VERSEMENT CAISSE RECETTE` pseudonymisé à tort. Corrigé ; le jeu
+  anonymisé donne désormais exactement les mêmes résultats que les feuilles réelles.
 
 ## Liste détaillée
 - [OK] tests/test_flux.py::test_import_et_rejet_client_non_mappe
@@ -54,6 +75,7 @@ implémentées, pas leur concordance avec le vrai rapport ni avec le vrai Sage.
 - [OK] tests/test_flux.py::test_champs_manuels_survivent_synchro
 - [OK] tests/test_flux.py::test_correspondance_jamais_automatique_sur_ressemblance
 - [OK] tests/test_flux.py::test_permissions
+- [OK] tests/test_flux.py::test_fichier_correspondances_export_import
 - [OK] tests/test_modules.py::test_cas9_bc_deja_inclus_pas_double_compte
 - [OK] tests/test_modules.py::test_cas9_bc_non_inclus_ajoute_une_fois
 - [OK] tests/test_modules.py::test_cas10_facture_echue_selon_politique
@@ -74,14 +96,31 @@ implémentées, pas leur concordance avec le vrai rapport ni avec le vrai Sage.
 - [OK] tests/test_modules.py::test_config_refuse_mot_de_passe
 - [OK] tests/test_modules.py::test_sauvegarde_restauration
 - [OK] tests/test_modules.py::test_transaction_atomique
+- [OK] tests/test_parser.py::test_reel_comptages[01-124-1-90-23-8]
+- [OK] tests/test_parser.py::test_reel_comptages[03-164-5-131-38-8]
+- [OK] tests/test_parser.py::test_reel_comptages[12-245-2-157-62-9]
+- [OK] tests/test_parser.py::test_reel_comptages[14-178-29-96-28-1]
+- [OK] tests/test_parser.py::test_reel_totaux_du_rapport_et_aucun_montant_oublie[01]
+- [OK] tests/test_parser.py::test_reel_totaux_du_rapport_et_aucun_montant_oublie[03]
+- [OK] tests/test_parser.py::test_reel_totaux_du_rapport_et_aucun_montant_oublie[12]
+- [OK] tests/test_parser.py::test_reel_totaux_du_rapport_et_aucun_montant_oublie[14]
+- [OK] tests/test_parser.py::test_reel_jour01_montants
+- [OK] tests/test_parser.py::test_reel_avoir_fvcb_et_bc_seul
+- [OK] tests/test_parser.py::test_reel_bc_avec_montant_facture_bloque_sans_perdre_acompte
+- [OK] tests/test_parser.py::test_reel_meme_numero_pour_deux_clients
+- [OK] tests/test_parser.py::test_reel_recus_negatifs_bloques
+- [OK] tests/test_parser.py::test_reel_liaisons_et_versements_exclus
 - [OK] tests/test_parser.py::test_cas1_seules_les_deux_sections_utiles
 - [OK] tests/test_parser.py::test_cas1_entete_recus_detectee_dynamiquement
 - [OK] tests/test_parser.py::test_cas2_bc_plus_facture_compte_une_fois
+- [OK] tests/test_parser.py::test_acompte_et_facture_comptant
+- [OK] tests/test_parser.py::test_acomptes_desactivables
 - [OK] tests/test_parser.py::test_avoir_negatif_pas_de_double_inversion
 - [OK] tests/test_parser.py::test_type_non_parametre_bloquant
 - [OK] tests/test_parser.py::test_compte_collectif_ventilation_analytique
 - [OK] tests/test_parser.py::test_client_sans_correspondance_signale
-- [OK] tests/test_parser.py::test_montants_h_i_incoherents_bloquants
+- [OK] tests/test_parser.py::test_jour02_cas_bloquants
+- [OK] tests/test_parser.py::test_date_feuille_differente_bloquante
 - [OK] tests/test_parser.py::test_entete_recus_absente_bloquante
 - [OK] tests/test_parser.py::test_parse_montant[1500-1500]
 - [OK] tests/test_parser.py::test_parse_montant[1500.0-1500]
@@ -95,3 +134,4 @@ implémentées, pas leur concordance avec le vrai rapport ni avec le vrai Sage.
 - [OK] tests/test_parser.py::test_parse_montant_centimes_refuses
 - [OK] tests/test_parser.py::test_classeur_prepare_aller_retour
 - [OK] tests/test_parser.py::test_export_erp_ecrit_par_excel_normalise
+- [OK] tests/test_parser.py::test_controle_croise_macro_application

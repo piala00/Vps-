@@ -15,8 +15,8 @@ from gtc_compta import EXPORT_FORMAT_VERSION  # noqa: E402
 from gtc_compta.config import load_config  # noqa: E402
 
 ENTETES = {
-    "FACTURES": "ct_num|client_libelle|reference_piece|bc_origine|type_document|montant|sens|mode_reference|acheteur_detail|feuille|ligne|notes",
-    "REGLEMENTS": "ct_num|client_libelle|reference_piece|bc_origine|type_document|montant|sens|mode_reference|acheteur_detail|feuille|ligne|notes",
+    "FACTURES": "ct_num|client_libelle|nature|reference_piece|bc_origine|type_document|montant|sens|mode_reference|acheteur_detail|feuille|ligne|notes",
+    "REGLEMENTS": "ct_num|client_libelle|nature|reference_piece|bc_origine|type_document|montant|sens|mode_reference|acheteur_detail|feuille|ligne|notes",
     "ANOMALIES": "feuille|ligne|section|gravite|motif|contenu|proposition|statut",
     "EXPORT_ERP": "format_version|id_import|agence|date_rapport|type_mouvement|reference_piece|code_tiers|nom_client|acheteur_detail|montant|sens|bc_origine|mode_reference|source_feuille|source_ligne|empreinte_ligne",
 }
@@ -37,6 +37,13 @@ def build(cfg, dest: Path) -> Path:
         ws.append([k, v])
     for pref, t in r["types_documents"].items():
         ws.append(["TYPE_DOCUMENT", pref, t["nature"], t["sens"], "confirme" if t.get("confirme") else "A CONFIRMER"])
+    acpt = r.get("acomptes", {})
+    ws.append(["ACOMPTE_COLONNE", acpt.get("colonne", "") if acpt.get("integrer") else "",
+               "confirme" if acpt.get("confirme") else "A CONFIRMER"])
+    for pb in r.get("prefixes_bons", []):
+        ws.append(["PREFIXE_BON", pb])
+    for va in r.get("valeurs_annulee", []):
+        ws.append(["VALEUR_ANNULEE", va])
     for m in r["mots_exclusion"]:
         ws.append(["EXCLUSION", m])
     for c in r["comptes_collectifs"]:
