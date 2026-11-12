@@ -121,7 +121,7 @@ class ParseurRapport:
                  date_rapport: date | None) -> ResultatPreparation:
         res = ResultatPreparation(feuille=feuille, date_rapport=date_rapport, agence=agence)
         st = {"lignes_lues": len(rows), "factures": 0, "avoirs": 0, "acomptes": 0, "reglements": 0, "annulations_recus": 0,
-              "bc_seuls_ignores": 0, "annulees": 0, "factures_montant_nul": 0, "totaux_exclus": 0,
+              "bc_seuls_ignores": 0, "bc_sans_numero_c": 0, "annulees": 0, "factures_montant_nul": 0, "totaux_exclus": 0,
               "hors_perimetre_exclus": 0, "anomalies": 0,
               "montants_exclus": defaultdict(int)}
 
@@ -170,6 +170,10 @@ class ParseurRapport:
                         m.reference_piece, "Erreur de saisie probable : le rapprochement Sage indiquera "
                                            "la bonne affectation"))
 
+        if st["bc_sans_numero_c"]:
+            res.anomalies.append(Anomalie(feuille, 0, "DOCUMENTS", "INFO",
+                f"{st['bc_sans_numero_c']} ligne(s) de bon de commande sans numero en colonne C (BC lu en colonne B)",
+                "", "Aucune incidence comptable ; a signaler aux commerciaux"))
         self._lier_annulations(res)
         for m in res.mouvements:
             self._affecter_client(m, res)
@@ -226,10 +230,32 @@ class ParseurRapport:
                             pass
                 continue
             if not self.re_doc.match(normaliser_reference(num)):
-                if a_montant:   # les en-tetes de colonnes sans montant sont ignores silencieusement
-                    res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "AVERTISSEMENT",
-                        "Ligne avec montant mais numero de document non reconnu",
-                        _row_text(row), "Verifier la colonne C"))
+                if not a_montant:   # en-tetes de colonnes sans montant : ignores silencieusement
+                    continue
+                if any(_est_montant(_cell(row, c)) for c in cols_f):
+                    # Montant de FACTURE sans numero de facture : impossible a comptabiliser / rapprocher.
+                    res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "BLOQUANT",
+                        f"Montant de facture sans numero de facture valide en colonne C ('{num}')",
+                        _row_text(row), "Renseigner le numero de la facture Sage"))
+                    continue
+                bc_b = _texte(_cell(row, "B"))
+                if not num and re.match(self.r.get("motif_bc", r"^BC\d+$"), normaliser_reference(bc_b)):
+                    # Ligne de BON DE COMMANDE dont le n° BCCB n'a pas ete recopie en C : rien n'est
+                    # comptabilise ; l'acompte / BP est seulement enregistre dans le registre des BC.
+                    st["bc_seuls_ignores"] += 1
+                    st["bc_sans_numero_c"] += 1
+                    try:
+                        acpt_bc = parse_montant(_cell(row, "F")) or 0
+                        bp_bc = parse_montant(_cell(row, "G")) or 0
+                    except MontantInvalide:
+                        acpt_bc = bp_bc = 0
+                    if normaliser(mode) not in annules:
+                        res.bons.append({"bc": normaliser_reference(bc_b), "piece": bc_b, "client": client,
+                                         "acompte": acpt_bc, "bp": bp_bc, "ligne": ligne})
+                    continue
+                res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "AVERTISSEMENT",
+                    "Ligne avec montant de bon de commande mais numero de document non reconnu",
+                    _row_text(row), "Verifier les colonnes B et C"))
                 continue
             vals = self._montants(row, cols_f, res, ligne, "DOCUMENTS")
             if vals is None:

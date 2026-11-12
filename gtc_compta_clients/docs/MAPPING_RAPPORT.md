@@ -1,4 +1,4 @@
-# Mapping du rapport commercial : établi sur les classeurs réels `10 RC OCT.xlsx` et `09 RC SEPT.xlsx`
+# Mapping du rapport commercial : établi sur les classeurs réels d'août, septembre et octobre 2026
 
 Analyse du 12/11/2026 : 32 feuilles (`01` à `31`, `RECAP`), 31 jours. Outils :
 `tools/analyser_rapport.py` (statistiques, contrôle des totaux) et `tools/anonymiser_rapport.py`
@@ -25,6 +25,26 @@ erreurs de saisie :
 | FACB040560 (19/10, CLIENTS DETAILS BTA / ALH OGA, 26 000) | colonne B « BC3594 » : chiffre manquant ; l'acompte est sur BC35949 (17/10, même acheteur, même montant) |
 | FACB040798 (20/10, CLIENTS DETAILS BTA / KUETE, 18 000) | colonne B « BC36198 » = BC d'un autre client ; BC réel inconnu |
 | FACB041560 (26/10, COMPTE DE LIAISON, 36 450) | BC036855 en **BP** (aucun acompte) mais facture en colonne COMPTANT : probablement non soldée par acompte dans Sage (le rapprochement le signalera) |
+
+## Troisième mois : août 2026 et vérification août → octobre (93 feuilles)
+- 93/93 jours cohérents (total du rapport = lignes ; aucun montant non expliqué).
+- Nouveau cas en août : les **04/08 (73 lignes) et 06/08 (26 lignes)**, des lignes de BC ont la colonne C
+  (n° BCCB) **vide**. Le BC est en B et les montants ne sont qu'en F/G. Ce sont des lignes de BC seules, sans
+  incidence comptable : leur acompte est conservé dans le registre et une information par jour est émise.
+  Un montant de **facture** sans numéro en C est en revanche **bloquant**.
+- RECAP, colonne ACOMPTE : deux nouveaux écarts en août (04/08 : feuille 7 968 225, RECAP 8 152 225 ;
+  21/08 : feuille 4 278 111, RECAP 4 364 500), soit **6 écarts sur 3 mois, tous dans la colonne ACOMPTE**.
+- Reçus négatifs : **9 sur 10 liés** à leur reçu d'origine. 7RCB024416 (09/09) annule 7RCB022350 d'**août**.
+  7RCB020646 (08/08, ligne 233) annule 7RCB020641, écrit plus bas dans la même feuille (ligne 263) : l'import
+  traite désormais les reçus négatifs après les positifs. Reste **7RCB030477** (27/10), en vérification dans Sage.
+- Même n° de reçu pour deux clients : **7RCB020978** le 11/08 (SOULEY DARGALA 8 000 000 et YOUSSOUFA OUSTAZ
+  NGAOUNDAL 2 500 000) ; reçu sans montant : 7RCB021355 (14/08).
+- n° de BL/BC portant un montant de facture le 08/08 : BLCB026988, BLCB026945, BLCB026987, BCCB025793
+  (montants positifs : pas des avoirs).
+- Factures comptant : avec août chargé, les BC « inconnus » de septembre passent de 15 à 1. Erreurs de
+  saisie en août : FACB030381 (BC25812 = BC de VENTE PROMOTIONNELLE), FACB031310 (BC27660 au lieu de
+  BC27662), FACB030462 (acompte négatif de −57 200 sur BC26827), FACB031561 (acompte 141 100 pour 142 400).
+  16 factures du début d'août portent des BC de **juillet** (rapport non fourni).
 
 ## Vérification de tous les mois : `tools/verifier_mois.py`
 ```
@@ -186,7 +206,7 @@ Octobre 2026 :
 | 7RCB028976 (14/10, 7 000 000) | 7RCB028853 (même jour) | 7RCB028851 |
 | 7RCB030438 (27/10, 8 100 000) | 7RCB030328 (26/10) | — |
 | 7RCB026463 (25/09, 121 800) | 7RCB026459 (24/09) | — |
-| 7RCB024416 (09/09, 123 500, « BOUTIQUE TOURISTIQUE ») — feuille 09, ligne 305 | **non trouvé** | 7RCB024417 « MOHAMADOU AWALOU TOURISTIQUE » (ligne 306, juste après) : même schéma que 7RCB030477 |
+| 7RCB024416 (09/09, 123 500, « BOUTIQUE TOURISTIQUE ») | **7RCB022350 d'août** (trouvé avec le rapport d'août) | 7RCB024417 « MOHAMADOU AWALOU TOURISTIQUE » : nouveau reçu sur le bon compte |
 | 7RCB030477 (27/10, 965 950) — feuille 27, ligne 338 | **non trouvé** sur « ALH OUMAROU BOUBAKARY » | 7RCB030347 « OUMAROU BOUBAKARY » (feuille 27, ligne 315) : même compte Sage ? **en vérification par la comptabilité** |
 
 ## Contrôle de complétude (pour chaque jour)

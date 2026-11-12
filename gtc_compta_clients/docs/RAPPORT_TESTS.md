@@ -1,7 +1,7 @@
 # Rapport de tests
 
 Exécution : `python -m pytest -q`, Python 3.12, Linux (environnement de développement), le 12/11/2026.
-**Résultat : 98 tests réussis, 0 échec.**
+**Résultat : 106 tests réussis, 0 échec.**
 
 Le parseur est testé sur une **copie anonymisée du rapport réel** (jours 01, 03, 12 et 14 de
 `10 RC OCT.xlsx`), avec les chiffres de référence du classeur : comptages, totaux `TOTAL VENTES` /
@@ -47,6 +47,11 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 `python tools/analyser_rapport.py "09 RC SEPT.xlsx"` : 30/30 jours cohérents sans modification des règles ;
 RECAP identique aux feuilles. Jeu anonymisé `tests/fixtures/RC_SEPT_2026_ANONYMISE.xlsx` (jours 09, 18, 24, 25).
 Import enchaîné septembre + octobre : 16 314 mouvements, 0 rejet, 0,9 s.
+
+## Vérification multi-mois (août + septembre + octobre 2026)
+`tools/verifier_mois.py` sur 93 feuilles : 93/93 jours cohérents ; 6 écarts RECAP (tous dans la colonne
+ACOMPTE) ; 9/10 reçus négatifs liés ; 28 factures comptant signalées (16 BC de juillet, non fourni, et des
+erreurs de saisie réelles). Jeu anonymisé d'août : `tests/fixtures/RC_AOUT_2026_ANONYMISE.xlsx`.
 
 ## Vérification multi-mois (septembre + octobre 2026)
 `tools/verifier_mois.py` : 62/62 jours cohérents ; 4 écarts RECAP (colonne ACOMPTE) ; 23 factures comptant
@@ -102,6 +107,7 @@ sans acompte connu sur leur BC (15 BC d'août, 8 erreurs de saisie réelles) ; 6
 - [OK] tests/test_flux.py::test_facture_comptant_issue_d_un_bc_en_bp
 - [OK] tests/test_flux.py::test_facture_comptant_colonne_b_non_bc_avec_acompte_sur_la_ligne
 - [OK] tests/test_flux.py::test_historique_bons_mois_precedent
+- [OK] tests/test_flux.py::test_recu_negatif_ecrit_avant_le_recu_positif_dans_la_feuille
 - [OK] tests/test_modules.py::test_cas9_bc_deja_inclus_pas_double_compte
 - [OK] tests/test_modules.py::test_cas9_bc_non_inclus_ajoute_une_fois
 - [OK] tests/test_modules.py::test_cas10_facture_echue_selon_politique
@@ -170,3 +176,10 @@ sans acompte connu sur leur BC (15 BC d'août, 8 erreurs de saisie réelles) ; 6
 - [OK] tests/test_parser.py::test_septembre_reel[24-165-1-117-28-19013325-121774450-82496750]
 - [OK] tests/test_parser.py::test_septembre_reel[25-143-0-86-23-21312325-247481745-115516700]
 - [OK] tests/test_parser.py::test_septembre_bc_avec_facture_bloque
+- [OK] tests/test_parser.py::test_aout_reel[04-145-25-6993100-127227025-117608400]
+- [OK] tests/test_parser.py::test_aout_reel[08-143-43-5417950-136479425-163859050]
+- [OK] tests/test_parser.py::test_aout_reel[11-244-42-12620575-180804350-144815900]
+- [OK] tests/test_parser.py::test_aout_lignes_bc_sans_numero_en_colonne_c
+- [OK] tests/test_parser.py::test_aout_recu_negatif_avant_le_positif_dans_la_journee
+- [OK] tests/test_parser.py::test_aout_meme_numero_de_recu_pour_deux_clients
+- [OK] tests/test_parser.py::test_facture_sans_numero_bloquante

@@ -83,7 +83,14 @@ def importer_lot(db, user: Utilisateur, lignes: list[dict], fichier: str,
         bid = cur.lastrowid
         rap.batch_id = bid
         vus = set()
-        for l in lignes:
+        # Les recus negatifs (contre-passations) sont traites apres les recus positifs du lot, quel que
+        # soit leur ordre dans le rapport, pour pouvoir etre lies au recu qu'ils annulent.
+        def _neg(l):
+            try:
+                return l["type_mouvement"] == "REGLEMENT" and int(l["montant"]) < 0
+            except (TypeError, ValueError):
+                return False
+        for l in sorted(lignes, key=_neg):
             res, motif = _importer_ligne(db, user, bid, l, ts, vus)
             db.execute("INSERT INTO raw_import_rows(batch_id, feuille, ligne, contenu_json, resultat, motif) "
                        "VALUES (?,?,?,?,?,?)", (bid, l.get("source_feuille"), l.get("source_ligne"),

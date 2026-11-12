@@ -290,3 +290,47 @@ def test_septembre_reel(cfg, feuille, fact, avoirs, acomptes, recus, h, i, f):
 def test_septembre_bc_avec_facture_bloque(cfg):
     r = analyser(cfg, "18", SEPT, {})
     assert any("BCCB031741" in a.motif and a.gravite == "BLOQUANT" for a in r.anomalies)
+
+
+# ---------------------------------------------------------------------------------------
+# Troisieme mois reel : aout 2026 (08 RC AOUT.xlsx anonymise, jours 04, 08, 11)
+# ---------------------------------------------------------------------------------------
+AOUT = Path(__file__).parent / "fixtures" / "RC_AOUT_2026_ANONYMISE.xlsx"
+
+
+@pytest.mark.parametrize("feuille,fact,recus,h,i,f", [
+    ("04", 145, 25, 6993100, 127227025, 117608400),
+    ("08", 143, 43, 5417950, 136479425, 163859050),
+    ("11", 244, 42, 12620575, 180804350, 144815900)])
+def test_aout_reel(cfg, feuille, fact, recus, h, i, f):
+    r = analyser(cfg, feuille, AOUT, {})
+    assert (r.stats["factures"], r.stats["reglements"]) == (fact, recus)
+    ctl = r.stats["controle_totaux"]
+    assert (ctl["documents_H"]["retenu"], ctl["documents_I"]["retenu"], ctl["recus_F"]["retenu"]) == (h, i, f)
+    assert all(v["rapport"] == v["lignes"] and v["ecart_non_explique"] == 0 for v in ctl.values())
+
+
+def test_aout_lignes_bc_sans_numero_en_colonne_c(cfg):
+    """04/08 : 73 lignes de BC sans n° BCCB en C (BC lu en B, montants en F/G uniquement) : aucun mouvement,
+    aucune alerte bloquante ; l'acompte est conserve dans le registre des BC."""
+    r = analyser(cfg, "04", AOUT, {})
+    assert r.stats["bc_sans_numero_c"] == 73
+    assert not any("non reconnu" in a.motif for a in r.anomalies)
+    assert any(b["bc"] == "BC25045" and b["acompte"] == 21100 for b in r.bons)
+
+
+def test_aout_recu_negatif_avant_le_positif_dans_la_journee(cfg):
+    r = analyser(cfg, "08", AOUT, {})
+    assert next(m for m in r.reglements if m.reference_piece == "7RCB020646").reference_liee == "7RCB020641"
+
+
+def test_aout_meme_numero_de_recu_pour_deux_clients(cfg):
+    r = analyser(cfg, "11", AOUT, {})
+    assert sum(1 for a in r.anomalies if "7RCB020978" in a.motif and "plusieurs clients" in a.motif) == 2
+
+
+def test_facture_sans_numero_bloquante(cfg):
+    rows = lire_feuille(DEMO / "RC_DEMO_SYNTHETIQUE.xlsx", "01")
+    rows.insert(12, [99, "BC0999", None, "ETS ALPHA", "EN COMPTE", None, None, None, 4000])
+    r = ParseurRapport(cfg["rapport"], CORR).analyser(rows, "01", "BERTOUA", None)
+    assert any("sans numero de facture" in a.motif and a.gravite == "BLOQUANT" for a in r.anomalies)

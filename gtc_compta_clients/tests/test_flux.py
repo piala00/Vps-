@@ -407,3 +407,14 @@ def test_historique_bons_mois_precedent(base, user, cfg):
     assert n > 300
     assert base.scalar("SELECT COUNT(*) FROM normalized_movements") == 0
     assert base.scalar("SELECT COUNT(*) FROM bons_commande_rapport WHERE acompte<>0") > 0
+
+
+def test_recu_negatif_ecrit_avant_le_recu_positif_dans_la_feuille(base, user):
+    """Cas reel du 08/08 : le recu negatif (ligne 233) precede dans la feuille le recu qu'il annule
+    (ligne 263). Le lien doit etre etabli quel que soit l'ordre."""
+    rap = imports.importer_lot(base, user, [
+        _ligne_recu("7RCB646", "CL002", "QUINCAILLERIE BETA", -500000, 8, "O"),
+        _ligne_recu("7RCB641", "CL002", "QUINCAILLERIE BETA", 500000, 8, "O")], "o", "o")
+    assert rap.inseres == 2
+    assert base.scalar("SELECT reference_liee FROM normalized_movements WHERE reference_piece='7RCB646'") == "7RCB641"
+    assert base.scalar("SELECT COUNT(*) FROM alertes WHERE type='ANNULATION_RECU_A_VERIFIER'") == 0

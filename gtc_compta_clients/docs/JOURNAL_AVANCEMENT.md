@@ -1,5 +1,15 @@
 # Journal d'avancement
 
+## Cycle 9 (12/11/2026) : août 2026, vérification sur 3 mois
+- `08 RC AOUT.xlsx` : 31/31 jours cohérents. Lignes de BC sans n° en colonne C (04/08, 06/08) reconnues
+  comme BC seuls ; facture sans numéro rendue bloquante.
+- Correction : un reçu négatif écrit avant le reçu qu'il annule dans la feuille est désormais lié.
+- Vérification août → octobre (93 feuilles) : 9/10 reçus négatifs liés ; 6 écarts RECAP (colonne ACOMPTE) ;
+  BC inconnus de septembre résolus par août ; erreurs de saisie listées dans MAPPING_RAPPORT.md.
+- Jeu de test anonymisé d'août (04, 08, 11). 106 tests.
+- Pour aller plus loin : rapport de **juillet** (16 factures comptant du début d'août portent des BC de juillet).
+
+
 ## Cycle 8 (12/11/2026) : vérification sur tous les mois
 - Registre des BC (migration 005), contrôle de chaque facture comptant contre l'historique de tous les mois,
   diagnostic et BC probable ; chargement de l'historique des mois antérieurs.
