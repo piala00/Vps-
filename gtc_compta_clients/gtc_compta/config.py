@@ -58,7 +58,8 @@ DEFAULTS: dict = {
         "colonne_montant_recu": "F",
         "mots_exclusion": ["TOTAL", "SOUS-TOTAL", "S/TOTAL", "REPORT", "VERSEMENT CAISSE",
                             "VERSEMENT BANQUE", "CAISSE CENTRALE", "SOLDE"],
-        "comptes_collectifs": ["CLIENTS DETAILS BTA"],
+        # Comptes "conteneurs" : la colonne E porte le beneficiaire reel (ventilation analytique).
+        "comptes_collectifs": ["CLIENTS DETAILS BTA", "COMPTE DE LIAISON"],
         "correspondance_auto_intitule_exact": False,
         "lignes_vides_fin_section": 8
     },

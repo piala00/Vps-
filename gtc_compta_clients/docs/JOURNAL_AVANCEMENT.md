@@ -6,7 +6,9 @@
 - Vérification : les factures comptant de COMPTE DE LIAISON sont adossées à des acomptes de BC, donc la
   règle « acompte imputé » s'applique ; ses paiements passés directement en comptabilité seront repris
   par l'option A au rapprochement.
-- Mois réel : 4 218 factures, 126 avoirs, 2 537 acomptes imputés, 913 reçus ; totaux 31/31 cohérents. 82 tests.
+- Mois réel : 4 218 factures, 126 avoirs, 2 537 acomptes imputés, 913 reçus ; totaux 31/31 cohérents.
+- COMPTE DE LIAISON déclaré compte conteneur : le bénéficiaire réel (colonne E) est conservé pour la
+  ventilation. Reçu 7RCB030477 (feuille 27, ligne 338) transmis à la comptabilité pour vérification. 83 tests.
 
 
 ## Cycle 4 (12/11/2026) : bons de commande et acomptes

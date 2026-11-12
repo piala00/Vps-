@@ -63,8 +63,8 @@ reprend celle du 20/10 (32 789 775 au lieu de 6 738 250). Total RECAP 435 334 25
 |---|---|---|
 | `VENTE PROMOTIONNELLE` | client (délégation commerciale) | facturée en compte, à crédit ; solde par reçus après la vente promotionnelle |
 | `SOURCE DU PAYS RETOUR` | client (compte rattaché à un fournisseur) | les déstockeurs y facturent puis effectuent le versement |
-| `COMPTE DE LIAISON` | client | facturation de clients sans cash immédiat ; le paiement (autre moyen) est passé en comptabilité dès réception de la preuve |
-| `CLIENTS DETAILS BTA` | compte collectif | acheteur réel en colonne E (ventilation analytique) |
+| `COMPTE DE LIAISON` | **compte conteneur** (comme CLIENTS DETAILS BTA) : bénéficiaire réel en colonne E (ETS RASHMA, DAVID PANZANI…) | facturation de clients sans cash immédiat ; paiement soit par reçu le jour même à ce nom, soit (le plus souvent) par un règlement / acompte dans la caisse des opérations de liaison |
+| `CLIENTS DETAILS BTA` | compte conteneur | acheteur réel en colonne E (ventilation analytique) |
 
 Conséquence pour le rapprochement : le paiement d'une facture COMPTE DE LIAISON passé directement en
 comptabilité n'apparaît pas dans le rapport. Il est détecté comme « écriture Sage absente du rapport » et
@@ -117,7 +117,7 @@ Octobre 2026 :
 | 7RCB028975 (14/10, 3 500 000) | 7RCB028907 (même jour) | 7RCB028847 |
 | 7RCB028976 (14/10, 7 000 000) | 7RCB028853 (même jour) | 7RCB028851 |
 | 7RCB030438 (27/10, 8 100 000) | 7RCB030328 (26/10) | — |
-| 7RCB030477 (27/10, 965 950) | **non trouvé** sur « ALH OUMAROU BOUBAKARY » | 7RCB030347 « OUMAROU BOUBAKARY » : même compte Sage ? |
+| 7RCB030477 (27/10, 965 950) — feuille 27, ligne 338 | **non trouvé** sur « ALH OUMAROU BOUBAKARY » | 7RCB030347 « OUMAROU BOUBAKARY » (feuille 27, ligne 315) : même compte Sage ? **en vérification par la comptabilité** |
 
 ## Contrôle de complétude (pour chaque jour)
 Pour chaque colonne H, I et F (acomptes) et pour la colonne F des reçus :

@@ -78,7 +78,8 @@
       "SOLDE"
     ],
     "comptes_collectifs": [
-      "CLIENTS DETAILS BTA"
+      "CLIENTS DETAILS BTA",
+      "COMPTE DE LIAISON"
     ],
     "correspondance_auto_intitule_exact": false,
     "lignes_vides_fin_section": 8

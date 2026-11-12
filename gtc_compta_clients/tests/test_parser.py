@@ -256,3 +256,12 @@ def test_controle_croise_macro_application(cfg):
     modif = [dict(x) for x in l]
     modif[0]["montant"] += 1
     assert len(comparer_exports(modif, l)) == 2
+
+
+def test_compte_de_liaison_conteneur(cfg):
+    """COMPTE DE LIAISON : compte conteneur, le beneficiaire reel (colonne E) est conserve."""
+    m = next(m for m in analyser(cfg).factures if m.reference_piece == "FACB0206")
+    assert m.ct_num == "CL050" and m.acheteur_detail == "REUNION DIRECTION"
+    r = analyser(cfg, "03", REEL, {})
+    benef = {m.acheteur_detail for m in r.mouvements if m.client_libelle == "COMPTE DE LIAISON"}
+    assert "" not in benef and len(benef) >= 2
