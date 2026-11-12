@@ -1,5 +1,14 @@
 # Journal d'avancement
 
+## Cycle 8 (12/11/2026) : vérification sur tous les mois
+- Registre des BC (migration 005), contrôle de chaque facture comptant contre l'historique de tous les mois,
+  diagnostic et BC probable ; chargement de l'historique des mois antérieurs.
+- Outil `tools/verifier_mois.py` : vérification de N rapports mensuels avec le traitement réel, classeur de constats.
+- Septembre + octobre : 62/62 jours cohérents ; 4 erreurs ACOMPTE dans RECAP ; 8 erreurs de saisie réelles
+  sur les factures comptant ; 15 BC d'août à confirmer.
+- **Besoin : les rapports des autres mois de 2026** (au minimum août) pour étendre la vérification. 98 tests.
+
+
 ## Cycle 7 (12/11/2026) : second mois réel (septembre 2026)
 - `09 RC SEPT.xlsx` traité sans changement de règles : 30/30 jours cohérents ; RECAP identique.
 - Jeu de test anonymisé de septembre (jours 09, 18, 24, 25) ; lien d'annulation de reçu entre deux jours.

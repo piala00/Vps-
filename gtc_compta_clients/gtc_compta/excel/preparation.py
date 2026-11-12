@@ -199,3 +199,9 @@ def comparer_exports(lignes_macro: list[dict], lignes_python: list[dict]) -> lis
     diff = [f"uniquement macro : {k[0]} {k[1]} {k[4]} {k[2]} {k[3]}" for k in (a - b).elements()]
     diff += [f"uniquement application : {k[0]} {k[1]} {k[4]} {k[2]} {k[3]}" for k in (b - a).elements()]
     return diff
+
+
+def bons_export(res: ResultatPreparation) -> list[dict]:
+    """Registre des bons de commande de la journee (acompte F, BP G) : information de controle."""
+    d = res.date_rapport.isoformat() if res.date_rapport else ""
+    return [dict(b, date_rapport=d, agence=res.agence) for b in res.bons]

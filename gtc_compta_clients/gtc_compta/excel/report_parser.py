@@ -68,6 +68,7 @@ class ResultatPreparation:
     factures: list[Mouvement] = field(default_factory=list)
     reglements: list[Mouvement] = field(default_factory=list)
     acomptes: list[Mouvement] = field(default_factory=list)
+    bons: list[dict] = field(default_factory=list)      # registre BC (information, jamais comptabilise)
     anomalies: list[Anomalie] = field(default_factory=list)
     stats: dict = field(default_factory=dict)
     ligne_entete_recus: int | None = None
@@ -235,6 +236,17 @@ class ParseurRapport:
                 continue
             factures = {c: vals[c] for c in cols_f if vals[c]}
             prefixe = prefixe_document(num)
+            bc = _texte(_cell(row, "B"))
+            try:
+                acpt_bc = parse_montant(_cell(row, "F")) or 0
+                bp_bc = parse_montant(_cell(row, "G")) or 0
+            except MontantInvalide:
+                acpt_bc = bp_bc = 0
+            if (acpt_bc or bp_bc) and normaliser(mode) not in annules:
+                # Registre des bons de commande : sert uniquement a controler les factures comptant.
+                # Colonne B sans n° de BC valide (vide, "OLA"...) : l'acompte est rattache a la piece.
+                res.bons.append({"bc": cle_bc(bc, num, self.r), "piece": num, "client": client,
+                                 "acompte": acpt_bc, "bp": bp_bc, "ligne": ligne})
             if normaliser(mode) in annules:
                 if factures:
                     res.anomalies.append(Anomalie(feuille, ligne, "DOCUMENTS", "BLOQUANT",
@@ -479,6 +491,14 @@ def _est_entete_section(row) -> bool:
         return False
     v = vals[0]
     return len(v) >= 6 and v == v.upper() and not re.search(r"\d", v)
+
+
+def cle_bc(colonne_b: str, piece: str, regles: dict) -> str:
+    """Cle du registre des BC : le n° de BC s'il est valide, sinon la piece elle-meme."""
+    b = normaliser_reference(colonne_b)
+    if b and re.match(regles.get("motif_bc", r"^BC\d+$"), b):
+        return b
+    return "PIECE:" + normaliser_reference(piece)
 
 
 def empreinte_mouvement(agence: str, m: Mouvement) -> str:

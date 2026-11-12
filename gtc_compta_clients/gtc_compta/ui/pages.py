@@ -319,6 +319,8 @@ class Import(Page):
         bouton(b, "1. Ouvrir un classeur de preparation (.xlsm / .xlsx)", self.ouvrir, actif=ok, motif=m).pack(side="left")
         bouton(b, "Creer un classeur de preparation depuis une feuille du rapport", self.creer_classeur,
                couleur="#455A64").pack(side="left", padx=8)
+        bouton(b, "Historique des BC (mois anterieurs)...", self.historique_bc, couleur="#455A64",
+               actif=ok, motif=m).pack(side="left", padx=8)
         self.btn_import = bouton(b, "2. Valider l'import", self.valider, couleur=VERT, actif=False,
                                  motif="Ouvrir d'abord un classeur et verifier l'apercu")
         self.btn_import.pack(side="left", padx=8)
@@ -380,7 +382,7 @@ class Import(Page):
 
     def apercu(self, r):
         p, lignes, res, source, n = r
-        self.fichier, self.lignes = p, lignes
+        self.fichier, self.lignes, self.res = p, lignes, res
         self.t_mvt.remplir(lignes, lambda l: (l["code_tiers"] or "?", l["nom_client"], l["reference_piece"],
                                               l["type_mouvement"], fmt_fcfa(l["montant"]), l["sens"],
                                               l["bc_origine"] or "", l["acheteur_detail"] or "", l["source_ligne"]),
@@ -418,9 +420,11 @@ class Import(Page):
                          "Sage du jour ?"):
             return
         lignes, fichier = self.lignes, self.fichier
+        bons = prep.bons_export(self.res) if getattr(self, "res", None) else []
 
         def travail():
-            rap = imports.importer_lot(self.db, self.user, lignes, fichier, imports.empreinte_fichier(fichier))
+            rap = imports.importer_lot(self.db, self.user, lignes, fichier, imports.empreinte_fichier(fichier),
+                                       bons=bons)
             d = date.fromisoformat(lignes[0]["date_rapport"])
             res = [] if rap.deja_importe else reco.rapprocher(self.db, self.user, self.sage, d)
             return rap, res
@@ -430,7 +434,9 @@ class Import(Page):
             stats = {}
             for x in res:
                 stats[x.statut] = stats.get(x.statut, 0) + 1
-            info(rap.resume() + "\n\nRapprochement Sage : " +
+            info(rap.resume() + (f"\n{rap.alertes_comptant} facture(s) comptant sans acompte connu sur leur BC "
+                                 "(voir Accueil > Alertes)" if rap.alertes_comptant else "")
+                 + "\n\nRapprochement Sage : " +
                  (", ".join(f"{k} : {v}" for k, v in stats.items()) or "non lance (lot deja importe)") +
                  ("\n\nRejets :\n" + "\n".join(f"ligne {l} : {m}" for l, m in rap.rejets[:15]) if rap.rejets else ""))
             self.btn_import.configure(state="disabled", fg_color="#9E9E9E")
@@ -438,6 +444,17 @@ class Import(Page):
             self.charger_lots()
 
         self.app.tache("Import et rapprochement", travail, fini)
+
+    def historique_bc(self):
+        """Charge les acomptes / BP des BC d'un rapport mensuel anterieur (aucun mouvement cree)."""
+        src = filedialog.askopenfilename(title="Rapport mensuel anterieur (lecture seule)",
+                                         filetypes=[("Excel", "*.xlsx *.xlsm")])
+        if src:
+            self.app.tache("Chargement de l'historique des bons de commande",
+                           lambda: imports.charger_historique_bons(self.db, self.user, src, self.cfg["rapport"],
+                                                                  self.cfg["agence"]),
+                           lambda n: info(f"{n} ligne(s) de bons de commande enregistree(s) dans le registre.\n"
+                                          "Elles servent uniquement a controler les factures comptant."))
 
     def creer_classeur(self):
         src = filedialog.askopenfilename(title="Rapport commercial (lecture seule)", filetypes=[("Excel", "*.xlsx *.xlsm")])

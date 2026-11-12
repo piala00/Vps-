@@ -42,6 +42,7 @@ DEFAULTS: dict = {
         "libelle_total_recus": "TOTAL DE VERSEMENTS",
         "motif_document": r"^(?:\d+)?[A-Z]{2,5}\d*[-/ ]?\d+",
         "motif_recu": r"^(?:\d+)?RCB",
+        "motif_bc": r"^BC\d+$",
         "types_documents": {
             "FACB": {"nature": "FACTURE", "sens": "D", "confirme": True},
             "FRCB": {"nature": "AVOIR", "sens": "D", "confirme": True},

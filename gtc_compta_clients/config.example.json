@@ -26,6 +26,7 @@
     "libelle_total_recus": "TOTAL DE VERSEMENTS",
     "motif_document": "^(?:\\d+)?[A-Z]{2,5}\\d*[-/ ]?\\d+",
     "motif_recu": "^(?:\\d+)?RCB",
+    "motif_bc": "^BC\\d+$",
     "types_documents": {
       "FACB": {
         "nature": "FACTURE",

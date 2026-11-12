@@ -347,3 +347,63 @@ def test_septembre_recu_negatif_lie_au_recu_de_la_veille(db, user, cfg):
     m = db.one("SELECT * FROM normalized_movements WHERE reference_piece='7RCB026463'")
     assert (m["montant"], m["reference_liee"]) == (-121800, "7RCB026459")
     assert db.scalar("SELECT COUNT(*) FROM alertes WHERE type='ANNULATION_RECU_A_VERIFIER'") == 0
+
+
+# -- Registre des BC et controle des factures comptant ------------------------------------------
+def _fc(ref, bc, ct, nom, mt, jour, id_import):
+    base = {"format_version": "GTC-EXPORT-1", "id_import": id_import, "agence": "BERTOUA",
+            "date_rapport": f"2026-10-{jour:02d}", "reference_piece": ref, "code_tiers": ct, "nom_client": nom,
+            "acheteur_detail": "", "montant": mt, "bc_origine": bc, "mode_reference": "COMPTANT",
+            "source_feuille": "x", "source_ligne": 1}
+    return [dict(base, type_mouvement="FACTURE", sens="D"), dict(base, type_mouvement="ACOMPTE", sens="C")]
+
+
+def _bon(bc, piece, nom, acompte, bp, jour):
+    return {"agence": "BERTOUA", "bc": bc, "piece": piece, "client": nom, "acompte": acompte, "bp": bp,
+            "date_rapport": f"2026-10-{jour:02d}", "ligne": 1}
+
+
+def _alertes_comptant(db):
+    return [r["message"] for r in db.query("SELECT message FROM alertes WHERE type='FACTURE_COMPTANT_SANS_ACOMPTE'")]
+
+
+def test_facture_comptant_acompte_sur_bc_anterieur(base, user):
+    imports.enregistrer_bons(base, [_bon("BC100", "BCCB100", "ETS ALPHA", 50000, 0, 1)])
+    rap = imports.importer_lot(base, user, _fc("FACB100", "BC100", "CL001", "ETS ALPHA", 50000, 3, "A"), "a", "a")
+    assert rap.alertes_comptant == 0 and _alertes_comptant(base) == []
+
+
+def test_facture_comptant_n_de_bc_d_un_autre_client(base, user):
+    imports.enregistrer_bons(base, [_bon("BC200", "BCCB200", "QUINCAILLERIE BETA", 9000, 0, 1),
+                                    _bon("BC201", "BCCB201", "ETS ALPHA", 26000, 0, 2)])
+    rap = imports.importer_lot(base, user, _fc("FACB200", "BC200", "CL001", "ETS ALPHA", 26000, 3, "B"), "b", "b")
+    assert rap.alertes_comptant == 1
+    msg = _alertes_comptant(base)[0]
+    assert "appartient a un autre client (QUINCAILLERIE BETA)" in msg and "BC probable : BC201" in msg
+
+
+def test_facture_comptant_issue_d_un_bc_en_bp(base, user):
+    imports.enregistrer_bons(base, [_bon("BC300", "BCCB300", "ETS ALPHA", 0, 36450, 24)])
+    imports.importer_lot(base, user, _fc("FACB300", "BC300", "CL001", "ETS ALPHA", 36450, 26, "C"), "c", "c")
+    assert "BC en BP" in _alertes_comptant(base)[0]
+
+
+def test_facture_comptant_colonne_b_non_bc_avec_acompte_sur_la_ligne(base, user):
+    """Colonne B = 'OLA' (pas un n° de BC) et acompte F = H sur la ligne : pas d'alerte."""
+    from gtc_compta.config import DEFAULTS
+    from gtc_compta.excel.report_parser import cle_bc
+    cle = cle_bc("OLA", "FACB400", DEFAULTS["rapport"])
+    assert cle == "PIECE:FACB400"
+    imports.enregistrer_bons(base, [_bon(cle, "FACB400", "ETS ALPHA", 1200, 0, 9)])
+    imports.importer_lot(base, user, _fc("FACB400", "OLA", "CL001", "ETS ALPHA", 1200, 9, "D"), "d", "d")
+    assert _alertes_comptant(base) == []
+
+
+def test_historique_bons_mois_precedent(base, user, cfg):
+    """Charger le registre de septembre (rapport anonymise) sans creer de mouvement."""
+    from pathlib import Path
+    sept = Path(__file__).parent / "fixtures" / "RC_SEPT_2026_ANONYMISE.xlsx"
+    n = imports.charger_historique_bons(base, user, sept, cfg["rapport"], "BERTOUA")
+    assert n > 300
+    assert base.scalar("SELECT COUNT(*) FROM normalized_movements") == 0
+    assert base.scalar("SELECT COUNT(*) FROM bons_commande_rapport WHERE acompte<>0") > 0

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..db import now_iso
-from ..text import normaliser_reference
+from ..text import normaliser, normaliser_reference
 from .auth import Utilisateur, exiger
 
 
@@ -20,6 +20,7 @@ class RapportImport:
     deja_presents: int = 0
     conflits: int = 0
     rejets: list[tuple[int, str]] = field(default_factory=list)
+    alertes_comptant: int = 0
 
     def resume(self) -> str:
         if self.deja_importe:
@@ -54,7 +55,7 @@ def completer_codes(lignes: list[dict], correspondances: dict[str, str]) -> int:
 
 
 def importer_lot(db, user: Utilisateur, lignes: list[dict], fichier: str,
-                 empreinte: str, feuille: str = "EXPORT_ERP") -> RapportImport:
+                 empreinte: str, feuille: str = "EXPORT_ERP", bons: list[dict] | None = None) -> RapportImport:
     exiger(user, "importer")
     if not lignes:
         raise ValueError("Aucune ligne a importer")
@@ -95,6 +96,9 @@ def importer_lot(db, user: Utilisateur, lignes: list[dict], fichier: str,
                 rap.conflits += 1
             else:
                 rap.rejets.append((l.get("source_ligne") or 0, motif))
+        if bons:
+            enregistrer_bons(db, bons, bid)
+        rap.alertes_comptant = controler_factures_comptant(db, bid)
         db.execute("UPDATE import_batches SET statut=?, nb_inseres=?, nb_deja_presents=?, nb_conflits=?, "
                    "nb_rejets=? WHERE id=?",
                    ("IMPORTE_AVEC_REJETS" if rap.rejets or rap.conflits else "IMPORTE",
@@ -229,3 +233,102 @@ def _invalider_rapprochements(db, ct_num, date_piece, raison):
 
 def lots(db, limite=100):
     return db.query("SELECT * FROM import_batches ORDER BY id DESC LIMIT ?", (limite,))
+
+
+# -- Registre des bons de commande et controle des factures comptant ------------------------
+def enregistrer_bons(db, bons: list[dict], batch_id: int | None = None) -> int:
+    n = 0
+    for b in bons:
+        cur = db.execute("INSERT OR IGNORE INTO bons_commande_rapport(agence, bc, piece, client_libelle, acompte, bp, "
+                         "date_rapport, source_ligne, batch_id) VALUES (?,?,?,?,?,?,?,?,?)",
+                         (b["agence"], b["bc"], b["piece"], b["client"], b["acompte"], b["bp"], b["date_rapport"],
+                          b.get("ligne"), batch_id))
+        n += cur.rowcount
+    return n
+
+
+def charger_historique_bons(db, user: Utilisateur, rapport, regles: dict, agence: str) -> int:
+    """Charge le registre des BC (acomptes, BP) d'un rapport mensuel ANTERIEUR, sans creer de mouvement :
+    permet de controler les factures comptant dont l'acompte a ete encaisse avant le demarrage."""
+    from openpyxl import load_workbook
+    from ..excel.preparation import bons_export
+    from ..excel.report_parser import ParseurRapport
+    exiger(user, "importer")
+    wb = load_workbook(rapport, read_only=True, data_only=True)
+    n = 0
+    try:
+        with db.transaction():
+            for f in [x for x in wb.sheetnames if x.isdigit()]:
+                res = ParseurRapport(regles, {}).analyser([list(r) for r in wb[f].iter_rows(values_only=True)],
+                                                          f, agence, None)
+                n += enregistrer_bons(db, bons_export(res))
+            db.audit(user.login, "HISTORIQUE_BONS_COMMANDE", str(rapport), {"lignes": n})
+    finally:
+        wb.close()
+    return n
+
+
+def _cle_bc_mouvement(a) -> str:
+    from ..config import DEFAULTS
+    from ..excel.report_parser import cle_bc
+    return cle_bc(a["bc_origine"] or "", a["reference_piece"], DEFAULTS["rapport"])
+
+
+def _diagnostic_comptant(db, agence, a, alias, deja, cle):
+    """Pourquoi l'acompte d'une facture comptant n'est-il pas retrouve sur son BC ?"""
+    from datetime import date, timedelta
+    reg = db.query("SELECT * FROM bons_commande_rapport WHERE agence=? AND bc=? AND date_rapport<=? "
+                   "ORDER BY date_rapport", (agence, cle, a["date_piece"]))
+    d = date.fromisoformat(a["date_piece"])
+    cands = [r for r in db.query(
+        "SELECT * FROM bons_commande_rapport WHERE agence=? AND acompte=? AND date_rapport BETWEEN ? AND ?",
+        (agence, a["montant"], (d - timedelta(days=45)).isoformat(), a["date_piece"]))
+        if alias.get(normaliser(r["client_libelle"])) == a["ct_num"] and r["bc"] != cle and r["bc"] not in deja]
+    suggestion = (" ; BC probable : " + ", ".join(f"{r['bc'].replace('PIECE:', '')} ({r['piece']} du {r['date_rapport']})"
+                                                  for r in cands[:3])) if cands else ""
+    b = (a["bc_origine"] or "").strip()
+    if cle.startswith("PIECE:"):
+        motif = "colonne B vide" if not b else f"colonne B = '{b}' (pas un n° de BC)"
+        return f"{motif} et aucun acompte sur la ligne de la facture" + suggestion
+    if not reg:
+        return (f"{cle} inconnu dans les rapports importes (BC anterieur a l'historique charge, ou erreur de "
+                "saisie en colonne B)" + suggestion)
+    clients = {alias.get(normaliser(r["client_libelle"])) for r in reg}
+    if a["ct_num"] not in clients:
+        return (f"{cle} appartient a un autre client ({reg[0]['client_libelle']}) : erreur probable en colonne B"
+                + suggestion)
+    acpt = sum(r["acompte"] for r in reg)
+    if acpt == 0 and any(r["bp"] for r in reg):
+        return (f"{cle} est un BC en BP (a credit, sans acompte) facture en COMPTANT : la facture n'est "
+                "probablement pas soldee par un acompte dans Sage")
+    return f"acompte de {cle} ({acpt}) inferieur aux factures comptant imputees sur ce BC" + suggestion
+
+
+def controler_factures_comptant(db, batch_id: int) -> int:
+    """Pour chaque facture comptant du lot (acompte impute), verifie dans le registre des BC (tous mois
+    importes) que l'acompte a bien ete encaisse sur son BC (ou sur la ligne de la facture). Sinon :
+    alerte avec diagnostic."""
+    acs = db.query("SELECT * FROM normalized_movements WHERE batch_id=? AND nature='ACOMPTE' AND statut<>'ANNULE' "
+                   "AND montant>0", (batch_id,))
+    if not acs:
+        return 0
+    alias = {r[0]: r[1] for r in db.query("SELECT libelle_normalise, ct_num FROM client_aliases")}
+    imputes: dict[str, int] = {}
+    for r in db.query("SELECT * FROM normalized_movements WHERE nature='ACOMPTE' AND statut<>'ANNULE' AND montant>0"):
+        k = (r["agence"], _cle_bc_mouvement(r))
+        imputes.setdefault(k, []).append((r["date_piece"], r["montant"]))
+    n = 0
+    for a in acs:
+        cle = _cle_bc_mouvement(a)
+        dispo = db.scalar("SELECT SUM(acompte) FROM bons_commande_rapport WHERE agence=? AND bc=? AND date_rapport<=?",
+                          (a["agence"], cle, a["date_piece"]), 0)
+        impute = sum(m for d_, m in imputes.get((a["agence"], cle), []) if d_ <= a["date_piece"])
+        if dispo >= impute:
+            continue
+        deja = {k[1] for k in imputes}
+        diag = _diagnostic_comptant(db, a["agence"], a, alias, deja, cle)
+        db.execute("INSERT INTO alertes(cree_le, type, ct_num, message) VALUES (?,?,?,?)",
+                   (now_iso(), "FACTURE_COMPTANT_SANS_ACOMPTE", a["ct_num"],
+                    f"{a['reference_piece']} : facture comptant de {a['montant']} du {a['date_piece']} - {diag}"))
+        n += 1
+    return n

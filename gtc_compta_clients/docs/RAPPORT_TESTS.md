@@ -1,7 +1,7 @@
 # Rapport de tests
 
 Exécution : `python -m pytest -q`, Python 3.12, Linux (environnement de développement), le 12/11/2026.
-**Résultat : 93 tests réussis, 0 échec.**
+**Résultat : 98 tests réussis, 0 échec.**
 
 Le parseur est testé sur une **copie anonymisée du rapport réel** (jours 01, 03, 12 et 14 de
 `10 RC OCT.xlsx`), avec les chiffres de référence du classeur : comptages, totaux `TOTAL VENTES` /
@@ -48,6 +48,10 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 RECAP identique aux feuilles. Jeu anonymisé `tests/fixtures/RC_SEPT_2026_ANONYMISE.xlsx` (jours 09, 18, 24, 25).
 Import enchaîné septembre + octobre : 16 314 mouvements, 0 rejet, 0,9 s.
 
+## Vérification multi-mois (septembre + octobre 2026)
+`tools/verifier_mois.py` : 62/62 jours cohérents ; 4 écarts RECAP (colonne ACOMPTE) ; 23 factures comptant
+sans acompte connu sur leur BC (15 BC d'août, 8 erreurs de saisie réelles) ; 6 reçus négatifs dont 4 liés.
+
 ## Autres vérifications effectuées
 - Interface réelle lancée sous Xvfb : les 10 modules s'affichent sans erreur (`tools/captures.py`, captures dans `docs/captures/`).
 - Spec PyInstaller : compilation réussie sous Linux. L'exécutable démarre et reste ouvert 12 s sans erreur.
@@ -93,6 +97,11 @@ Import enchaîné septembre + octobre : 16 314 mouvements, 0 rejet, 0,9 s.
 - [OK] tests/test_flux.py::test_recu_negatif_sage_indisponible
 - [OK] tests/test_flux.py::test_recu_negatif_comptes_differents_a_analyser
 - [OK] tests/test_flux.py::test_septembre_recu_negatif_lie_au_recu_de_la_veille
+- [OK] tests/test_flux.py::test_facture_comptant_acompte_sur_bc_anterieur
+- [OK] tests/test_flux.py::test_facture_comptant_n_de_bc_d_un_autre_client
+- [OK] tests/test_flux.py::test_facture_comptant_issue_d_un_bc_en_bp
+- [OK] tests/test_flux.py::test_facture_comptant_colonne_b_non_bc_avec_acompte_sur_la_ligne
+- [OK] tests/test_flux.py::test_historique_bons_mois_precedent
 - [OK] tests/test_modules.py::test_cas9_bc_deja_inclus_pas_double_compte
 - [OK] tests/test_modules.py::test_cas9_bc_non_inclus_ajoute_une_fois
 - [OK] tests/test_modules.py::test_cas10_facture_echue_selon_politique

@@ -47,7 +47,8 @@ def main():
                                                                                    date(2026, 10, 1))
     classeur = prep.ecrire_classeur_prepare(res, rows, OUT / "GTC_PREPARATION_20261001.xlsx", u.login)
     lignes = prep.lire_export_erp(classeur)
-    imports.importer_lot(db, u, lignes, str(classeur), imports.empreinte_fichier(classeur))
+    imports.importer_lot(db, u, lignes, str(classeur), imports.empreinte_fichier(classeur),
+                         bons=prep.bons_export(res))
     reconciliation.rapprocher(db, u, sage, date(2026, 10, 1))
     from reportlab.pdfgen import canvas
     c = canvas.Canvas(str(pdfs / "Facture FACB0201 ETS ALPHA.pdf"))

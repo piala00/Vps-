@@ -26,6 +26,47 @@ erreurs de saisie :
 | FACB040798 (20/10, CLIENTS DETAILS BTA / KUETE, 18 000) | colonne B « BC36198 » = BC d'un autre client ; BC réel inconnu |
 | FACB041560 (26/10, COMPTE DE LIAISON, 36 450) | BC036855 en **BP** (aucun acompte) mais facture en colonne COMPTANT : probablement non soldée par acompte dans Sage (le rapprochement le signalera) |
 
+## Vérification de tous les mois : `tools/verifier_mois.py`
+```
+python tools\verifier_mois.py "08 RC AOUT.xlsx" "09 RC SEPT.xlsx" "10 RC OCT.xlsx" ... --sortie VERIFICATION.xlsx
+```
+L'outil passe tous les rapports fournis, dans l'ordre chronologique, par le **traitement réel** de
+l'application : parseur, registre des BC, import, contrôles. Il produit un classeur de constats avec les
+feuilles SYNTHESE, CONTROLE_JOURS, RECAP, ANOMALIES, FACTURES_COMPTANT, RECUS_NEGATIFS et NUMEROS.
+
+Résultat septembre + octobre 2026 (62 feuilles) :
+- 62/62 jours : total du rapport = lignes, et aucun montant non expliqué ;
+- **feuille RECAP, colonne ACOMPTE : 4 erreurs**. Le 04/09, RECAP indique 9 559 275 pour 6 224 400 sur la
+  feuille. Le 21/09, RECAP indique 0 pour 30 958 550. Les 04/10 et 21/10 sont déjà signalés plus bas. Les
+  colonnes vente comptant, vente à terme et recouvrements sont exactes ;
+- 23 factures comptant sans acompte connu sur leur BC :
+  - **15 au début de septembre** : BC d'**août** (BC28xxx/BC29xxx), à confirmer avec le rapport d'août ;
+  - **8 erreurs réelles** :
+
+| Facture | Constat | Proposition |
+|---|---|---|
+| FACB034781 (12/09) | BC30659 = BC de HAMADOU HASSANA | BC30652 (même client, même montant, la veille) |
+| FACB035365 (15/09) | BC21288 inconnu | BC31288 (chiffre erroné) |
+| FACB035350 (15/09) | acompte du BC31327 (15 000) inférieur à la facture (19 700) | vérifier le complément |
+| FACB037037 (26/09) | colonne B vide, aucun acompte sur la ligne | vérifier le règlement |
+| FACB038619 (05/10) | BC31018 = BC de SAIDOU BIRI | BC34018 |
+| FACB040560 (19/10) | BC3594 inconnu | BC35949 |
+| FACB040798 (20/10) | BC36198 = BC de SALAHOUDINE OUSMANOU ABDOULAYE | BC36199 |
+| FACB041560 (26/10) | BC036855 en BP facturé en comptant | facture probablement non soldée par acompte |
+
+## Registre des bons de commande (contrôle des factures comptant)
+À chaque import, les montants ACOMPTE (F) et BP (G) des BC sont enregistrés dans un **registre**. C'est une
+information de contrôle, jamais un mouvement comptable. Chaque facture comptant est contrôlée contre ce
+registre, tous mois importés confondus (acompte du BC ≥ factures comptant imputées). Si le contrôle échoue,
+l'alerte `FACTURE_COMPTANT_SANS_ACOMPTE` donne un diagnostic : colonne B vide ou sans n° de BC, BC inconnu
+(antérieur à l'historique ou mal saisi), BC appartenant à un autre client, BC en BP, ou acompte insuffisant.
+Elle propose aussi le **BC probable** (même client, même montant, dans les 45 jours).
+
+Seule une valeur de la forme `BC` + chiffres est un n° de BC (`rapport.motif_bc`). Sinon (vide, « OLA »,
+« RASHMA »…), l'acompte est rattaché à la ligne de la facture. Pour les mois antérieurs au démarrage :
+bouton « Historique des BC (mois antérieurs) » (Préparation / Imports), qui charge le registre sans créer
+de mouvement.
+
 ## Structure d'une feuille journalière
 | Ligne | Contenu |
 |---|---|
