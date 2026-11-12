@@ -146,6 +146,24 @@ def reference(db, agence, annee, mois, typ):
     return {c: r[c] for c in COLONNES} if r else None
 
 
+def comparer_pieces(pieces_cr: list, pieces_sage: list[dict]) -> dict:
+    """Comparaison piece par piece : pieces du CR [[piece, client, montant], ...] / pieces Sage
+    [{"piece", "ct_num", "montant"}, ...] (numeros normalises)."""
+    sage_par_piece: dict[str, int] = {}
+    for p in pieces_sage:
+        k = normaliser_reference(p["piece"])
+        sage_par_piece[k] = sage_par_piece.get(k, 0) + p["montant"]
+    cr_par_piece: dict[str, int] = {}
+    for piece, _client, montant in pieces_cr:
+        k = normaliser_reference(piece)
+        cr_par_piece[k] = cr_par_piece.get(k, 0) + (montant or 0)
+    return {"pieces_cr_absentes_de_sage": sorted((k, v) for k, v in cr_par_piece.items() if k not in sage_par_piece),
+            "pieces_sage_absentes_du_cr": sorted((k, v) for k, v in sage_par_piece.items() if k not in cr_par_piece),
+            "montants_differents": sorted((k, cr_par_piece[k], sage_par_piece[k]) for k in cr_par_piece
+                                          if k in sage_par_piece and cr_par_piece[k] != sage_par_piece[k]),
+            "nb_pieces_sage": len(sage_par_piece), "nb_pieces_cr": len(cr_par_piece)}
+
+
 def rapprocher_ventes_jour(db, user: Utilisateur, sage, agence: str, jour: date) -> dict:
     """Compare le total des ventes du CR avec les ventes comptabilisees dans Sage ce jour-la, piece par piece."""
     e = db.one("SELECT * FROM etat_comparatif_jours WHERE agence=? AND date_jour=?", (agence, jour.isoformat()))
@@ -160,25 +178,11 @@ def rapprocher_ventes_jour(db, user: Utilisateur, sage, agence: str, jour: date)
                        (json.dumps({"erreur": str(exc)}), now_iso(), user.login, agence, jour.isoformat()))
         return {"statut": "SAGE_INDISPONIBLE", "message": str(exc)}
     total_sage = sum(p["montant"] for p in pieces_sage)
-    sage_par_piece: dict[str, int] = {}
-    for p in pieces_sage:
-        k = normaliser_reference(p["piece"])
-        sage_par_piece[k] = sage_par_piece.get(k, 0) + p["montant"]
-    cr_par_piece: dict[str, int] = {}
-    for piece, _client, montant in json.loads(e["pieces_cr"] or "[]"):
-        k = normaliser_reference(piece)
-        cr_par_piece[k] = cr_par_piece.get(k, 0) + (montant or 0)
     retenu = db.scalar("SELECT SUM(montant) FROM normalized_movements WHERE agence=? AND date_piece=? "
                        "AND nature IN ('FACTURE','AVOIR') AND statut<>'ANNULE'", (agence, jour.isoformat()), 0)
-    absentes_sage = sorted((k, v) for k, v in cr_par_piece.items() if k not in sage_par_piece)
-    absentes_cr = sorted((k, v) for k, v in sage_par_piece.items() if k not in cr_par_piece)
-    differentes = sorted((k, cr_par_piece[k], sage_par_piece[k]) for k in cr_par_piece
-                         if k in sage_par_piece and cr_par_piece[k] != sage_par_piece[k])
     ecart = e["total_ventes"] - total_sage
     statut = "CONCORDANT" if ecart == 0 else "ECART"
-    detail = {"pieces_cr_absentes_de_sage": absentes_sage, "pieces_sage_absentes_du_cr": absentes_cr,
-              "montants_differents": differentes, "nb_pieces_sage": len(sage_par_piece),
-              "nb_pieces_cr": len(cr_par_piece), "total_retenu_fiches": retenu}
+    detail = {**comparer_pieces(json.loads(e["pieces_cr"] or "[]"), pieces_sage), "total_retenu_fiches": retenu}
     with db.transaction():
         db.execute("UPDATE etat_comparatif_jours SET ventes_sage=?, ecart_sage=?, statut_sage=?, detail_sage=?, "
                    "verifie_le=?, verifie_par=?, total_ventes_retenu=? WHERE agence=? AND date_jour=?",
