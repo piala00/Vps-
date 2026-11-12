@@ -32,6 +32,11 @@ REQUETES = {
     "ecritures_piece": "SELECT EC_No, CT_Num, JO_Num, EC_Date, EC_Piece, EC_RefPiece, EC_Intitule, "
                        "EC_Sens, EC_Montant, EC_Echeance, EC_Lettre FROM F_ECRITUREC "
                        "WHERE CG_Num LIKE ? AND (EC_Piece = ? OR EC_RefPiece = ?) ORDER BY EC_Date, EC_No",
+    # Ventes comptabilisees d'un jour : journaux de ventes (sage.journaux_ventes), comptes clients, par piece.
+    # A VERIFIER : codes des journaux de ventes ; date comptable = date de la facture apres mise a jour.
+    "ventes_jour": "SELECT EC_Piece, CT_Num, SUM(CASE WHEN EC_Sens = 0 THEN EC_Montant ELSE -EC_Montant END) "
+                   "FROM F_ECRITUREC WHERE CG_Num LIKE ? AND EC_Date = ? AND JO_Num IN ({journaux}) "
+                   "GROUP BY EC_Piece, CT_Num",
     # A VERIFIER : DO_Domaine=0 vente, DO_Type=1 bon de commande ; champ total TTC
     "bon_commande": "SELECT DO_Piece, DO_Tiers, DO_Date, DO_TotalTTC FROM F_DOCENTETE "
                     "WHERE DO_Domaine = 0 AND DO_Type = 1 AND (DO_Piece = ? OR DO_Piece LIKE ?)",
@@ -140,6 +145,23 @@ class SqlSageAdapter:
     def ecritures_par_piece(self, piece):
         p = piece.strip()
         return [self._entree(r) for r in self._query("ecritures_piece", (self.compte, p, p))]
+
+    def ventes_du_jour(self, jour):
+        journaux = list(self.cfg.get("journaux_ventes") or ["VTE"])
+        sql = self.requetes["ventes_jour"].replace("{journaux}", ",".join("?" * len(journaux)))
+        verifier_lecture_seule(sql)
+        cn = self._connect()
+        try:
+            cur = cn.cursor()
+            cur.execute(sql, [self.compte, jour] + journaux)
+            rows = cur.fetchall()
+        except Exception as exc:  # noqa: BLE001
+            raise SageExtractionIncomplete(f"Requete 'ventes_jour' en echec : {exc}") from exc
+        finally:
+            cn.rollback()
+            cn.close()
+        return [{"piece": str(r[0] or "").strip(), "ct_num": str(r[1] or "").strip(), "montant": round(float(r[2] or 0))}
+                for r in rows]
 
     def solde_client(self, ct_num, date_arrete):
         return sum(e.signe for e in self.ecritures_client(ct_num, None, date_arrete))

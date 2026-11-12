@@ -39,8 +39,10 @@ montant n'est oublié.
 
 ## Erreurs de la feuille RECAP (hors fiches clients)
 **Douze écarts sur sept mois, tous dans la colonne ACOMPTE, toujours le 4 et le 21 du mois** (04 et 21 avril,
-juin, juillet, août, septembre, octobre). C'est presque certainement une **erreur de formule** dans les lignes
-« 4 » et « 21 » de la feuille RECAP, à corriger dans le modèle. Les colonnes vente comptant, vente à terme et
+juin, juillet, août, septembre, octobre). Cause **confirmée** : sur ces deux lignes, la formule de la colonne
+ACOMPTE pointe la feuille de la **veille** (octobre : `B7 = '03'!F284` au lieu de `'04'!F321` ; `B24 = '20'!F230` au
+lieu de `'21'!F214`). À corriger dans le modèle RECAP. Par ailleurs, le TOTAL M-1 de RECAP est saisi à la main :
+vide d'avril à août, et différent du mois précédent en septembre et octobre (voir ETAT_COMPARATIF.md). Les colonnes vente comptant, vente à terme et
 recouvrements sont exactes sur les sept mois.
 
 ## Contrôles actifs sans cas constaté sur ces sept mois

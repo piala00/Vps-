@@ -204,6 +204,7 @@ class ParseurRapport:
         if idx_recus is not None:
             self._section_recus(rows, idx_recus + 1, res, st)
         st["controle_totaux"] = self._controle_totaux(rows, fin_docs, idx_recus, res, st)
+        st["total_acompte_cr"], st["total_ventes_cellule_cr"] = self._cellules_total(rows[:fin_docs])
         st["montants_exclus"] = dict(st["montants_exclus"])
 
         vus, par_ref = {}, {}
@@ -473,6 +474,26 @@ class ParseurRapport:
             res.anomalies.append(Anomalie(res.feuille, ligne, "DOCUMENTS", "INFO",
                 f"Facture {num} ANNULEE compensee par {autre[2]} ANNULEE ({mt} / {-mt}) : les deux pieces sont "
                 "reprises (elles existent dans Sage et s'annulent)", _row_text(row), ""))
+
+    def _cellules_total(self, docs):
+        """(ACOMPTE de la ligne TOTAL VENTES, cellule du CR qui calcule la vente totale = 2e ligne TOTAL VENTES)."""
+        lib = normaliser(self.r.get("libelle_total_ventes", "TOTAL VENTES"))
+        acompte, cellule = None, None
+        cols_f = self.r["colonnes_facture"]
+        for row in docs:
+            txt_bce = normaliser(" ".join(_texte(_cell(row, c)) for c in "BCDE"))
+            if acompte is None and lib in txt_bce:
+                try:
+                    acompte = parse_montant(_cell(row, "F")) or 0
+                except MontantInvalide:
+                    acompte = None
+                continue
+            if lib in normaliser(_texte(_cell(row, "G"))):
+                try:
+                    cellule = parse_montant(_cell(row, cols_f[-1]))
+                except MontantInvalide:
+                    cellule = None
+        return acompte, cellule
 
     def _controle_totaux(self, rows, fin_docs, idx_recus, res, st) -> dict:
         """Rapproche les montants extraits des lignes TOTAL du rapport lui-meme.

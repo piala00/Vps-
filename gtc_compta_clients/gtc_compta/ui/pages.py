@@ -450,11 +450,21 @@ class Import(Page):
         bons = prep.bons_export(self.res) if getattr(self, "res", None) else []
         anos = prep.anomalies_export(self.res) if getattr(self, "res", None) else []
 
+        res_cr = getattr(self, "res", None)
+
         def travail():
+            from ..services import etat_comparatif as ec
             rap = imports.importer_lot(self.db, self.user, lignes, fichier, imports.empreinte_fichier(fichier),
                                        bons=bons, anomalies=anos)
             d = date.fromisoformat(lignes[0]["date_rapport"])
             res = [] if rap.deja_importe else reco.rapprocher(self.db, self.user, self.sage, d)
+            if res_cr is not None and not rap.deja_importe:
+                # Etat comparatif du jour, puis controle des ventes du jour avec Sage
+                with self.db.transaction():
+                    ec.enregistrer_jour(self.db, ec.valeurs_jour(res_cr, self.cfg["rapport"],
+                                                                 self.cfg["etat_comparatif"]["recette"]),
+                                        source=fichier, batch_id=rap.batch_id)
+                ec.rapprocher_ventes_jour(self.db, self.user, self.sage, self.cfg["agence"], d)
             return rap, res
 
         def fini(r):
@@ -1242,7 +1252,129 @@ class Parametres(Page):
         self.app.destroy()
 
 
-PAGES = {"accueil": Accueil, "clients": Clients, "import": Import, "fiches": Fiches, "rapprochement": Rapprochement,
+# =====================================================================================
+class EtatComparatif(Page):
+    titre = "Etat comparatif"
+    sous_titre = "Ventes, recouvrements et recette par jour (modele RECAP) - rapprochement des ventes avec Sage"
+
+    def construire(self):
+        from ..services import etat_comparatif as ec
+        self.ec = ec
+        b = barre(self)
+        f = ctk.CTkFrame(b, fg_color="transparent")
+        f.pack(side="left", padx=(0, 10))
+        ctk.CTkLabel(f, text="Mois", font=ctk.CTkFont(size=11)).pack(anchor="w")
+        self.mois = ctk.CTkComboBox(f, values=self._liste_mois() or ["(aucun)"], width=160,
+                                    command=lambda _v: self.charger())
+        self.mois.pack()
+        bouton(b, "Verifier les ventes du mois avec Sage", self.verifier_mois).pack(side="left", padx=6, pady=(16, 0))
+        bouton(b, "Verifier le jour selectionne", self.verifier_jour, couleur="#455A64").pack(side="left", padx=6, pady=(16, 0))
+        bouton(b, "Exporter en Excel", self.exporter, couleur=VERT).pack(side="left", padx=6, pady=(16, 0))
+        bouton(b, "Charger un rapport mensuel...", self.charger_rapport, couleur="#455A64",
+               actif=self.user.peut("importer"), motif="Reserve aux roles autorises (importer)").pack(side="left", padx=6, pady=(16, 0))
+        self.t = Table(self, [("d", "Date", 100, "w"), ("vc", "Vente comptant", 120, "e"), ("vk", "Vente a credit", 130, "e"),
+                              ("tv", "Total ventes", 130, "e"), ("rc", "Recouvrements", 130, "e"), ("re", "Recette totale", 130, "e"),
+                              ("vs", "Ventes Sage", 130, "e"), ("ec", "Ecart CR-Sage", 110, "e"), ("st", "Statut Sage", 150, "w")],
+                       height=15, on_select=self.detail)
+        self.t.pack(fill="both", expand=True, padx=14, pady=4)
+        self.lbl = ctk.CTkTextbox(self, height=130, font=ctk.CTkFont(family="Consolas", size=11))
+        self.lbl.pack(fill="x", padx=14, pady=4)
+        ctk.CTkLabel(self, text="Recette totale = recouvrements + vente comptant. Le total des ventes du CR doit etre egal "
+                                "aux ventes comptabilisees dans Sage le meme jour (factures comptant + credit, avoirs deduits).",
+                     text_color="#555", wraplength=1100, justify="left").pack(fill="x", padx=16)
+        self.charger()
+
+    def _liste_mois(self):
+        return [f"{self.ec.NOMS_MOIS[m - 1]} {a}" for a, m in self.ec.mois_disponibles(self.db, self.cfg["agence"])]
+
+    def _mois_courant(self):
+        v = self.mois.get()
+        if not v or v.startswith("("):
+            return None
+        nom, annee = v.rsplit(" ", 1)
+        return int(annee), self.ec.NOMS_MOIS.index(nom) + 1
+
+    def charger(self):
+        m = self._mois_courant()
+        if not m:
+            self.t.remplir([], lambda r: r)
+            return
+        t = self.ec.tableau_mois(self.db, self.cfg["agence"], *m)
+        lignes = [dict(r) for r in t["jours"]]
+        for lib, cle in (("TOTAL M", "total_m"), ("TOTAL M-1", "total_m1"), ("EVOLUTION", "evolution"),
+                         ("TOTAL N-1", "total_n1"), ("ECART N-(N-1)", "ecart_n1")):
+            d = t[cle]
+            lignes.append({"date_jour": lib, **({c: d[c] for c in self.ec.COLONNES} if d else {c: None for c in self.ec.COLONNES}),
+                           "ventes_sage": t["sage"]["ventes_sage"] if cle == "total_m" else None, "ecart_sage": None,
+                           "statut_sage": (f"{t['sage']['jours_concordants']} OK / {t['sage']['jours_ecart']} ecart(s)"
+                                           if cle == "total_m" else ""), "detail_sage": None})
+        self.t.remplir(lignes, lambda r: (_fd(r["date_jour"]) if r["date_jour"][:2] == "20" else r["date_jour"],
+                                          fmt_fcfa(r["vente_comptant"]), fmt_fcfa(r["vente_credit"]),
+                                          fmt_fcfa(r["total_ventes"]), fmt_fcfa(r["recouvrements"]), fmt_fcfa(r["recette"]),
+                                          fmt_fcfa(r["ventes_sage"]), fmt_fcfa(r["ecart_sage"], True), r["statut_sage"]),
+                       tag=lambda r: {"CONCORDANT": "VALIDE", "ECART": "ECART_A_ANALYSER",
+                                      "SAGE_INDISPONIBLE": "EN_ATTENTE_SAGE"}.get(r["statut_sage"]))
+
+    def detail(self, r):
+        self.lbl.delete("1.0", "end")
+        if not r or not r.get("detail_sage"):
+            return
+        d = json.loads(r["detail_sage"])
+        if "erreur" in d:
+            self.lbl.insert("end", f"Sage indisponible : {d['erreur']}")
+            return
+        txt = [f"{_fd(r['date_jour'])} : CR {fmt_fcfa(r['total_ventes'])} / Sage {fmt_fcfa(r['ventes_sage'])} / "
+               f"integre aux fiches {fmt_fcfa(d.get('total_retenu_fiches'))}"]
+        txt += [f"  Piece du CR absente de Sage (non mise a jour ou n° errone) : {p} {fmt_fcfa(m)}"
+                for p, m in d["pieces_cr_absentes_de_sage"]]
+        txt += [f"  Piece Sage absente du CR : {p} {fmt_fcfa(m)}" for p, m in d["pieces_sage_absentes_du_cr"]]
+        txt += [f"  Montant different : {p} CR {fmt_fcfa(a)} / Sage {fmt_fcfa(b)}" for p, a, b in d["montants_differents"]]
+        self.lbl.insert("end", "\n".join(txt))
+
+    def verifier_mois(self):
+        m = self._mois_courant()
+        if not m:
+            return erreur("Aucun mois charge.")
+        self.app.tache("Rapprochement des ventes du mois avec Sage",
+                       lambda: self.ec.rapprocher_ventes_mois(self.db, self.user, self.sage, self.cfg["agence"], *m),
+                       lambda r: (self.charger(), info(f"{sum(1 for v in r.values() if v == 'CONCORDANT')} jour(s) concordant(s), "
+                                                       f"{sum(1 for v in r.values() if v == 'ECART')} en ecart, "
+                                                       f"{sum(1 for v in r.values() if v == 'SAGE_INDISPONIBLE')} Sage indisponible.")))
+
+    def verifier_jour(self):
+        r = self.t.selection()
+        if not r or r["date_jour"][:2] != "20":
+            return erreur("Selectionner une journee.")
+        self.app.tache("Rapprochement des ventes du jour", lambda: self.ec.rapprocher_ventes_jour(
+            self.db, self.user, self.sage, self.cfg["agence"], date.fromisoformat(r["date_jour"])), lambda _r: self.charger())
+
+    def exporter(self):
+        m = self._mois_courant()
+        if not m:
+            return erreur("Aucun mois charge.")
+        dest = self.ctx.data_dir / "exports" / f"ETAT_COMPARATIF_{m[0]}_{m[1]:02d}.xlsx"
+        self.ec.exporter_excel(self.db, self.cfg["agence"], [m], dest, self.cfg["societe"])
+        if confirmer(f"Etat comparatif exporte :\n{dest}\n\nOuvrir le fichier ?"):
+            docs.ouvrir_fichier(dest)
+
+    def charger_rapport(self):
+        src = filedialog.askopenfilename(title="Rapport commercial mensuel (lecture seule)", filetypes=[("Excel", "*.xlsx *.xlsm")])
+        if not src:
+            return
+        v = demander_texte(self, "Mois du rapport", "Mois et annee du rapport (MM/AAAA) :")
+        if not v:
+            return
+        try:
+            mois, annee = (int(x) for x in v.split("/"))
+        except ValueError:
+            return erreur("Format attendu : MM/AAAA")
+        self.app.tache("Chargement de l'etat comparatif", lambda: self.ec.charger_rapport_mensuel(
+            self.db, self.user, src, self.cfg["rapport"], self.cfg["agence"], mois, annee,
+            self.cfg["etat_comparatif"]["recette"]),
+            lambda n: (info(f"{n} journee(s) chargee(s)."), self.app.afficher("etat")))
+
+
+PAGES = {"accueil": Accueil, "clients": Clients, "import": Import, "fiches": Fiches, "rapprochement": Rapprochement, "etat": EtatComparatif,
          "solvabilite": Solvabilite, "pointage": Pointage, "documents": Documents, "impressions": Impressions,
          "parametres": Parametres}
 

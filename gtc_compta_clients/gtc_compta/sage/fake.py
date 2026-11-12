@@ -79,6 +79,18 @@ class FakeSageAdapter:
         return [e for e in self.ecritures if p in (e.numero_piece.replace(" ", "").upper(),
                                                    e.reference_piece.replace(" ", "").upper())]
 
+    journaux_ventes = ("VTE",)
+
+    def ventes_du_jour(self, jour):
+        """Ventes comptabilisees ce jour (journaux de ventes, comptes clients) : effet signe par piece."""
+        self._check()
+        out = {}
+        for e in self.ecritures:
+            if e.journal in self.journaux_ventes and e.date_ecriture == jour:
+                k = (e.numero_piece, e.ct_num)
+                out[k] = out.get(k, 0) + e.signe
+        return [{"piece": p, "ct_num": c, "montant": m} for (p, c), m in out.items()]
+
     def chercher_bon_commande(self, reference):
         self._check()
         ref = reference.replace(" ", "").upper()

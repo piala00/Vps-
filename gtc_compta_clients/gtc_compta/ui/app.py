@@ -20,6 +20,7 @@ MODULES = [
     ("import", "Preparation / Imports"),
     ("fiches", "Fiches clients"),
     ("rapprochement", "Rapprochement Sage"),
+    ("etat", "Etat comparatif"),
     ("solvabilite", "Solvabilite / BC"),
     ("pointage", "Pointage client"),
     ("documents", "Documents"),

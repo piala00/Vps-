@@ -50,6 +50,12 @@ def main():
     imports.importer_lot(db, u, lignes, str(classeur), imports.empreinte_fichier(classeur),
                          bons=prep.bons_export(res), anomalies=prep.anomalies_export(res))
     reconciliation.rapprocher(db, u, sage, date(2026, 10, 1))
+    from gtc_compta.services import etat_comparatif as ec
+    ec.enregistrer_jour(db, ec.valeurs_jour(res, ctx.cfg["rapport"]), source=str(classeur))
+    ec.rapprocher_ventes_jour(db, u, sage, ctx.cfg["agence"], date(2026, 10, 1))
+    res2 = ParseurRapport(ctx.cfg["rapport"], clients.correspondances(db)).analyser(
+        lire_feuille(ROOT / "demo" / "RC_DEMO_SYNTHETIQUE.xlsx", "02"), "COLLAGE", "BERTOUA", date(2026, 10, 2))
+    ec.enregistrer_jour(db, ec.valeurs_jour(res2, ctx.cfg["rapport"]), source="demo")
     from reportlab.pdfgen import canvas
     c = canvas.Canvas(str(pdfs / "Facture FACB0201 ETS ALPHA.pdf"))
     c.drawString(72, 750, "FACTURE FACB0201 - DOCUMENT FICTIF DE DEMONSTRATION")

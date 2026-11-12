@@ -23,6 +23,7 @@ from openpyxl.styles import Font, PatternFill  # noqa: E402
 from gtc_compta.config import DEFAULTS  # noqa: E402
 from gtc_compta.db import Database  # noqa: E402
 from gtc_compta.excel.preparation import anomalies_export, bons_export, lignes_export  # noqa: E402
+from gtc_compta.excel.rapport_mensuel import lire_recap, mois_du_fichier  # noqa: E402
 from gtc_compta.excel.report_parser import CATALOGUE_ERREURS, ParseurRapport  # noqa: E402
 from gtc_compta.sage.base import SageClient  # noqa: E402
 from gtc_compta.sage.fake import FakeSageAdapter  # noqa: E402
@@ -41,40 +42,6 @@ def total_ligne(rows, libelle, col):
         if libelle in txt and len(r) > idx:
             return r[idx] if isinstance(r[idx], (int, float)) else 0
     return None
-
-
-def mois_du_fichier(path, wb):
-    """Mois du rapport : prefixe du nom de fichier (\"05_RC_MAI\", \"05 RC MAI\"), sinon mois majoritaire des
-    dates imprimees. Annee : celle des dates imprimees."""
-    import re as _re
-    from collections import Counter as _C
-    dates = []
-    for f in [x for x in wb.sheetnames if x.isdigit()][:31]:
-        for r in wb[f].iter_rows(min_row=1, max_row=8, values_only=True):
-            v = next((x for x in r[:3] if hasattr(x, "year")), None)
-            if v is not None:
-                dates.append(v)
-                break
-    annee = _C(d.year for d in dates).most_common(1)[0][0] if dates else date.today().year
-    m = _re.match(r"^(\d{1,2})[ _.-]", Path(path).name)
-    if m and 1 <= int(m.group(1)) <= 12:
-        return int(m.group(1)), annee
-    return (_C(d.month for d in dates).most_common(1)[0][0] if dates else None), annee
-
-
-def lire_recap(wb):
-    if "RECAP" not in wb.sheetnames:
-        return {}
-    out = {}
-    rows = list(wb["RECAP"].iter_rows(values_only=True))
-    entete = next((i for i, r in enumerate(rows) if r and r[0] and "DATE" in normaliser(r[0])), None)
-    if entete is None:
-        return {}
-    noms = [normaliser(c) if c else "" for c in rows[entete]]
-    for r in rows[entete + 1:]:
-        if r and hasattr(r[0], "date"):
-            out[r[0].date().isoformat()] = {n: r[k] for k, n in enumerate(noms) if n}
-    return out
 
 
 def main():

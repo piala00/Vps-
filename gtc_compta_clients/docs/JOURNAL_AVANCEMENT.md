@@ -1,5 +1,16 @@
 # Journal d'avancement
 
+## Cycle 11 (12/11/2026) : état comparatif et rapprochement des ventes avec Sage
+- Module « État comparatif » (modèle RECAP) : vente comptant, vente à crédit, total ventes, recouvrements,
+  recette totale = recouvrements + vente comptant ; TOTAL M, M-1, ÉVOLUTION, N-1 (saisi dans RECAP à défaut),
+  ÉCART ; export Excel ; alimenté à chaque import et depuis un rapport mensuel complet (migration 007).
+- Rapprochement quotidien des ventes CR / Sage (lecture seule), pièce par pièce, lancé à l'import ; requête
+  `ventes_jour` à vérifier sur l'installation.
+- Outil `tools/etat_comparatif.py` : état comparatif et analyse mois par mois d'avril à octobre 2026.
+- Feuille RECAP : cause des erreurs ACOMPTE identifiée (formule des lignes 4 et 21 pointant la veille) ;
+  TOTAL M-1 saisi à la main, incohérent avec le mois précédent. 131 tests.
+
+
 ## Cycle 10 (12/11/2026) : registre des anomalies CR et vérification sur 7 mois
 - **Registre des anomalies CR** (migration 006) : chaque erreur de rapport pouvant fausser un solde est conservée
   OUVERTE, affichée sur la fiche du client et au tableau de bord, puis traitée (intégration de la facture

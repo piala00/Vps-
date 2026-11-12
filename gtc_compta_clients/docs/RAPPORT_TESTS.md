@@ -1,7 +1,7 @@
 # Rapport de tests
 
 Exécution : `python -m pytest -q`, Python 3.12, Linux (environnement de développement), le 12/11/2026.
-**Résultat : 123 tests réussis, 0 échec.**
+**Résultat : 131 tests réussis, 0 échec.**
 
 Le parseur est testé sur une **copie anonymisée du rapport réel** (jours 01, 03, 12 et 14 de
 `10 RC OCT.xlsx`), avec les chiffres de référence du classeur : comptages, totaux `TOTAL VENTES` /
@@ -47,6 +47,12 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 `python tools/analyser_rapport.py "09 RC SEPT.xlsx"` : 30/30 jours cohérents sans modification des règles ;
 RECAP identique aux feuilles. Jeu anonymisé `tests/fixtures/RC_SEPT_2026_ANONYMISE.xlsx` (jours 09, 18, 24, 25).
 Import enchaîné septembre + octobre : 16 314 mouvements, 0 rejet, 0,9 s.
+
+## État comparatif (avril → octobre 2026)
+`tools/etat_comparatif.py` : chiffres journaliers identiques à la feuille RECAP pour vente comptant, vente à terme,
+total ventes et recouvrements, sur les 214 journées (hors ACOMPTE, faux dans RECAP le 4 et le 21) ; cellule
+« vente totale » du CR = comptant + crédit chaque jour. Rapprochement Sage testé avec le Sage fictif (concordance,
+écart expliqué pièce par pièce, Sage indisponible).
 
 ## Vérification sur sept mois (avril → octobre 2026)
 `tools/verifier_mois.py` sur 7 rapports : **214/214 journées cohérentes, aucun montant non expliqué** ;
@@ -102,6 +108,14 @@ sans acompte connu sur leur BC (15 BC d'août, 8 erreurs de saisie réelles) ; 6
 - [OK] tests/test_anomalies.py::test_reel_juin_commentaire_a_la_place_du_client
 - [OK] tests/test_anomalies.py::test_reel_juillet_numero_de_preparation_de_livraison
 - [OK] tests/test_anomalies.py::test_date_feuille_du_modele_non_mise_a_jour
+- [OK] tests/test_etat_comparatif.py::test_valeurs_jour_reel_01_octobre
+- [OK] tests/test_etat_comparatif.py::test_recette_selon_le_modele_recap
+- [OK] tests/test_etat_comparatif.py::test_rapprochement_ventes_ecart_explique_piece_par_piece
+- [OK] tests/test_etat_comparatif.py::test_rapprochement_ventes_concordant
+- [OK] tests/test_etat_comparatif.py::test_rapprochement_ventes_sage_indisponible
+- [OK] tests/test_etat_comparatif.py::test_nouveaux_chiffres_du_cr_remettent_le_controle_a_faire
+- [OK] tests/test_etat_comparatif.py::test_tableau_du_mois_et_export_excel
+- [OK] tests/test_etat_comparatif.py::test_references_saisies_dans_recap
 - [OK] tests/test_flux.py::test_import_et_rejet_client_non_mappe
 - [OK] tests/test_flux.py::test_cas3_reimport_zero_doublon
 - [OK] tests/test_flux.py::test_cas3_montant_modifie_conflit_sans_doublon

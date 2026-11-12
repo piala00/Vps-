@@ -29,6 +29,7 @@ DEFAULTS: dict = {
         "timeout_s": 10,
         "compte_collectif_clients": "411",
         "journal_report_nouveau": "RAN",
+        "journaux_ventes": ["VTE"],
     },
     "rapport": {
         # Regles etablies a partir du classeur reel "10 RC OCT.xlsx" (analyse du 12/11/2026).
@@ -68,6 +69,9 @@ DEFAULTS: dict = {
         "correspondance_auto_intitule_exact": False,
         "lignes_vides_fin_section": 8
     },
+    # Etat comparatif : recette totale = recouvrements + vente comptant (regle GTC) ;
+    # "acompte+recouvrement" reproduit la formule du modele RECAP du rapport commercial.
+    "etat_comparatif": {"recette": "comptant+recouvrement"},
     "solvabilite": {
         "politique_factures_echues": "signaler",
         "plafond_zero": "donnees_insuffisantes",

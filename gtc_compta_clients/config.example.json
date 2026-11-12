@@ -18,7 +18,10 @@
     "odbc_driver": "",
     "timeout_s": 10,
     "compte_collectif_clients": "411",
-    "journal_report_nouveau": "RAN"
+    "journal_report_nouveau": "RAN",
+    "journaux_ventes": [
+      "VTE"
+    ]
   },
   "rapport": {
     "entete_recus": "RECUS DE VERSEMENTS",
@@ -91,6 +94,9 @@
     ],
     "correspondance_auto_intitule_exact": false,
     "lignes_vides_fin_section": 8
+  },
+  "etat_comparatif": {
+    "recette": "comptant+recouvrement"
   },
   "solvabilite": {
     "politique_factures_echues": "signaler",
