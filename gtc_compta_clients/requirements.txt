@@ -1,0 +1,7 @@
+# Dependances verrouillees (versions testees dans l'environnement de developpement)
+customtkinter==6.0.0
+darkdetect==0.8.0
+packaging==24.0
+openpyxl==3.1.5
+reportlab==5.1.0
+pyodbc==5.2.0 ; sys_platform == "win32"

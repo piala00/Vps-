@@ -1,0 +1,78 @@
+{
+  "societe": "GLOBAL TRADE COMPANY SARL",
+  "agence": "BERTOUA",
+  "data_dir": "data",
+  "utilisateur": {
+    "login": "comptable",
+    "nom": "Comptable",
+    "role": "comptable_controleur"
+  },
+  "sage": {
+    "mode": "demo",
+    "server": "GTC-LISTENER,1433",
+    "database_compta": "",
+    "database_gescom": "",
+    "trusted_connection": true,
+    "username": "",
+    "password_env": "GTC_SAGE_PASSWORD",
+    "odbc_driver": "",
+    "timeout_s": 10,
+    "compte_collectif_clients": "411",
+    "journal_report_nouveau": "RAN"
+  },
+  "rapport": {
+    "entete_recus": "RECUS DE VERSEMENTS",
+    "motif_document": "^(?:\\d+)?[A-Z]{2,5}\\d*[-/ ]?\\d+",
+    "motif_recu": "^(?:\\d+)?RCB",
+    "types_documents": {
+      "FACB": {
+        "nature": "FACTURE",
+        "sens": "D",
+        "confirme": false
+      },
+      "FVCB": {
+        "nature": "FACTURE",
+        "sens": "D",
+        "confirme": false
+      }
+    },
+    "colonnes_facture": [
+      "H",
+      "I"
+    ],
+    "colonnes_bc": [
+      "F",
+      "G"
+    ],
+    "colonne_montant_recu": "F",
+    "mots_exclusion": [
+      "TOTAL",
+      "SOUS-TOTAL",
+      "S/TOTAL",
+      "REPORT",
+      "VERSEMENT CAISSE",
+      "VERSEMENT BANQUE",
+      "LIAISON",
+      "CAISSE CENTRALE"
+    ],
+    "comptes_collectifs": [
+      "CLIENTS DETAILS BTA"
+    ],
+    "correspondance_auto_intitule_exact": false,
+    "lignes_vides_fin_section": 8
+  },
+  "solvabilite": {
+    "politique_factures_echues": "signaler",
+    "plafond_zero": "donnees_insuffisantes",
+    "depassement_max_sous_condition": null
+  },
+  "impression": {
+    "lignes_par_page": 0,
+    "marge_reliure_mm": 20,
+    "seuil_alerte_pages": 2
+  },
+  "documents": {
+    "dossiers_pdf": [],
+    "dossier_export": ""
+  }
+}
