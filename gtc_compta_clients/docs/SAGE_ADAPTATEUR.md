@@ -19,6 +19,7 @@ Les noms de tables et de champs reprennent ceux déjà utilisés par le connecte
 | `clients` | `F_COMPTET WHERE CT_Type = 0` | `CT_Type = 0` = client ; `CT_Encours` = encours autorisé |
 | `ecritures` | `F_ECRITUREC WHERE CT_Num = ? AND CG_Num LIKE '411%' AND EC_Date BETWEEN ...` | `EC_Sens` 0 = débit ; comptes collectifs clients en 411 ; exclusion éventuelle des écritures de simulation, brouillard ou extourne ; traitement du journal `RAN` en début d'exercice (risque de double comptage si RAN et écritures N-1 coexistent) |
 | `nb_ecritures` | `COUNT(*)` identique | détection d'une extraction incomplète |
+| `ecritures_piece` | `F_ECRITUREC WHERE CG_Num LIKE '411%' AND (EC_Piece = ? OR EC_RefPiece = ?)` | recherche d'un reçu sur tous les comptes clients (contrôle des reçus négatifs) |
 | `bon_commande` | `F_DOCENTETE WHERE DO_Domaine = 0 AND DO_Type = 1` | `DO_Type = 1` = bon de commande vente ; champ total `DO_TotalTTC` (le code existant utilise `DO_TTC`) ; référence abrégée ↔ `DO_Piece` |
 
 ## Non implémenté volontairement (aucune logique inventée)

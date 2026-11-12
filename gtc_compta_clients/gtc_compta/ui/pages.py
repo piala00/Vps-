@@ -108,9 +108,26 @@ class Accueil(Page):
         t.pack(fill="both", expand=True, padx=14, pady=(0, 14))
         t.remplir(db.query("SELECT * FROM alertes WHERE statut='OUVERTE' ORDER BY id DESC LIMIT 200"),
                   lambda r: (r["cree_le"], r["type"], r["ct_num"] or "", r["message"]))
+        self.t_alertes = t
         b = barre(self)
         bouton(b, "Marquer les alertes comme traitees", self.clore_alertes,
                actif=self.user.peut("valider_fiche"), motif="Reserve au comptable controleur").pack(side="left")
+        bouton(b, "Verifier dans Sage (recu negatif)", self.verifier_recu, couleur="#455A64",
+               actif=self.user.peut("reprise_sage"), motif="Reserve au comptable controleur").pack(side="left", padx=6)
+
+    def verifier_recu(self):
+        from ..services import controles
+        a = self.t_alertes.selection()
+        if not a:
+            return erreur("Selectionner une alerte ANNULATION_RECU_A_VERIFIER.")
+        try:
+            mid = controles.mouvement_de_l_alerte(self.db, a["id"])
+        except ValueError as exc:
+            return erreur(str(exc))
+        self.app.tache("Controle du recu negatif dans Sage",
+                       lambda: controles.verifier_recu_negatif_dans_sage(self.db, self.user, self.sage, mid),
+                       lambda r: (info("\n".join(r["details"]), f"Resultat : {r['conclusion']}"),
+                                  self.app.afficher("accueil")))
 
     def clore_alertes(self):
         if confirmer("Marquer toutes les alertes ouvertes comme traitees ?"):

@@ -28,6 +28,10 @@ REQUETES = {
                  "AND EC_Date >= ? AND EC_Date <= ? ORDER BY EC_Date, EC_No",
     "nb_ecritures": "SELECT COUNT(*) FROM F_ECRITUREC WHERE CT_Num = ? AND CG_Num LIKE ? "
                     "AND EC_Date >= ? AND EC_Date <= ?",
+    # Toutes les ecritures clients portant un numero de piece (tous comptes tiers confondus)
+    "ecritures_piece": "SELECT EC_No, CT_Num, JO_Num, EC_Date, EC_Piece, EC_RefPiece, EC_Intitule, "
+                       "EC_Sens, EC_Montant, EC_Echeance, EC_Lettre FROM F_ECRITUREC "
+                       "WHERE CG_Num LIKE ? AND (EC_Piece = ? OR EC_RefPiece = ?) ORDER BY EC_Date, EC_No",
     # A VERIFIER : DO_Domaine=0 vente, DO_Type=1 bon de commande ; champ total TTC
     "bon_commande": "SELECT DO_Piece, DO_Tiers, DO_Date, DO_TotalTTC FROM F_DOCENTETE "
                     "WHERE DO_Domaine = 0 AND DO_Type = 1 AND (DO_Piece = ? OR DO_Piece LIKE ?)",
@@ -121,18 +125,21 @@ class SqlSageAdapter:
         attendu = self._query("nb_ecritures", p)[0][0]
         if attendu != len(rows):
             raise SageExtractionIncomplete(f"{len(rows)} ecritures lues sur {attendu} attendues")
-        out = []
-        for r in rows:
-            montant = round(float(r[8]))
-            out.append(SageEntry(ec_no=int(r[0]), ct_num=str(r[1]).strip(), journal=str(r[2] or ""),
-                                 date_ecriture=r[3].date() if hasattr(r[3], "date") else r[3],
-                                 numero_piece=str(r[4] or "").strip(),
-                                 reference_piece=str(r[5] or "").strip(),
-                                 libelle=str(r[6] or "").strip(),
-                                 sens="D" if int(r[7]) == 0 else "C", montant=montant,
-                                 date_echeance=r[9].date() if r[9] is not None and hasattr(r[9], "date") else None,
-                                 lettre=bool(r[10] and int(r[10]))))
-        return out
+        return [self._entree(r) for r in rows]
+
+    @staticmethod
+    def _entree(r) -> SageEntry:
+        return SageEntry(ec_no=int(r[0]), ct_num=str(r[1]).strip(), journal=str(r[2] or ""),
+                         date_ecriture=r[3].date() if hasattr(r[3], "date") else r[3],
+                         numero_piece=str(r[4] or "").strip(), reference_piece=str(r[5] or "").strip(),
+                         libelle=str(r[6] or "").strip(), sens="D" if int(r[7]) == 0 else "C",
+                         montant=round(float(r[8])),
+                         date_echeance=r[9].date() if r[9] is not None and hasattr(r[9], "date") else None,
+                         lettre=bool(r[10] and int(r[10])))
+
+    def ecritures_par_piece(self, piece):
+        p = piece.strip()
+        return [self._entree(r) for r in self._query("ecritures_piece", (self.compte, p, p))]
 
     def solde_client(self, ct_num, date_arrete):
         return sum(e.signe for e in self.ecritures_client(ct_num, None, date_arrete))

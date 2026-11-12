@@ -1,7 +1,7 @@
 # Rapport de tests
 
 Exécution : `python -m pytest -q`, Python 3.12, Linux (environnement de développement), le 12/11/2026.
-**Résultat : 82 tests réussis, 0 échec.**
+**Résultat : 87 tests réussis, 0 échec.**
 
 Le parseur est testé sur une **copie anonymisée du rapport réel** (jours 01, 03, 12 et 14 de
 `10 RC OCT.xlsx`), avec les chiffres de référence du classeur : comptages, totaux `TOTAL VENTES` /
@@ -83,6 +83,10 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 - [OK] tests/test_flux.py::test_import_refuse_sens_contraire_a_la_regle
 - [OK] tests/test_flux.py::test_appariement_independant_de_la_representation_sage
 - [OK] tests/test_flux.py::test_migration_004_convertit_les_anciens_signes
+- [OK] tests/test_flux.py::test_recu_negatif_origine_trouvee_dans_sage
+- [OK] tests/test_flux.py::test_recu_negatif_les_deux_recus_sur_le_meme_compte
+- [OK] tests/test_flux.py::test_recu_negatif_sage_indisponible
+- [OK] tests/test_flux.py::test_recu_negatif_comptes_differents_a_analyser
 - [OK] tests/test_modules.py::test_cas9_bc_deja_inclus_pas_double_compte
 - [OK] tests/test_modules.py::test_cas9_bc_non_inclus_ajoute_une_fois
 - [OK] tests/test_modules.py::test_cas10_facture_echue_selon_politique
@@ -104,9 +108,9 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 - [OK] tests/test_modules.py::test_sauvegarde_restauration
 - [OK] tests/test_modules.py::test_transaction_atomique
 - [OK] tests/test_parser.py::test_reel_comptages[01-124-1-84-23-8]
-- [OK] tests/test_parser.py::test_reel_comptages[03-164-5-83-38-8]
-- [OK] tests/test_parser.py::test_reel_comptages[12-245-2-154-62-9]
-- [OK] tests/test_parser.py::test_reel_comptages[14-178-29-91-28-1]
+- [OK] tests/test_parser.py::test_reel_comptages[03-165-6-85-38-8]
+- [OK] tests/test_parser.py::test_reel_comptages[12-247-2-156-62-9]
+- [OK] tests/test_parser.py::test_reel_comptages[14-181-32-97-28-1]
 - [OK] tests/test_parser.py::test_reel_totaux_du_rapport_et_aucun_montant_oublie[01]
 - [OK] tests/test_parser.py::test_reel_totaux_du_rapport_et_aucun_montant_oublie[03]
 - [OK] tests/test_parser.py::test_reel_totaux_du_rapport_et_aucun_montant_oublie[12]
@@ -118,7 +122,7 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 - [OK] tests/test_parser.py::test_reel_meme_numero_pour_deux_clients
 - [OK] tests/test_parser.py::test_reel_recus_negatifs_annulent_le_recu_errone
 - [OK] tests/test_parser.py::test_recu_negatif_sans_original_avertit
-- [OK] tests/test_parser.py::test_reel_liaisons_et_versements_exclus
+- [OK] tests/test_parser.py::test_reel_compte_de_liaison_est_un_client
 - [OK] tests/test_parser.py::test_cas1_seules_les_deux_sections_utiles
 - [OK] tests/test_parser.py::test_cas1_entete_recus_detectee_dynamiquement
 - [OK] tests/test_parser.py::test_cas2_bc_plus_facture_compte_une_fois
@@ -145,3 +149,4 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 - [OK] tests/test_parser.py::test_classeur_prepare_aller_retour
 - [OK] tests/test_parser.py::test_export_erp_ecrit_par_excel_normalise
 - [OK] tests/test_parser.py::test_controle_croise_macro_application
+- [OK] tests/test_parser.py::test_compte_de_liaison_conteneur

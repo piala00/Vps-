@@ -111,6 +111,14 @@ Traitement :
   libellé client différent). Les reçus de même montant faits le même jour sur d'autres comptes sont
   cités comme réaffectations possibles.
 
+Vérification dans Sage (tableau de bord → alerte → « Vérifier dans Sage (reçu négatif) »), selon la
+procédure de la comptabilité, en lecture seule :
+1. rechercher sur le compte qui porte le reçu négatif un **reçu antérieur de même montant**. S'il existe, la
+   logique est confirmée, le lien est enregistré et l'alerte close. Si ce reçu figure dans le rapport sous un
+   **autre libellé**, il est signalé que les deux libellés désignent le même compte Sage ;
+2. sinon, indiquer **dans quels comptes Sage** ont été passés le reçu négatif et les reçus positifs de même
+   montant du même jour. Résultat : `MEME_COMPTE`, `A_ANALYSER` ou `NON_COMPTABILISE`.
+
 Octobre 2026 :
 | Reçu négatif | Annule | Réaffectation possible (même jour, même montant) |
 |---|---|---|

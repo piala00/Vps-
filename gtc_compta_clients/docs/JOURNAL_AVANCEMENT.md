@@ -1,5 +1,13 @@
 # Journal d'avancement
 
+## Cycle 6 (12/11/2026) : contrôle assisté des reçus négatifs
+- Action « Vérifier dans Sage (reçu négatif) » sur les alertes : recherche du reçu d'origine sur le même
+  compte Sage, sinon des comptes où les reçus ont été passés. Lecture seule, résultat tracé dans l'audit.
+- Cas en cours : 7RCB030477 (ALH OUMAROU BOUBAKARY, feuille 27 l. 338) / 7RCB030347 (OUMAROU BOUBAKARY,
+  feuille 27 l. 315). **Vérification dans Sage par la comptabilité en cours** ; le contrôle sera rejoué
+  automatiquement dès l'accès Sage. 87 tests.
+
+
 ## Cycle 5 (12/11/2026) : comptes clients particuliers
 - COMPTE DE LIAISON, VENTE PROMOTIONNELLE et SOURCE DU PAYS RETOUR sont des comptes clients Sage normaux.
   COMPTE DE LIAISON n'est plus exclu ; seuls les versements de caisse et les totaux le restent.

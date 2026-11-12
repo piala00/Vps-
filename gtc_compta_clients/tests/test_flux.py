@@ -261,3 +261,65 @@ def test_migration_004_convertit_les_anciens_signes(tmp_path):
     assert rows == {"FRCB1": ("AVOIR", "D", -500), "7RCB2": ("REGLEMENT", "C", -800),
                     "FACB3": ("FACTURE", "D", 900), "7RCB4": ("REGLEMENT", "C", 300)}
     assert d.scalar("PRAGMA foreign_keys") == 1
+
+
+def _ligne_recu(ref, ct, nom, mt, jour, id_import):
+    return {"format_version": "GTC-EXPORT-1", "id_import": id_import, "agence": "BERTOUA",
+            "date_rapport": f"2026-10-{jour:02d}", "type_mouvement": "REGLEMENT", "reference_piece": ref,
+            "code_tiers": ct, "nom_client": nom, "acheteur_detail": "", "montant": mt, "sens": "C",
+            "bc_origine": "", "mode_reference": "", "source_feuille": "x", "source_ligne": 1}
+
+
+def test_recu_negatif_origine_trouvee_dans_sage(base, user, sage):
+    """Cas 1 : le recu d'origine est dans Sage sur le meme compte (anterieur au rapport) -> lien etabli."""
+    from gtc_compta.services import controles
+    imports.importer_lot(base, user, [_ligne_recu("7RCB477", "CL002", "QUINCAILLERIE BETA", -965950, 27, "N")],
+                         "n", "n")
+    alerte = base.one("SELECT * FROM alertes WHERE type='ANNULATION_RECU_A_VERIFIER'")
+    mid = controles.mouvement_de_l_alerte(base, alerte["id"])
+    sage.ajouter_ecriture(SageEntry(500, "CL002", "CAI", date(2026, 9, 20), "7RCB399", "7RCB399", "Recu", "C", 965950))
+    r = controles.verifier_recu_negatif_dans_sage(base, user, sage, mid)
+    assert r["conclusion"] == "ORIGINE_TROUVEE" and r["origine"] == "7RCB399"
+    assert base.scalar("SELECT reference_liee FROM normalized_movements WHERE id=?", (mid,)) == "7RCB399"
+    assert base.scalar("SELECT statut FROM alertes WHERE id=?", (alerte["id"],)) == "TRAITEE"
+
+
+def test_recu_negatif_les_deux_recus_sur_le_meme_compte(base, user, sage):
+    """Cas 2 : pas de recu anterieur ; le recu positif du jour (autre libelle dans le rapport) et le recu
+    negatif sont passes sur le MEME compte Sage -> ils s'annulent, libelles a rattacher."""
+    from gtc_compta.services import controles
+    imports.importer_lot(base, user, [_ligne_recu("7RCB347", "CL001", "ETS ALPHA", 965950, 27, "P"),
+                                      _ligne_recu("7RCB477", "CL002", "QUINCAILLERIE BETA", -965950, 27, "P")],
+                         "p", "p")
+    sage.ajouter_ecriture(SageEntry(501, "CL002", "CAI", date(2026, 10, 27), "7RCB347", "7RCB347", "Recu", "C", 965950))
+    sage.ajouter_ecriture(SageEntry(502, "CL002", "CAI", date(2026, 10, 27), "7RCB477", "7RCB477", "Recu", "C", -965950))
+    mid = base.scalar("SELECT id FROM normalized_movements WHERE reference_piece='7RCB477'")
+    r = controles.verifier_recu_negatif_dans_sage(base, user, sage, mid)
+    assert r["conclusion"] == "MEME_COMPTE" and r["origine"] == "7RCB347"
+    assert any("MEME compte" in x for x in r["details"])
+
+
+def test_recu_negatif_sage_indisponible(base, user, sage):
+    from gtc_compta.sage.base import SageIndisponible
+    from gtc_compta.services import controles
+    imports.importer_lot(base, user, [_ligne_recu("7RCB477", "CL002", "QUINCAILLERIE BETA", -5000, 27, "Q")], "q", "q")
+    sage.disponible = False
+    with pytest.raises(SageIndisponible):
+        controles.verifier_recu_negatif_dans_sage(base, user, sage,
+                                                  base.scalar("SELECT id FROM normalized_movements"))
+
+
+def test_recu_negatif_comptes_differents_a_analyser(base, user, sage):
+    """Cas 3 : aucun recu anterieur sur le compte du recu negatif ; le recu positif du jour est sur un autre
+    compte Sage -> a analyser par le comptable (aucune modification automatique)."""
+    from gtc_compta.services import controles
+    imports.importer_lot(base, user, [_ligne_recu("7RCB347", "CL001", "ETS ALPHA", 965950, 27, "R"),
+                                      _ligne_recu("7RCB477", "CL002", "QUINCAILLERIE BETA", -965950, 27, "R")],
+                         "r", "r")
+    sage.ajouter_ecriture(SageEntry(601, "CL001", "CAI", date(2026, 10, 27), "7RCB347", "7RCB347", "Recu", "C", 965950))
+    sage.ajouter_ecriture(SageEntry(602, "CL002", "CAI", date(2026, 10, 27), "7RCB477", "7RCB477", "Recu", "C", -965950))
+    mid = base.scalar("SELECT id FROM normalized_movements WHERE reference_piece='7RCB477'")
+    r = controles.verifier_recu_negatif_dans_sage(base, user, sage, mid)
+    assert r["conclusion"] == "A_ANALYSER"
+    assert r["comptes"] == {"7RCB477": ["CL002"], "7RCB347": ["CL001"]}
+    assert base.scalar("SELECT reference_liee FROM normalized_movements WHERE id=?", (mid,)) is None

@@ -73,6 +73,12 @@ class FakeSageAdapter:
         self._check()
         return {ct: self.solde_client(ct, date_ref) for ct in self.clients}
 
+    def ecritures_par_piece(self, piece):
+        self._check()
+        p = piece.replace(" ", "").upper()
+        return [e for e in self.ecritures if p in (e.numero_piece.replace(" ", "").upper(),
+                                                   e.reference_piece.replace(" ", "").upper())]
+
     def chercher_bon_commande(self, reference):
         self._check()
         ref = reference.replace(" ", "").upper()
