@@ -1,7 +1,7 @@
 # Rapport de tests
 
 Exécution : `python -m pytest -q`, Python 3.12, Linux (environnement de développement), le 12/11/2026.
-**Résultat : 87 tests réussis, 0 échec.**
+**Résultat : 93 tests réussis, 0 échec.**
 
 Le parseur est testé sur une **copie anonymisée du rapport réel** (jours 01, 03, 12 et 14 de
 `10 RC OCT.xlsx`), avec les chiffres de référence du classeur : comptages, totaux `TOTAL VENTES` /
@@ -42,6 +42,11 @@ Contrôle croisé avec la feuille RECAP : RECOUVREMENTS extraits = 3 942 549 420
 
 Volume (base SQLite) : import du mois complet (7 705 mouvements, 26 lots) en 0,4 s. Le réimport des mêmes
 données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée (2 414 lignes) est calculée en 16 ms.
+
+## Second mois réel (septembre 2026)
+`python tools/analyser_rapport.py "09 RC SEPT.xlsx"` : 30/30 jours cohérents sans modification des règles ;
+RECAP identique aux feuilles. Jeu anonymisé `tests/fixtures/RC_SEPT_2026_ANONYMISE.xlsx` (jours 09, 18, 24, 25).
+Import enchaîné septembre + octobre : 16 314 mouvements, 0 rejet, 0,9 s.
 
 ## Autres vérifications effectuées
 - Interface réelle lancée sous Xvfb : les 10 modules s'affichent sans erreur (`tools/captures.py`, captures dans `docs/captures/`).
@@ -87,6 +92,7 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 - [OK] tests/test_flux.py::test_recu_negatif_les_deux_recus_sur_le_meme_compte
 - [OK] tests/test_flux.py::test_recu_negatif_sage_indisponible
 - [OK] tests/test_flux.py::test_recu_negatif_comptes_differents_a_analyser
+- [OK] tests/test_flux.py::test_septembre_recu_negatif_lie_au_recu_de_la_veille
 - [OK] tests/test_modules.py::test_cas9_bc_deja_inclus_pas_double_compte
 - [OK] tests/test_modules.py::test_cas9_bc_non_inclus_ajoute_une_fois
 - [OK] tests/test_modules.py::test_cas10_facture_echue_selon_politique
@@ -150,3 +156,8 @@ données depuis un autre fichier insère 0 mouvement. La fiche la plus chargée 
 - [OK] tests/test_parser.py::test_export_erp_ecrit_par_excel_normalise
 - [OK] tests/test_parser.py::test_controle_croise_macro_application
 - [OK] tests/test_parser.py::test_compte_de_liaison_conteneur
+- [OK] tests/test_parser.py::test_septembre_reel[09-238-3-150-40-16206800-185834025-124993825]
+- [OK] tests/test_parser.py::test_septembre_reel[18-152-11-73-32-10043100-177364600-124607850]
+- [OK] tests/test_parser.py::test_septembre_reel[24-165-1-117-28-19013325-121774450-82496750]
+- [OK] tests/test_parser.py::test_septembre_reel[25-143-0-86-23-21312325-247481745-115516700]
+- [OK] tests/test_parser.py::test_septembre_bc_avec_facture_bloque

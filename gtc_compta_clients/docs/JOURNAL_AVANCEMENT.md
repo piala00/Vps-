@@ -1,5 +1,14 @@
 # Journal d'avancement
 
+## Cycle 7 (12/11/2026) : second mois réel (septembre 2026)
+- `09 RC SEPT.xlsx` traité sans changement de règles : 30/30 jours cohérents ; RECAP identique.
+- Jeu de test anonymisé de septembre (jours 09, 18, 24, 25) ; lien d'annulation de reçu entre deux jours.
+- Recoupement des acomptes entre mois : 13/17 confirmés en septembre ; 3 erreurs de n° de BC (colonne B) et
+  1 facture comptant issue d'un BC « BP » relevées.
+- Nouveau reçu négatif à vérifier dans Sage : 7RCB024416 (09/09, BOUTIQUE TOURISTIQUE, −123 500).
+- Import enchaîné des deux mois : 16 314 mouvements, 0 rejet. 93 tests.
+
+
 ## Cycle 6 (12/11/2026) : contrôle assisté des reçus négatifs
 - Action « Vérifier dans Sage (reçu négatif) » sur les alertes : recherche du reçu d'origine sur le même
   compte Sage, sinon des comptes où les reçus ont été passés. Lecture seule, résultat tracé dans l'audit.

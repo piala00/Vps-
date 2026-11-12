@@ -323,3 +323,27 @@ def test_recu_negatif_comptes_differents_a_analyser(base, user, sage):
     assert r["conclusion"] == "A_ANALYSER"
     assert r["comptes"] == {"7RCB477": ["CL002"], "7RCB347": ["CL001"]}
     assert base.scalar("SELECT reference_liee FROM normalized_movements WHERE id=?", (mid,)) is None
+
+
+def test_septembre_recu_negatif_lie_au_recu_de_la_veille(db, user, cfg):
+    """25/09 : 7RCB026463 (-121 800) annule 7RCB026459 du 24/09, meme client (rapport reel anonymise)."""
+    from pathlib import Path
+    from gtc_compta.sage.base import SageClient
+    from gtc_compta.sage.fake import FakeSageAdapter
+    from gtc_compta.text import normaliser
+    sept = Path(__file__).parent / "fixtures" / "RC_SEPT_2026_ANONYMISE.xlsx"
+    res = {f: ParseurRapport(cfg["rapport"], {}).analyser(lire_feuille(sept, f), f, "BERTOUA", None)
+           for f in ("24", "25")}
+    noms = sorted({normaliser(m.client_libelle) for r in res.values() for m in r.mouvements})
+    sage = FakeSageAdapter()
+    for k, nom in enumerate(noms):
+        sage.ajouter_client(SageClient(f"S{k:03d}", nom))
+    svc_clients.synchroniser_clients(db, user, sage, [])
+    corr = {nom: f"S{k:03d}" for k, nom in enumerate(noms)}
+    for f in ("24", "25"):
+        lignes = lignes_export(res[f])
+        imports.completer_codes(lignes, corr)
+        assert not imports.importer_lot(db, user, lignes, f"sept{f}", f).rejets
+    m = db.one("SELECT * FROM normalized_movements WHERE reference_piece='7RCB026463'")
+    assert (m["montant"], m["reference_liee"]) == (-121800, "7RCB026459")
+    assert db.scalar("SELECT COUNT(*) FROM alertes WHERE type='ANNULATION_RECU_A_VERIFIER'") == 0

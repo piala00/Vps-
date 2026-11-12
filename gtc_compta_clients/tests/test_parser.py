@@ -265,3 +265,28 @@ def test_compte_de_liaison_conteneur(cfg):
     r = analyser(cfg, "03", REEL, {})
     benef = {m.acheteur_detail for m in r.mouvements if m.client_libelle == "COMPTE DE LIAISON"}
     assert "" not in benef and len(benef) >= 2
+
+
+# ---------------------------------------------------------------------------------------
+# Second mois reel : septembre 2026 (09 RC SEPT.xlsx anonymise, jours 09, 18, 24, 25)
+# ---------------------------------------------------------------------------------------
+SEPT = Path(__file__).parent / "fixtures" / "RC_SEPT_2026_ANONYMISE.xlsx"
+
+
+@pytest.mark.parametrize("feuille,fact,avoirs,acomptes,recus,h,i,f", [
+    ("09", 238, 3, 150, 40, 16206800, 185834025, 124993825),
+    ("18", 152, 11, 73, 32, 10043100, 177364600, 124607850),
+    ("24", 165, 1, 117, 28, 19013325, 121774450, 82496750),
+    ("25", 143, 0, 86, 23, 21312325, 247481745, 115516700)])
+def test_septembre_reel(cfg, feuille, fact, avoirs, acomptes, recus, h, i, f):
+    r = analyser(cfg, feuille, SEPT, {})
+    s = r.stats
+    assert (s["factures"], s["avoirs"], s["acomptes"], s["reglements"]) == (fact, avoirs, acomptes, recus)
+    ctl = s["controle_totaux"]
+    assert (ctl["documents_H"]["retenu"], ctl["documents_I"]["retenu"], ctl["recus_F"]["retenu"]) == (h, i, f)
+    assert all(v["rapport"] == v["lignes"] and v["ecart_non_explique"] == 0 for v in ctl.values())
+
+
+def test_septembre_bc_avec_facture_bloque(cfg):
+    r = analyser(cfg, "18", SEPT, {})
+    assert any("BCCB031741" in a.motif and a.gravite == "BLOQUANT" for a in r.anomalies)

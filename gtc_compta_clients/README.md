@@ -12,7 +12,7 @@ A4 recto verso.
 | Élément | État |
 |---|---|
 | Fondations, base SQLite, migrations, audit, rôles | fait, testé |
-| Parseur du rapport + classeur de préparation (traitement Python de secours) | fait, **validé sur les 31 jours du rapport réel `10 RC OCT.xlsx`** (contrôle de complétude des totaux) |
+| Parseur du rapport + classeur de préparation (traitement Python de secours) | fait, **validé sur deux mois réels (`09 RC SEPT.xlsx`, `10 RC OCT.xlsx`)** (contrôle de complétude des totaux) |
 | Module VBA `.bas` + script de construction du `.xlsm` | écrit, **non exécuté** (pas d'Excel dans l'environnement de développement) |
 | Import idempotent, ventilation, soldes progressifs, corrections tracées | fait, testé |
 | Rapprochement Sage, écarts, reprise option A/B, rétroactivité | fait, testé avec un **Sage fictif** |
@@ -27,7 +27,7 @@ Le détail se trouve dans [docs/JOURNAL_AVANCEMENT.md](docs/JOURNAL_AVANCEMENT.m
 ## Installation (poste de développement ou Windows)
 ```bat
 python -m pip install -r requirements-dev.txt
-python -m pytest -q                 :: 87 tests
+python -m pytest -q                 :: 93 tests
 python tools\analyser_rapport.py "10 RC OCT.xlsx"   :: controle d'un rapport reel (lecture seule)
 python tools\make_demo.py           :: données fictives
 python tools\demo_setup.py          :: environnement de démonstration complet

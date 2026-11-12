@@ -1,4 +1,4 @@
-# Mapping du rapport commercial : établi sur le classeur réel `10 RC OCT.xlsx`
+# Mapping du rapport commercial : établi sur les classeurs réels `10 RC OCT.xlsx` et `09 RC SEPT.xlsx`
 
 Analyse du 12/11/2026 : 32 feuilles (`01` à `31`, `RECAP`), 31 jours. Outils :
 `tools/analyser_rapport.py` (statistiques, contrôle des totaux) et `tools/anonymiser_rapport.py`
@@ -6,6 +6,25 @@ Analyse du 12/11/2026 : 32 feuilles (`01` à `31`, `RECAP`), 31 jours. Outils :
 
 > Le classeur réel lui-même n'est **pas** versionné (données clients). Seule la copie anonymisée
 > (noms remplacés, montants et numéros conservés) sert aux tests.
+
+## Validation sur un second mois : septembre 2026
+`09 RC SEPT.xlsx` (feuilles 01 à 31, RECAP, `Feuil1` vide ; la feuille 31 est vide et datée du 01/10) est traité
+**sans aucune modification des règles** :
+- 30/30 jours cohérents (total du rapport = lignes ; aucun montant oublié) ;
+- 4 682 factures, 123 avoirs, 2 781 acomptes imputés, 928 reçus ; 2 n° BCCB portant une facture
+  (BCCB031741 le 18/09, BCCB032460 le 23/09, montants positifs : ce ne sont pas des avoirs) ;
+- RECAP de septembre : vente comptant, vente à terme et recouvrements **identiques** aux feuilles ;
+- import enchaîné septembre + octobre : 16 314 mouvements sur 52 jours, 0 rejet, 0,9 s.
+
+Recoupement des acomptes entre les deux mois : sur les 17 factures comptant d'octobre dont l'acompte
+n'apparaissait pas en octobre, **13 ont leur acompte sur un BC de septembre**. Les 4 autres révèlent des
+erreurs de saisie :
+| Facture | Constat |
+|---|---|
+| FACB038619 (05/10, DEST ANAS ABDOU NOVIA, 26 000) | colonne B « BC31018 » = BC de septembre d'un autre client ; même erreur sur BCCB034018 le 03/10 (devrait être BC34018) |
+| FACB040560 (19/10, CLIENTS DETAILS BTA / ALH OGA, 26 000) | colonne B « BC3594 » : chiffre manquant ; l'acompte est sur BC35949 (17/10, même acheteur, même montant) |
+| FACB040798 (20/10, CLIENTS DETAILS BTA / KUETE, 18 000) | colonne B « BC36198 » = BC d'un autre client ; BC réel inconnu |
+| FACB041560 (26/10, COMPTE DE LIAISON, 36 450) | BC036855 en **BP** (aucun acompte) mais facture en colonne COMPTANT : probablement non soldée par acompte dans Sage (le rapprochement le signalera) |
 
 ## Structure d'une feuille journalière
 | Ligne | Contenu |
@@ -125,6 +144,8 @@ Octobre 2026 :
 | 7RCB028975 (14/10, 3 500 000) | 7RCB028907 (même jour) | 7RCB028847 |
 | 7RCB028976 (14/10, 7 000 000) | 7RCB028853 (même jour) | 7RCB028851 |
 | 7RCB030438 (27/10, 8 100 000) | 7RCB030328 (26/10) | — |
+| 7RCB026463 (25/09, 121 800) | 7RCB026459 (24/09) | — |
+| 7RCB024416 (09/09, 123 500, « BOUTIQUE TOURISTIQUE ») — feuille 09, ligne 305 | **non trouvé** | 7RCB024417 « MOHAMADOU AWALOU TOURISTIQUE » (ligne 306, juste après) : même schéma que 7RCB030477 |
 | 7RCB030477 (27/10, 965 950) — feuille 27, ligne 338 | **non trouvé** sur « ALH OUMAROU BOUBAKARY » | 7RCB030347 « OUMAROU BOUBAKARY » (feuille 27, ligne 315) : même compte Sage ? **en vérification par la comptabilité** |
 
 ## Contrôle de complétude (pour chaque jour)
