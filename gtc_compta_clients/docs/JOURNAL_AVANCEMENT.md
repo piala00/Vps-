@@ -1,5 +1,14 @@
 # Journal d'avancement
 
+## Cycle 5 (12/11/2026) : comptes clients particuliers
+- COMPTE DE LIAISON, VENTE PROMOTIONNELLE et SOURCE DU PAYS RETOUR sont des comptes clients Sage normaux.
+  COMPTE DE LIAISON n'est plus exclu ; seuls les versements de caisse et les totaux le restent.
+- Vérification : les factures comptant de COMPTE DE LIAISON sont adossées à des acomptes de BC, donc la
+  règle « acompte imputé » s'applique ; ses paiements passés directement en comptabilité seront repris
+  par l'option A au rapprochement.
+- Mois réel : 4 218 factures, 126 avoirs, 2 537 acomptes imputés, 913 reçus ; totaux 31/31 cohérents. 82 tests.
+
+
 ## Cycle 4 (12/11/2026) : bons de commande et acomptes
 - Règle de la comptabilité : rien n'est comptabilisé au stade du BC (colonnes F et G non exploitées). Seules
   les factures (H, I) et les règlements passent à la mise à jour comptable.
@@ -44,7 +53,7 @@
 2. ~~Les FVCB~~ : réglé (débit avec leur signe, comme toute facture).
 3. ~~Reçus négatifs~~ : **réglé**. Il s'agit d'annulations de reçus faits sur un compte erroné (règle implémentée).
    Reste à vérifier : `7RCB030477` (ALH OUMAROU BOUBAKARY) a-t-il le même compte Sage que « OUMAROU BOUBAKARY » ?
-4. **COMPTE DE LIAISON**, **VENTE PROMOTIONNELLE**, **SOURCE DU PAYS RETOUR** : quels comptes Sage ?
+4. ~~COMPTE DE LIAISON, VENTE PROMOTIONNELLE, SOURCE DU PAYS RETOUR~~ : réglé (comptes clients).
 5. Les 8 lignes `BCCB` portant un montant de facture : quelle est la règle de correction attendue des commerciaux ?
 
 

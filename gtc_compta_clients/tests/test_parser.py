@@ -22,7 +22,7 @@ def analyser(cfg, feuille="01", fichier=None, corr=CORR):
 # Rapport REEL (anonymise) : chiffres de reference etablis sur 10 RC OCT.xlsx
 # ---------------------------------------------------------------------------------------
 @pytest.mark.parametrize("feuille,fact,avoirs,acomptes,recus,annulees", [
-    ("01", 124, 1, 84, 23, 8), ("03", 164, 5, 83, 38, 8), ("12", 245, 2, 154, 62, 9), ("14", 178, 29, 91, 28, 1)])
+    ("01", 124, 1, 84, 23, 8), ("03", 165, 6, 85, 38, 8), ("12", 247, 2, 156, 62, 9), ("14", 181, 32, 97, 28, 1)])
 def test_reel_comptages(cfg, feuille, fact, avoirs, acomptes, recus, annulees):
     s = analyser(cfg, feuille, REEL, {}).stats
     assert (s["factures"], s["avoirs"], s["acomptes"], s["reglements"], s["annulees"]) == \
@@ -100,10 +100,16 @@ def test_recu_negatif_sans_original_avertit(cfg):
     assert any("7RCB0462" in x.motif and x.gravite == "AVERTISSEMENT" for x in r.anomalies)
 
 
-def test_reel_liaisons_et_versements_exclus(cfg):
+def test_reel_compte_de_liaison_est_un_client(cfg):
+    """COMPTE DE LIAISON, VENTE PROMOTIONNELLE, SOURCE DU PAYS RETOUR : comptes clients Sage reels."""
     r = analyser(cfg, "03", REEL, {})
-    assert not any("LIAISON" in m.client_libelle for m in r.mouvements)
-    assert r.stats["montants_exclus"]["H"] == -81515
+    liaison = [m for m in r.mouvements if m.client_libelle == "COMPTE DE LIAISON"]
+    assert {m.reference_piece for m in liaison} >= {"FRCB000747", "FACB038198"}
+    av = next(m for m in liaison if m.reference_piece == "FRCB000747")
+    assert (av.nature, av.sens, av.montant) == ("AVOIR", "D", -172995)
+    assert r.stats["montants_exclus"].get("H", 0) == 0
+    # les versements de caisse restent exclus
+    assert not any("VERSEMENT" in m.client_libelle for m in r.mouvements)
 
 
 # ---------------------------------------------------------------------------------------
@@ -112,12 +118,12 @@ def test_reel_liaisons_et_versements_exclus(cfg):
 def test_cas1_seules_les_deux_sections_utiles(cfg):
     r = analyser(cfg)
     assert {m.reference_piece for m in r.factures} == {"FACB0201", "FACB0301", "FACB0202", "FACB0203",
-                                                       "FRCB0001", "FACB0204"}
+                                                       "FRCB0001", "FACB0204", "FACB0206", "FACB0207"}
     assert {m.reference_piece for m in r.reglements} == {"7RCB0451"}
     assert sum(m.montant for m in r.reglements) == 300000     # REPORT, versements caisse, BTF exclus
-    assert {m.reference_piece for m in r.acomptes} == {"FACB0301", "FACB0202"}   # liaison exclue
+    assert {m.reference_piece for m in r.acomptes} == {"FACB0301", "FACB0202", "FACB0206"}
     assert r.stats["annulees"] == 1
-    assert r.stats["hors_perimetre_exclus"] == 5   # liaison + REPORT + versements caisse + BTF + SOLDE
+    assert r.stats["hors_perimetre_exclus"] == 4   # REPORT + versements caisse + BTF + SOLDE
     assert all(v["ecart_non_explique"] == 0 for v in r.stats["controle_totaux"].values())
 
 

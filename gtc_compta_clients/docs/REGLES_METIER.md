@@ -54,6 +54,9 @@
    `A_RAPPROCHER`, une alerte est créée et les confirmations client concernées sont marquées.
 
 ## Écritures Sage absentes du rapport
+Cas fréquent : le paiement d'un client COMPTE DE LIAISON, passé en comptabilité dès réception de la preuve
+de paiement, sans reçu dans le rapport.
+
 - **Option A** : reprise comme mouvement `COMPLEMENT_SAGE` lié à l'EC_No (unicité SQL), avec motif et
   justificatif. Elle est refusée si un mouvement ERP porte déjà la même référence (risque de double
   comptabilisation). Rien n'est écrit dans Sage.

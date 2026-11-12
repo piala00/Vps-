@@ -28,7 +28,7 @@ def importer(db, user, cfg, feuille="01"):
 
 def test_import_et_rejet_client_non_mappe(base, user, cfg):
     rap = importer(base, user, cfg)
-    assert rap.inseres == 8 and len(rap.rejets) == 1
+    assert rap.inseres == 11 and len(rap.rejets) == 1
     assert "Code tiers absent" in rap.rejets[0][1]
 
 
@@ -41,7 +41,7 @@ def test_cas3_reimport_zero_doublon(base, user, cfg):
     for l in lignes:
         l["id_import"] = "AUTRE-FICHIER"
     rap2 = imports.importer_lot(base, user, lignes, "copie.xlsx", "y")
-    assert rap2.inseres == 0 and rap2.deja_presents == 8
+    assert rap2.inseres == 0 and rap2.deja_presents == 11
     assert base.scalar("SELECT COUNT(*) FROM normalized_movements") == n
 
 
@@ -77,6 +77,7 @@ def test_cas5_cas6_concordance_et_ecart(base, user, cfg, sage):
     importer(base, user, cfg)
     res = {r.ct_num: r for r in reco.rapprocher(base, user, sage, J1)}
     assert res["CL001"].statut == "VALIDE" and res["CL002"].statut == "VALIDE" and res["CL099"].statut == "VALIDE"
+    assert res["CL050"].statut == "VALIDE" and res["CL050"].solde_erp == 60000      # COMPTE DE LIAISON
     r = base.one("SELECT * FROM daily_reconciliations WHERE ct_num='CL001' AND obsolete=0")
     preuve = json.loads(r["preuve_json"])
     assert r["valide_par"] == "AUTO:compta1" and r["empreinte_sage"] and preuve["nb_ecritures_sage"] == 3
@@ -173,7 +174,7 @@ def test_fichier_correspondances_export_import(db, user, sage, cfg, tmp_path):
     svc_clients.synchroniser_clients(db, user, sage, cfg["rapport"]["comptes_collectifs"])
     n = svc_clients.exporter_libelles_a_completer(db, cfg["rapport"], DEMO / "RC_DEMO_SYNTHETIQUE.xlsx",
                                                   tmp_path / "c.xlsx")
-    assert n == 6                                      # 5 clients connus + NOUVEAU CLIENT X
+    assert n == 7                                      # 6 clients connus + NOUVEAU CLIENT X
     wb = load_workbook(tmp_path / "c.xlsx")
     ws = wb["CORRESPONDANCES"]
     for row in ws.iter_rows(min_row=2):

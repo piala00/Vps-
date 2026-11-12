@@ -57,7 +57,7 @@ DEFAULTS: dict = {
         "factures_comptant": {"mode": "solder_par_acompte", "colonnes": ["H"], "confirme": False},
         "colonne_montant_recu": "F",
         "mots_exclusion": ["TOTAL", "SOUS-TOTAL", "S/TOTAL", "REPORT", "VERSEMENT CAISSE",
-                            "VERSEMENT BANQUE", "LIAISON", "CAISSE CENTRALE", "SOLDE"],
+                            "VERSEMENT BANQUE", "CAISSE CENTRALE", "SOLDE"],
         "comptes_collectifs": ["CLIENTS DETAILS BTA"],
         "correspondance_auto_intitule_exact": False,
         "lignes_vides_fin_section": 8

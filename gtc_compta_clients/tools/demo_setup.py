@@ -28,9 +28,6 @@ def main():
     pdfs = OUT / "factures_pdf"
     pdfs.mkdir()
     cfg = {"data_dir": "data", "sage": {"mode": "demo"},
-           "rapport": {"types_documents": {"FACB": {"nature": "FACTURE", "sens": "D", "confirme": False},
-                                           "FVCB": {"nature": "FACTURE", "sens": "D", "confirme": False},
-                                           "FRCB": {"nature": "AVOIR", "sens": "C", "confirme": False}}},
            "documents": {"dossiers_pdf": [str(pdfs)], "dossier_export": str(OUT / "exports")},
            "utilisateur": {"login": "compta1", "nom": "Comptable (demo)", "role": "comptable_controleur"}}
     (OUT / "config.json").write_text(json.dumps(cfg, indent=2), encoding="utf-8")
@@ -38,10 +35,11 @@ def main():
     db, u, sage = ctx.db, ctx.user, ctx.sage
     clients.synchroniser_clients(db, u, sage, ctx.cfg["rapport"]["comptes_collectifs"])
     for lib, ct in {"ETS ALPHA": "CL001", "QUINCAILLERIE BETA": "CL002", "SOCIETE GAMMA": "CL003",
-                    "DELTA SARL": "CL004", "CLIENTS DETAILS BTA": "CL099"}.items():
+                    "DELTA SARL": "CL004", "CLIENTS DETAILS BTA": "CL099", "COMPTE DE LIAISON": "CL050"}.items():
         clients.definir_correspondance(db, u, lib, ct)
     for ct, zone, tel in [("CL001", "CENTRE", "699000001"), ("CL002", "CENTRE", "677000002"),
-                          ("CL003", "EST - BATOURI", "655000003"), ("CL004", "BELABO", ""), ("CL099", "CENTRE", "")]:
+                          ("CL003", "EST - BATOURI", "655000003"), ("CL004", "BELABO", ""), ("CL099", "CENTRE", ""),
+                          ("CL050", "CENTRE", "")]:
         clients.maj_champs_manuels(db, u, ct, zone=zone, delai_reglement_jours=30, telephone_whatsapp=tel or None)
     clients.importer_soldes_ouverture(db, u, sage, date(2026, 9, 30))
     rows = lire_feuille(ROOT / "demo" / "RC_DEMO_SYNTHETIQUE.xlsx", "01")

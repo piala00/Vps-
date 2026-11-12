@@ -19,7 +19,7 @@ DEMO = ROOT / "demo"
 REF = date(2026, 9, 30)
 J1 = date(2026, 10, 1)
 CORR = {"ETS ALPHA": "CL001", "QUINCAILLERIE BETA": "CL002", "SOCIETE GAMMA": "CL003",
-        "DELTA SARL": "CL004", "CLIENTS DETAILS BTA": "CL099"}
+        "DELTA SARL": "CL004", "CLIENTS DETAILS BTA": "CL099", "COMPTE DE LIAISON": "CL050"}
 
 
 @pytest.fixture(scope="session", autouse=True)

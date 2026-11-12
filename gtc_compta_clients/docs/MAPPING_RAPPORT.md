@@ -51,12 +51,29 @@ reprend celle du 20/10 (32 789 775 au lieu de 6 738 250). Total RECAP 435 334 25
 | `FRCB` (60) et `FVCB` (59) | 119 | **toujours négatifs** : AVOIR au **débit négatif** (règle GTC) |
 | lignes `ANNULEE` | 106 | ignorées (bloquant si un montant est présent) |
 | factures à montant nul (`AVARIE`, `BONUS`, `AN`…) | 27 | aucune écriture, information |
-| `COMPTE DE LIAISON` | ~60 | hors périmètre (liaison interne) |
+| `COMPTE DE LIAISON`, `VENTE PROMOTIONNELLE`, `SOURCE DU PAYS RETOUR` | ~70 pièces | **comptes clients Sage normaux** (confirmé par la comptabilité) : traités comme tout client |
 | n° `BCCB` portant un montant facture | 8 | **bloquant** : le n° de facture manque |
 | même n° de facture pour 2 clients (`FACB039522` le 12/10) | 1 | avertissement + conflit enregistré à l'import |
 | reçus `7RCB` négatifs | 4 | **annulation d'un reçu fait sur un compte erroné** (règle confirmée par la comptabilité) : reçu au **crédit négatif**, lié au reçu annulé ; 3/4 liés automatiquement, 1 en alerte |
 | reçus | 913 | tous `7RCB`, montant en F (RECOUVREMENTS) |
 | libellés clients distincts | ~213 | fichier de correspondances à compléter |
+
+## Comptes clients particuliers (confirmé par la comptabilité le 12/11/2026)
+| Libellé | Nature | Fonctionnement |
+|---|---|---|
+| `VENTE PROMOTIONNELLE` | client (délégation commerciale) | facturée en compte, à crédit ; solde par reçus après la vente promotionnelle |
+| `SOURCE DU PAYS RETOUR` | client (compte rattaché à un fournisseur) | les déstockeurs y facturent puis effectuent le versement |
+| `COMPTE DE LIAISON` | client | facturation de clients sans cash immédiat ; le paiement (autre moyen) est passé en comptabilité dès réception de la preuve |
+| `CLIENTS DETAILS BTA` | compte collectif | acheteur réel en colonne E (ventilation analytique) |
+
+Conséquence pour le rapprochement : le paiement d'une facture COMPTE DE LIAISON passé directement en
+comptabilité n'apparaît pas dans le rapport. Il est détecté comme « écriture Sage absente du rapport » et
+repris par l'option A (reprise liée à l'EC_No, sans rien écrire dans Sage).
+
+Octobre : 40 factures, 7 avoirs et 46 acomptes imputés de plus qu'avec l'ancienne exclusion. Les factures
+comptant de COMPTE DE LIAISON sont toutes adossées à un acompte de BC (31 sur la même ligne, 14 sur un BC
+antérieur du mois, 1 sur un BC de septembre). Contrôle sur tout le mois : 2 520 factures comptant sur 2 537
+ont leur acompte visible en octobre ; les 17 autres portent des n° de BC antérieurs à octobre.
 
 ## Bons de commande et acomptes (règle confirmée par la comptabilité le 12/11/2026)
 - Tant qu'un montant est dans les colonnes BON DE COMMANDE (F « ENTREE » = acompte, G « BP »), **rien
@@ -105,7 +122,7 @@ Octobre 2026 :
 ## Contrôle de complétude (pour chaque jour)
 Pour chaque colonne H, I et F (acomptes) et pour la colonne F des reçus :
 1. **total du rapport = somme des lignes de détail**. Il est vérifié sur les 31 jours sans aucun écart.
-2. **somme des lignes = retenu + exclu (liaisons, caisse) + bloqué (anomalies)**. Il est vérifié sur les 31 jours.
+2. **somme des lignes = retenu + exclu (versements de caisse) + bloqué (anomalies)**. Il est vérifié sur les 31 jours.
    Un montant non interprété fait apparaître une anomalie bloquante.
 
 ## Points restant à confirmer par la comptabilité
@@ -113,5 +130,5 @@ Pour chaque colonne H, I et F (acomptes) et pour la colonne F des reçus :
    au premier rapprochement réel la **référence** sous laquelle Sage passe l'acompte imputé (n° de facture,
    de BC ou de règlement). L'appariement essaie les trois, puis date et montant.
 2. ~~Sens des `FVCB`~~ : réglé. Comme toute facture, ils vont au débit avec leur signe (négatif).
-3. **`COMPTE DE LIAISON`** : exclusion confirmée ? Existe-t-il un compte 411 correspondant dans Sage ?
-4. **`VENTE PROMOTIONNELLE`**, **`SOURCE DU PAYS RETOUR`** : comptes clients Sage réels ?
+3. ~~`COMPTE DE LIAISON`, `VENTE PROMOTIONNELLE`, `SOURCE DU PAYS RETOUR`~~ : réglé, ce sont des comptes
+   clients (voir « Comptes clients particuliers »).

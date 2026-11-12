@@ -30,6 +30,13 @@
    "encours_autorise": 0
   },
   {
+   "ct_num": "CL050",
+   "intitule": "COMPTE DE LIAISON",
+   "telephone": "",
+   "ville": "BERTOUA",
+   "encours_autorise": null
+  },
+  {
    "ct_num": "CL099",
    "intitule": "CLIENTS DETAILS BTA",
    "telephone": "",
@@ -171,6 +178,39 @@
    "libelle": "Frais de transport refactures",
    "sens": "D",
    "montant": 25000
+  },
+  {
+   "ec_no": 19,
+   "ct_num": "CL050",
+   "journal": "VTE",
+   "date_ecriture": "2026-10-01",
+   "numero_piece": "FACB0206",
+   "reference_piece": "FACB0206",
+   "libelle": "Facture FACB0206",
+   "sens": "D",
+   "montant": 2700
+  },
+  {
+   "ec_no": 20,
+   "ct_num": "CL050",
+   "journal": "CAI",
+   "date_ecriture": "2026-10-01",
+   "numero_piece": "RC0454",
+   "reference_piece": "BC0106",
+   "libelle": "Acompte BC0106",
+   "sens": "C",
+   "montant": 2700
+  },
+  {
+   "ec_no": 21,
+   "ct_num": "CL050",
+   "journal": "VTE",
+   "date_ecriture": "2026-10-01",
+   "numero_piece": "FACB0207",
+   "reference_piece": "FACB0207",
+   "libelle": "Facture FACB0207",
+   "sens": "D",
+   "montant": 60000
   },
   {
    "ec_no": 17,

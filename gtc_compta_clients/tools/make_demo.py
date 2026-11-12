@@ -68,7 +68,8 @@ def rapport(path):
         [None, "FRCB0001", "ETS ALPHA", "EN COMPTE", None, None, None, -50000],              # avoir / retour
         [None, "FACB0204", "NOUVEAU CLIENT X", "EN COMPTE", None, None, None, 75000],        # sans correspondance
         ["BC0105", "FACB0205", "ETS ALPHA", "ANNULEE", 0, None, 0, None],                    # annulee
-        ["BC0106", "FACB0206", "COMPTE DE LIAISON", "REUNION DIRECTION", 2700, None, 2700, None],  # liaison
+        ["BC0106", "FACB0206", "COMPTE DE LIAISON", "REUNION DIRECTION", 2700, None, 2700, None],  # client liaison (comptant)
+        [None, "FACB0207", "COMPTE DE LIAISON", "EN COMPTE", None, None, None, 60000],        # liaison en compte
     ], [
         ["7RCB0451", "ETS ALPHA", 300000],
     ])
@@ -93,6 +94,7 @@ SAGE = {
         {"ct_num": "CL002", "intitule": "QUINCAILLERIE BETA", "telephone": "677000002", "ville": "BERTOUA", "encours_autorise": 500000},
         {"ct_num": "CL003", "intitule": "SOCIETE GAMMA", "telephone": "655000003", "ville": "BATOURI", "encours_autorise": 1000000},
         {"ct_num": "CL004", "intitule": "DELTA SARL", "telephone": "", "ville": "BELABO", "encours_autorise": 0},
+        {"ct_num": "CL050", "intitule": "COMPTE DE LIAISON", "telephone": "", "ville": "BERTOUA", "encours_autorise": None},
         {"ct_num": "CL099", "intitule": "CLIENTS DETAILS BTA", "telephone": "", "ville": "BERTOUA", "encours_autorise": None},
     ],
     "ecritures": [
@@ -108,6 +110,9 @@ SAGE = {
         {"ec_no": 14, "ct_num": "CL002", "journal": "CAI", "date_ecriture": "2026-10-01", "numero_piece": "RC0452", "reference_piece": "BC0102", "libelle": "Acompte sur commande BC0102", "sens": "C", "montant": 120000},
         {"ec_no": 15, "ct_num": "CL003", "journal": "VTE", "date_ecriture": "2026-10-01", "numero_piece": "FACB0203", "reference_piece": "FACB0203", "libelle": "Facture FACB0203", "sens": "D", "montant": 200000, "date_echeance": "2026-10-15"},
         {"ec_no": 16, "ct_num": "CL003", "journal": "OD", "date_ecriture": "2026-10-01", "numero_piece": "OD0007", "reference_piece": "", "libelle": "Frais de transport refactures", "sens": "D", "montant": 25000},
+        {"ec_no": 19, "ct_num": "CL050", "journal": "VTE", "date_ecriture": "2026-10-01", "numero_piece": "FACB0206", "reference_piece": "FACB0206", "libelle": "Facture FACB0206", "sens": "D", "montant": 2700},
+        {"ec_no": 20, "ct_num": "CL050", "journal": "CAI", "date_ecriture": "2026-10-01", "numero_piece": "RC0454", "reference_piece": "BC0106", "libelle": "Acompte BC0106", "sens": "C", "montant": 2700},
+        {"ec_no": 21, "ct_num": "CL050", "journal": "VTE", "date_ecriture": "2026-10-01", "numero_piece": "FACB0207", "reference_piece": "FACB0207", "libelle": "Facture FACB0207", "sens": "D", "montant": 60000},
         {"ec_no": 17, "ct_num": "CL099", "journal": "VTE", "date_ecriture": "2026-10-01", "numero_piece": "FACB0202", "reference_piece": "FACB0202", "libelle": "Facture detail", "sens": "D", "montant": 35000},
         {"ec_no": 18, "ct_num": "CL099", "journal": "CAI", "date_ecriture": "2026-10-01", "numero_piece": "RC0453", "reference_piece": "", "libelle": "Acompte detail", "sens": "C", "montant": 35000},
     ],

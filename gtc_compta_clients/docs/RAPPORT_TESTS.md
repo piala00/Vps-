@@ -30,8 +30,8 @@ avec le vrai Sage reste à établir.
 
 ## Validation sur le rapport réel complet (31 jours, hors dépôt)
 `python tools/analyser_rapport.py "10 RC OCT.xlsx"` :
-- 4 178 factures, 119 avoirs, 2 491 acomptes imputés sur factures comptant, 913 reçus (+4 reçus négatifs) extraits ; 1 350 BC/BL seuls, 106 annulées,
-  27 factures à montant nul, liaisons et versements de caisse exclus ;
+- 4 218 factures, 126 avoirs, 2 537 acomptes imputés sur factures comptant, 913 reçus (+4 reçus négatifs) extraits ; 1 350 BC/BL seuls, 106 annulées,
+  30 factures à montant nul, versements de caisse exclus (COMPTE DE LIAISON traité comme un client) ;
 - **31/31 jours** : le total du rapport est égal à la somme des lignes, et la somme des lignes est égale à
   retenu + exclu + bloqué (aucun montant oublié) ;
 - 8 lignes bloquantes sur le mois (n° de BC portant une facture) ; les 4 reçus négatifs sont traités comme

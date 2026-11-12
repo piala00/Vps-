@@ -91,7 +91,7 @@ def _valide(base, user, cfg, sage):
 def test_cas13_impression_differee_recto_verso(base, user, cfg, sage, tmp_path):
     _valide(base, user, cfg, sage)
     q = printing.file_attente(base, cfg["impression"])
-    assert [x["ct_num"] for x in q] == ["CL099", "CL001", "CL002"] or len(q) == 3
+    assert {x["ct_num"] for x in q} == {"CL001", "CL002", "CL050", "CL099"}
     res = printing.generer_fiches(base, user, [x["ct_num"] for x in q], tmp_path / "f.pdf", cfg)
     assert all(n % 2 == 0 for n in res["pages_par_client"].values())   # clients separes physiquement
     assert len(PdfReader(str(tmp_path / "f.pdf")).pages) == res["pages"]
