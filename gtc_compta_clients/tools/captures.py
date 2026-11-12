@@ -53,7 +53,7 @@ def main():
                 iid = next(i for i, r in p.t._data.items() if r["ct_num"] == "CL003")
                 p.t.tv.selection_set(iid)
             elif key == "etat":
-                p.t.tv.selection_set("0")
+                pass
             elif key == "solvabilite":
                 p.bc.insert(0, "BCCB0101")
                 p.controler()

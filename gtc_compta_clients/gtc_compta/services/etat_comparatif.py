@@ -234,8 +234,15 @@ NOMS_MOIS = ["JANVIER", "FEVRIER", "MARS", "AVRIL", "MAI", "JUIN", "JUILLET", "A
              "NOVEMBRE", "DECEMBRE"]
 
 
+COLONNES_ETAT = ["vente_comptant", "vente_credit", "total_ventes", "recouvrements", "recette"]
+ENTETE_ETAT = ["DATES", "VENTE COMPTANT", "VENTE A CREDIT", "TOTAL VENTES", "RECOUVREMENTS", "RECETTE TOTALE"]
+
+
 def exporter_excel(db, agence: str, mois_liste: list[tuple[int, int]], dest, societe: str = "") -> str:
-    """Classeur Excel : une feuille par mois au format de la feuille RECAP, completee du rapprochement Sage."""
+    """Classeur Excel :
+    - une feuille par mois : l'ETAT COMPARATIF au format de la feuille RECAP, arrete a la RECETTE TOTALE ;
+    - RAPPROCHEMENT VENTES SAGE : total des ventes du CR / ventes comptabilisees dans Sage, par jour ;
+    - CONTROLES : TOTAL M-1 saisi dans RECAP compare au M-1 calcule, acompte et cellule du CR (information)."""
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     wb = Workbook()
@@ -246,54 +253,88 @@ def exporter_excel(db, agence: str, mois_liste: list[tuple[int, int]], dest, soc
     vert = PatternFill("solid", fgColor="E8F5E9")
     fin = Side(style="thin", color="999999")
     cadre = Border(left=fin, right=fin, top=fin, bottom=fin)
-    entete = ["DATES", "VENTE COMPTANT", "VENTE A CREDIT", "TOTAL VENTES", "RECOUVREMENTS", "RECETTE TOTALE",
-              "ACOMPTE (info)", "TOTAL VENTES CR (cellule)", "VENTES SAGE", "ECART CR - SAGE", "STATUT SAGE"]
+
+    def entete(ws, cols):
+        ws.append(cols)
+        for c in ws[ws.max_row]:
+            c.font, c.fill, c.border = gras, bleu, cadre
+            c.alignment = Alignment(wrap_text=True, horizontal="center")
+
+    def montants(ws, debut):
+        for row in ws.iter_rows(min_row=debut, max_row=ws.max_row):
+            for c in row:
+                if isinstance(c.value, int) and not isinstance(c.value, bool):
+                    c.number_format = "# ##0"
+                elif isinstance(c.value, date):
+                    c.number_format = "DD/MM/YYYY"
+
+    tableaux = {}
     for annee, mois in sorted(mois_liste):
-        t = tableau_mois(db, agence, annee, mois)
+        t = tableaux[(annee, mois)] = tableau_mois(db, agence, annee, mois)
         ws = wb.create_sheet(f"{NOMS_MOIS[mois - 1][:9]} {annee}")
         ws.append([f"{societe} - {agence}"])
         ws.append([f"ETAT COMPARATIF - {NOMS_MOIS[mois - 1]} {annee}"])
         ws["A1"].font = gras
         ws["A2"].font = Font(bold=True, size=13)
-        ws.append(entete)
-        for c in ws[3]:
-            c.font, c.fill, c.border = gras, bleu, cadre
-            c.alignment = Alignment(wrap_text=True, horizontal="center")
+        entete(ws, ENTETE_ETAT)
         for r in t["jours"]:
-            ws.append([date.fromisoformat(r["date_jour"]), r["vente_comptant"], r["vente_credit"], r["total_ventes"],
-                       r["recouvrements"], r["recette"], r["acompte"], r["total_ventes_cellule_cr"], r["ventes_sage"],
-                       r["ecart_sage"], r["statut_sage"]])
-            ligne = ws[ws.max_row]
-            ligne[0].number_format = "DD/MM/YYYY"
-            if r["statut_sage"] == "ECART":
-                ligne[10].fill = rouge
-            elif r["statut_sage"] == "CONCORDANT":
-                ligne[10].fill = vert
+            ws.append([date.fromisoformat(r["date_jour"])] + [r[c] for c in COLONNES_ETAT])
+            for c in ws[ws.max_row]:
+                c.border = cadre
+
         def bloc(lib, d):
-            ws.append([lib] + ([d[c] for c in COLONNES] if d else ["n/d"] * len(COLONNES)))
+            ws.append([lib] + ([d[c] for c in COLONNES_ETAT] if d else ["n/d"] * len(COLONNES_ETAT)))
             for c in ws[ws.max_row]:
                 c.font, c.border = gras, cadre
         bloc("TOTAL M", t["total_m"])
         bloc("TOTAL M-1", t["total_m1"])
         bloc("EVOLUTION", t["evolution"])
-        bloc("TOTAL N-1" + (" (saisi dans RECAP)" if t.get("source_n1") == "saisi dans RECAP" else ""), t["total_n1"])
+        bloc("TOTAL N-1" + (" (saisi RECAP)" if t.get("source_n1") == "saisi dans RECAP" else ""), t["total_n1"])
         bloc("ECART N - (N-1)", t["ecart_n1"])
-        ws.append([])
-        s = t["sage"]
-        ws.append(["Rapprochement Sage", f"{s['jours_concordants']} jour(s) concordant(s)", f"{s['jours_ecart']} en ecart",
-                   f"{s['jours_non_verifies']} non verifie(s)"])
-        if t.get("m1_saisi_recap") and t["total_m1"]:
-            d = {c: t["m1_saisi_recap"][c] - t["total_m1"][c] for c in COLONNES}
-            if any(d[c] for c in ("vente_comptant", "vente_credit", "recouvrements")):
-                bloc("M-1 SAISI DANS RECAP", t["m1_saisi_recap"])
-                bloc("ECART M-1 SAISI - M-1 CALCULE", d)
-        ws.append(["Recette totale = recouvrements + vente comptant (regle GTC)."])
-        for row in ws.iter_rows(min_row=4, max_row=ws.max_row):
-            for c in row[1:10]:
-                if isinstance(c.value, int):
-                    c.number_format = "# ##0"
-        for col, larg in zip("ABCDEFGHIJK", (14, 16, 16, 16, 16, 16, 14, 18, 16, 16, 18)):
+        montants(ws, 4)
+        for col, larg in zip("ABCDEF", (22, 17, 17, 17, 17, 17)):
             ws.column_dimensions[col].width = larg
         ws.freeze_panes = "B4"
+
+    ws = wb.create_sheet("RAPPROCHEMENT VENTES SAGE")
+    ws.append(["Total des ventes du CR / ventes comptabilisees dans Sage le meme jour (factures comptant + credit, "
+               "avoirs deduits)"])
+    ws["A1"].font = gras
+    entete(ws, ["DATE", "TOTAL VENTES CR", "VENTES SAGE", "ECART CR - SAGE", "STATUT", "INTEGRE AUX FICHES",
+                "PIECES CR ABSENTES DE SAGE", "PIECES SAGE ABSENTES DU CR", "MONTANTS DIFFERENTS"])
+    for (annee, mois), t in tableaux.items():
+        for r in t["jours"]:
+            d = json.loads(r["detail_sage"]) if r["detail_sage"] else {}
+            ws.append([date.fromisoformat(r["date_jour"]), r["total_ventes"], r["ventes_sage"], r["ecart_sage"],
+                       r["statut_sage"], r["total_ventes_retenu"],
+                       ", ".join(f"{p} ({m})" for p, m in d.get("pieces_cr_absentes_de_sage", [])),
+                       ", ".join(f"{p} ({m})" for p, m in d.get("pieces_sage_absentes_du_cr", [])),
+                       ", ".join(f"{p} (CR {a} / Sage {b})" for p, a, b in d.get("montants_differents", []))])
+            if r["statut_sage"] in ("ECART", "CONCORDANT"):
+                ws[ws.max_row][4].fill = rouge if r["statut_sage"] == "ECART" else vert
+    montants(ws, 3)
+    for col, larg in zip("ABCDEFGHI", (12, 17, 17, 16, 18, 17, 45, 45, 45)):
+        ws.column_dimensions[col].width = larg
+    ws.freeze_panes = "B3"
+
+    ws = wb.create_sheet("CONTROLES")
+    entete(ws, ["MOIS", "CONTROLE", "VENTE COMPTANT", "VENTE A CREDIT", "TOTAL VENTES", "RECOUVREMENTS",
+                "RECETTE TOTALE"])
+    for (annee, mois), t in tableaux.items():
+        lib = f"{NOMS_MOIS[mois - 1]} {annee}"
+        if t.get("m1_saisi_recap"):
+            ws.append([lib, "TOTAL M-1 saisi dans RECAP"] + [t["m1_saisi_recap"][c] for c in COLONNES_ETAT])
+            if t["total_m1"]:
+                ws.append([lib, "Ecart M-1 saisi - M-1 calcule"]
+                          + [t["m1_saisi_recap"][c] - t["total_m1"][c] for c in COLONNES_ETAT])
+        acompte = sum(r["acompte"] or 0 for r in t["jours"])
+        cellule = [r for r in t["jours"] if r["total_ventes_cellule_cr"] is not None
+                   and r["total_ventes_cellule_cr"] != r["total_ventes"]]
+        ws.append([lib, f"Acompte du mois (colonne ENTREE des BC, information) : {acompte}"])
+        ws.append([lib, "Cellule 'vente totale' du CR = comptant + credit" if not cellule else
+                   "Cellule 'vente totale' du CR differente : " + ", ".join(r["date_jour"] for r in cellule)])
+    montants(ws, 2)
+    for col, larg in zip("ABCDEFG", (16, 60, 17, 17, 17, 17, 17)):
+        ws.column_dimensions[col].width = larg
     wb.save(dest)
     return str(dest)

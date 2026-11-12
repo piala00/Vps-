@@ -10,8 +10,11 @@ Un grand tableau par mois, une ligne par jour :
 | TOTAL VENTES | vente comptant + vente à crédit (= cellule du CR qui calcule la vente totale, 2ᵉ ligne « TOTAL VENTES ») |
 | RECOUVREMENTS | somme des reçus (RECOUVREMENTS) |
 | **RECETTE TOTALE** | **recouvrements + vente comptant** (règle GTC) |
-| ACOMPTE (info) | colonne ENTREE des BC |
-| VENTES SAGE / ÉCART / STATUT | rapprochement avec Sage Comptabilité (ci-dessous) |
+
+**L'état comparatif s'arrête à la RECETTE TOTALE.** Le rapprochement avec Sage et les contrôles sont présentés à part :
+onglet « Rapprochement des ventes avec Sage » dans l'application, et feuilles `RAPPROCHEMENT VENTES SAGE` et
+`CONTROLES` dans l'export Excel (TOTAL M-1 saisi dans RECAP comparé au M-1 calculé, acompte du mois, cellule
+« vente totale » du CR).
 
 Puis, comme dans RECAP : **TOTAL M**, **TOTAL M-1** (calculé sur le mois précédent chargé), **ÉVOLUTION**, **TOTAL N-1**
 (calculé si l'année précédente est chargée, sinon repris de la ligne saisie dans RECAP, avec la mention « saisi dans
@@ -42,8 +45,8 @@ Le contrôle est lancé automatiquement à l'import de chaque journée, et à la
 - **Application** : module « État comparatif » (choix du mois, rapprochement Sage, détail des écarts, export Excel,
   chargement d'un rapport mensuel complet pour l'historique).
 - **Outil** : `python tools/etat_comparatif.py "04 RC AVR.xlsx" … "10 RC OCT.xlsx" --sortie ETAT_COMPARATIF.xlsx
-  [--config config.json]`. Il produit une feuille par mois, ainsi que les feuilles ANALYSE_MENSUELLE et
-  CONTROLE_RECAP. Avec `--config` en mode `sql`, le rapprochement Sage de chaque jour est fait.
+  [--config config.json]`. Il produit une feuille d'état comparatif par mois (jusqu'à la recette totale), ainsi
+  que les feuilles RAPPROCHEMENT VENTES SAGE, CONTROLES, ANALYSE_MENSUELLE et CONTROLE_RECAP. Avec `--config` en mode `sql`, le rapprochement Sage de chaque jour est fait.
 
 ## Constats sur avril → octobre 2026
 | Mois | Total ventes | Recouvrements | Recette totale |

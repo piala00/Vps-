@@ -1268,20 +1268,27 @@ class EtatComparatif(Page):
                                     command=lambda _v: self.charger())
         self.mois.pack()
         bouton(b, "Verifier les ventes du mois avec Sage", self.verifier_mois).pack(side="left", padx=6, pady=(16, 0))
-        bouton(b, "Verifier le jour selectionne", self.verifier_jour, couleur="#455A64").pack(side="left", padx=6, pady=(16, 0))
+        bouton(b, "Verifier le jour selectionne (onglet Sage)", self.verifier_jour, couleur="#455A64").pack(side="left", padx=6, pady=(16, 0))
         bouton(b, "Exporter en Excel", self.exporter, couleur=VERT).pack(side="left", padx=6, pady=(16, 0))
         bouton(b, "Charger un rapport mensuel...", self.charger_rapport, couleur="#455A64",
                actif=self.user.peut("importer"), motif="Reserve aux roles autorises (importer)").pack(side="left", padx=6, pady=(16, 0))
-        self.t = Table(self, [("d", "Date", 100, "w"), ("vc", "Vente comptant", 120, "e"), ("vk", "Vente a credit", 130, "e"),
-                              ("tv", "Total ventes", 130, "e"), ("rc", "Recouvrements", 130, "e"), ("re", "Recette totale", 130, "e"),
-                              ("vs", "Ventes Sage", 130, "e"), ("ec", "Ecart CR-Sage", 110, "e"), ("st", "Statut Sage", 150, "w")],
-                       height=15, on_select=self.detail)
-        self.t.pack(fill="both", expand=True, padx=14, pady=4)
-        self.lbl = ctk.CTkTextbox(self, height=130, font=ctk.CTkFont(family="Consolas", size=11))
-        self.lbl.pack(fill="x", padx=14, pady=4)
-        ctk.CTkLabel(self, text="Recette totale = recouvrements + vente comptant. Le total des ventes du CR doit etre egal "
-                                "aux ventes comptabilisees dans Sage le meme jour (factures comptant + credit, avoirs deduits).",
-                     text_color="#555", wraplength=1100, justify="left").pack(fill="x", padx=16)
+        onglets = ctk.CTkTabview(self)
+        onglets.pack(fill="both", expand=True, padx=14, pady=4)
+        o1 = onglets.add("Etat comparatif")
+        self.t = Table(o1, [("d", "Date", 150, "w"), ("vc", "Vente comptant", 160, "e"), ("vk", "Vente a credit", 160, "e"),
+                            ("tv", "Total ventes", 160, "e"), ("rc", "Recouvrements", 160, "e"),
+                            ("re", "Recette totale", 160, "e")], height=16)
+        self.t.pack(fill="both", expand=True)
+        ctk.CTkLabel(o1, text="Recette totale = recouvrements + vente comptant.", text_color="#555").pack(anchor="w")
+        o2 = onglets.add("Rapprochement des ventes avec Sage")
+        self.ts = Table(o2, [("d", "Date", 100, "w"), ("tv", "Total ventes CR", 150, "e"), ("vs", "Ventes Sage", 150, "e"),
+                             ("ec", "Ecart CR - Sage", 140, "e"), ("st", "Statut", 160, "w"),
+                             ("fi", "Integre aux fiches", 150, "e")], height=11, on_select=self.detail)
+        self.ts.pack(fill="both", expand=True)
+        self.lbl = ctk.CTkTextbox(o2, height=120, font=ctk.CTkFont(family="Consolas", size=11))
+        self.lbl.pack(fill="x", pady=4)
+        ctk.CTkLabel(o2, text="Le total des ventes du CR doit etre egal aux ventes comptabilisees dans Sage le meme jour "
+                              "(factures comptant + credit, avoirs deduits).", text_color="#555").pack(anchor="w")
         self.charger()
 
     def _liste_mois(self):
@@ -1300,20 +1307,21 @@ class EtatComparatif(Page):
             self.t.remplir([], lambda r: r)
             return
         t = self.ec.tableau_mois(self.db, self.cfg["agence"], *m)
+        cols = self.ec.COLONNES_ETAT
         lignes = [dict(r) for r in t["jours"]]
         for lib, cle in (("TOTAL M", "total_m"), ("TOTAL M-1", "total_m1"), ("EVOLUTION", "evolution"),
-                         ("TOTAL N-1", "total_n1"), ("ECART N-(N-1)", "ecart_n1")):
+                         ("TOTAL N-1" + (" (RECAP)" if t.get("source_n1") == "saisi dans RECAP" else ""), "total_n1"),
+                         ("ECART N-(N-1)", "ecart_n1")):
             d = t[cle]
-            lignes.append({"date_jour": lib, **({c: d[c] for c in self.ec.COLONNES} if d else {c: None for c in self.ec.COLONNES}),
-                           "ventes_sage": t["sage"]["ventes_sage"] if cle == "total_m" else None, "ecart_sage": None,
-                           "statut_sage": (f"{t['sage']['jours_concordants']} OK / {t['sage']['jours_ecart']} ecart(s)"
-                                           if cle == "total_m" else ""), "detail_sage": None})
-        self.t.remplir(lignes, lambda r: (_fd(r["date_jour"]) if r["date_jour"][:2] == "20" else r["date_jour"],
-                                          fmt_fcfa(r["vente_comptant"]), fmt_fcfa(r["vente_credit"]),
-                                          fmt_fcfa(r["total_ventes"]), fmt_fcfa(r["recouvrements"]), fmt_fcfa(r["recette"]),
-                                          fmt_fcfa(r["ventes_sage"]), fmt_fcfa(r["ecart_sage"], True), r["statut_sage"]),
-                       tag=lambda r: {"CONCORDANT": "VALIDE", "ECART": "ECART_A_ANALYSER",
-                                      "SAGE_INDISPONIBLE": "EN_ATTENTE_SAGE"}.get(r["statut_sage"]))
+            lignes.append({"date_jour": lib, **({c: d[c] for c in cols} if d else {c: None for c in cols})})
+        self.t.remplir(lignes, lambda r: tuple([_fd(r["date_jour"]) if r["date_jour"][:2] == "20" else r["date_jour"]]
+                                               + [fmt_fcfa(r[c]) for c in cols]),
+                       tag=lambda r: None if r["date_jour"][:2] == "20" else "RAPPROCHE")
+        self.ts.remplir([dict(r) for r in t["jours"]],
+                        lambda r: (_fd(r["date_jour"]), fmt_fcfa(r["total_ventes"]), fmt_fcfa(r["ventes_sage"]),
+                                   fmt_fcfa(r["ecart_sage"], True), r["statut_sage"], fmt_fcfa(r["total_ventes_retenu"])),
+                        tag=lambda r: {"CONCORDANT": "VALIDE", "ECART": "ECART_A_ANALYSER",
+                                       "SAGE_INDISPONIBLE": "EN_ATTENTE_SAGE"}.get(r["statut_sage"]))
 
     def detail(self, r):
         self.lbl.delete("1.0", "end")
@@ -1342,8 +1350,8 @@ class EtatComparatif(Page):
                                                        f"{sum(1 for v in r.values() if v == 'SAGE_INDISPONIBLE')} Sage indisponible.")))
 
     def verifier_jour(self):
-        r = self.t.selection()
-        if not r or r["date_jour"][:2] != "20":
+        r = self.ts.selection()
+        if not r:
             return erreur("Selectionner une journee.")
         self.app.tache("Rapprochement des ventes du jour", lambda: self.ec.rapprocher_ventes_jour(
             self.db, self.user, self.sage, self.cfg["agence"], date.fromisoformat(r["date_jour"])), lambda _r: self.charger())

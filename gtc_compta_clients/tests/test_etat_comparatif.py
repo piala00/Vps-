@@ -80,9 +80,10 @@ def test_tableau_du_mois_et_export_excel(base, user, cfg, tmp_path):
     assert t["evolution"]["recouvrements"] == t["total_m"]["recouvrements"] - t["total_m1"]["recouvrements"]
     dest = ec.exporter_excel(base, "BERTOUA", [(2026, 9), (2026, 10)], tmp_path / "etat.xlsx", "GTC")
     wb = load_workbook(dest)
-    assert wb.sheetnames == ["SEPTEMBRE 2026", "OCTOBRE 2026"]
+    assert wb.sheetnames == ["SEPTEMBRE 2026", "OCTOBRE 2026", "RAPPROCHEMENT VENTES SAGE", "CONTROLES"]
     ws = wb["OCTOBRE 2026"]
     assert ws["A3"].value == "DATES" and ws["F3"].value == "RECETTE TOTALE"
+    assert ws.max_column == 6                                  # l'etat comparatif s'arrete a la recette totale
     assert any(r[0].value == "TOTAL M" for r in ws.iter_rows())
 
 
