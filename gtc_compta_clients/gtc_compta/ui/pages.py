@@ -1269,17 +1269,24 @@ class EtatComparatif(Page):
         self.mois.pack()
         bouton(b, "Verifier les ventes du mois avec Sage", self.verifier_mois).pack(side="left", padx=6, pady=(16, 0))
         bouton(b, "Verifier le jour selectionne (onglet Sage)", self.verifier_jour, couleur="#455A64").pack(side="left", padx=6, pady=(16, 0))
+        bouton(b, "Calculer les creances (Sage)", self.creances, couleur="#455A64").pack(side="left", padx=6, pady=(16, 0))
         bouton(b, "Exporter en Excel", self.exporter, couleur=VERT).pack(side="left", padx=6, pady=(16, 0))
-        bouton(b, "Charger un rapport mensuel...", self.charger_rapport, couleur="#455A64",
-               actif=self.user.peut("importer"), motif="Reserve aux roles autorises (importer)").pack(side="left", padx=6, pady=(16, 0))
+        menu = ctk.CTkFrame(self, fg_color="transparent")
+        menu.pack(fill="x", padx=14)
+        bouton(menu, "Charger un rapport mensuel (CR)...", self.charger_rapport, couleur="#455A64",
+               actif=self.user.peut("importer"), motif="Reserve aux roles autorises (importer)").pack(side="left")
+        bouton(menu, "Importer un etat chiffre d'affaires existant...", self.importer_etat, couleur="#455A64",
+               actif=self.user.peut("importer"), motif="Reserve aux roles autorises (importer)").pack(side="left", padx=6)
         onglets = ctk.CTkTabview(self)
         onglets.pack(fill="both", expand=True, padx=14, pady=4)
         o1 = onglets.add("Etat comparatif")
-        self.t = Table(o1, [("d", "Date", 150, "w"), ("vc", "Vente comptant", 160, "e"), ("vk", "Vente a credit", 160, "e"),
-                            ("tv", "Total ventes", 160, "e"), ("rc", "Recouvrements", 160, "e"),
-                            ("re", "Recette totale", 160, "e")], height=16)
+        self.t = Table(o1, [("d", "DATES", 190, "w"), ("tv", "TOTAL", 160, "e"), ("vc", "COMPTANT", 160, "e"),
+                            ("vk", "CREDIT", 160, "e"), ("rc", "RECOUVREMENT", 160, "e"),
+                            ("re", "TOTAL RECETTE", 160, "e")], height=16)
         self.t.pack(fill="both", expand=True)
-        ctk.CTkLabel(o1, text="Recette totale = recouvrements + vente comptant.", text_color="#555").pack(anchor="w")
+        ctk.CTkLabel(o1, text="Modele ETAT CHIFFRE D'AFFAIRE : CREDIT = TOTAL - COMPTANT ; TOTAL RECETTE = COMPTANT + "
+                              "RECOUVREMENT. Les lignes Total M-1, N-1 et CREANCE sont calculees (jamais saisies).",
+                     text_color="#555").pack(anchor="w")
         o2 = onglets.add("Rapprochement des ventes avec Sage")
         self.ts = Table(o2, [("d", "Date", 100, "w"), ("tv", "Total ventes CR", 150, "e"), ("vs", "Ventes Sage", 150, "e"),
                              ("ec", "Ecart CR - Sage", 140, "e"), ("st", "Statut", 160, "w"),
@@ -1309,11 +1316,21 @@ class EtatComparatif(Page):
         t = self.ec.tableau_mois(self.db, self.cfg["agence"], *m)
         cols = self.ec.COLONNES_ETAT
         lignes = [dict(r) for r in t["jours"]]
-        for lib, cle in (("TOTAL M", "total_m"), ("TOTAL M-1", "total_m1"), ("EVOLUTION", "evolution"),
-                         ("TOTAL N-1" + (" (RECAP)" if t.get("source_n1") == "saisi dans RECAP" else ""), "total_n1"),
-                         ("ECART N-(N-1)", "ecart_n1")):
+        a, mo = m
+        m1 = (a, mo - 1) if mo > 1 else (a - 1, 12)
+        nm = self.ec.NOMS_MOIS
+        for lib, cle in (("TOTAL", "total_m"), (f"Total {nm[m1[1] - 1]} {m1[0]}", "total_m1"), ("VARIATION", "evolution"),
+                         (f"Total {nm[mo - 1]} {a - 1}" + (" (saisi)" if t.get("source_n1") == "saisi" else ""), "total_n1"),
+                         ("VARIATION", "ecart_n1")):
             d = t[cle]
             lignes.append({"date_jour": lib, **({c: d[c] for c in cols} if d else {c: None for c in cols})})
+        fin_m, fin_m1 = self.ec.fin_de_mois(a, mo), self.ec.fin_de_mois(*m1)
+        cf, cd = t.get("creance_fin"), t.get("creance_debut")
+        vide = {c: None for c in cols}
+        lignes.append({"date_jour": f"CREANCE AU {fin_m:%d-%m-%y}", **vide, "vente_credit": cf})
+        lignes.append({"date_jour": f"CREANCE AU {fin_m1:%d-%m-%y}", **vide, "vente_credit": cd})
+        lignes.append({"date_jour": "VARIATION", **vide,
+                       "vente_credit": cf - cd if cf is not None and cd is not None else None})
         self.t.remplir(lignes, lambda r: tuple([_fd(r["date_jour"]) if r["date_jour"][:2] == "20" else r["date_jour"]]
                                                + [fmt_fcfa(r[c]) for c in cols]),
                        tag=lambda r: None if r["date_jour"][:2] == "20" else "RAPPROCHE")
@@ -1364,6 +1381,34 @@ class EtatComparatif(Page):
         self.ec.exporter_excel(self.db, self.cfg["agence"], [m], dest, self.cfg["societe"])
         if confirmer(f"Etat comparatif exporte :\n{dest}\n\nOuvrir le fichier ?"):
             docs.ouvrir_fichier(dest)
+
+    def creances(self):
+        m = self._mois_courant()
+        if not m:
+            return erreur("Aucun mois charge.")
+        a, mo = m
+        m1 = (a, mo - 1) if mo > 1 else (a - 1, 12)
+
+        def travail():
+            return [self.ec.calculer_creance(self.db, self.user, self.sage, self.cfg["agence"], *x) for x in (m1, m)]
+        self.app.tache("Calcul des creances clients", travail,
+                       lambda r: (self.charger(), info("\n".join(x.get("message") or f"{fmt_fcfa(x['montant'])} ({x['source']})"
+                                                               for x in r), "Creances")))
+
+    def importer_etat(self):
+        src = filedialog.askopenfilename(title="Etat chiffre d'affaires (une feuille par mois)",
+                                         filetypes=[("Excel", "*.xlsx")])
+        if not src:
+            return
+        ag = demander_texte(self, "Agence", "Agence concernee par cet etat :", obligatoire=True)
+        if not ag:
+            return
+        self.app.tache("Import de l'etat chiffre d'affaires",
+                       lambda: self.ec.charger_etat_modele(self.db, self.user, src, ag.strip().upper()),
+                       lambda r: info(f"{r['jours']} journee(s), {len(r['mois'])} mois importes pour {ag.upper()}.\n\n"
+                                      + ("Controles des lignes saisies a la main :\n- " + "\n- ".join(
+                                          f"{c[0]} : {c[2]}" for c in r["controles"]) if r["controles"]
+                                         else "Aucune incoherence dans les lignes saisies."), "Etat chiffre d'affaires"))
 
     def charger_rapport(self):
         src = filedialog.askopenfilename(title="Rapport commercial mensuel (lecture seule)", filetypes=[("Excel", "*.xlsx *.xlsm")])

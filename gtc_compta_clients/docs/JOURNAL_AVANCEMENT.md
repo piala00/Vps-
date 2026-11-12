@@ -167,3 +167,11 @@
 
 Avancement global estimé : fondations et moteurs en place ; **aucune fonctionnalité n'est encore validée
 sur les données réelles de GTC**.
+
+## Cycle : modèle « ETAT CHIFFRE D'AFFAIRE »
+- Export mensuel au format exact de l'état de la comptabilité (TOTAL, COMPTANT, CREDIT, RECOUVREMENT, TOTAL
+  RECETTE ; Total M-1, Total N-1, variations, créances début/fin de mois), formules Excel vivantes.
+- Créances calculées (Sage en lecture seule, ou fiches si soldes d'ouverture complets), sinon `n/d`.
+- Import d'un état existant avec contrôles : libellés, créances incohérentes ou non mises à jour, Total M-1 faux.
+  5 erreurs relevées sur les deux exemples 2025.
+- 135 tests réussis.

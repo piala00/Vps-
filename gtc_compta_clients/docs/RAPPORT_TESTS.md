@@ -1,7 +1,7 @@
 # Rapport de tests
 
 Exécution : `python -m pytest -q`, Python 3.12, Linux (environnement de développement), le 12/11/2026.
-**Résultat : 131 tests réussis, 0 échec.**
+**Résultat : 135 tests réussis, 0 échec.**
 
 Le parseur est testé sur une **copie anonymisée du rapport réel** (jours 01, 03, 12 et 14 de
 `10 RC OCT.xlsx`), avec les chiffres de référence du classeur : comptages, totaux `TOTAL VENTES` /
@@ -116,6 +116,10 @@ sans acompte connu sur leur BC (15 BC d'août, 8 erreurs de saisie réelles) ; 6
 - [OK] tests/test_etat_comparatif.py::test_nouveaux_chiffres_du_cr_remettent_le_controle_a_faire
 - [OK] tests/test_etat_comparatif.py::test_tableau_du_mois_et_export_excel
 - [OK] tests/test_etat_comparatif.py::test_references_saisies_dans_recap
+- [OK] tests/test_etat_comparatif.py::test_creance_fin_de_mois_depuis_sage
+- [OK] tests/test_etat_comparatif.py::test_creance_non_disponible_sans_sage_ni_soldes_d_ouverture
+- [OK] tests/test_etat_comparatif.py::test_import_d_un_etat_chiffre_d_affaire_existant
+- [OK] tests/test_etat_comparatif.py::test_creances_non_mises_a_jour_detectees
 - [OK] tests/test_flux.py::test_import_et_rejet_client_non_mappe
 - [OK] tests/test_flux.py::test_cas3_reimport_zero_doublon
 - [OK] tests/test_flux.py::test_cas3_montant_modifie_conflit_sans_doublon

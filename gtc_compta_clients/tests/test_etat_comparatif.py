@@ -82,9 +82,59 @@ def test_tableau_du_mois_et_export_excel(base, user, cfg, tmp_path):
     wb = load_workbook(dest)
     assert wb.sheetnames == ["SEPTEMBRE 2026", "OCTOBRE 2026", "RAPPROCHEMENT VENTES SAGE", "CONTROLES"]
     ws = wb["OCTOBRE 2026"]
-    assert ws["A3"].value == "DATES" and ws["F3"].value == "RECETTE TOTALE"
-    assert ws.max_column == 6                                  # l'etat comparatif s'arrete a la recette totale
-    assert any(r[0].value == "TOTAL M" for r in ws.iter_rows())
+    # Modele GTC « ETAT CHIFFRE D'AFFAIRE »
+    assert ws["A1"].value == "ETAT CHIFFRE D'AFFAIRE MOIS OCTOBRE 2026"
+    assert (ws["A2"].value, ws["B2"].value) == ("DATES", "CHIFFRE D'AFFAIRE")
+    assert [ws.cell(3, c).value for c in range(2, 7)] == ["TOTAL", "COMPTANT", "CREDIT", "RECOUVREMENT", "TOTAL RECETTE"]
+    assert ws.max_column == 6                                   # s'arrete au TOTAL RECETTE
+    assert ws["D4"].value == "=B4-C4" and ws["F4"].value == "=C4+E4"        # formules du modele
+    assert ws.cell(4 + 31, 1).value == "TOTAL" and ws.cell(4 + 31, 2).value == "=SUM(B4:B34)"
+    assert ws.cell(36, 1).value == "Total SEPTEMBRE 2026" and ws.cell(37, 1).value == "VARIATION"
+    assert ws.cell(38, 1).value == "Total OCTOBRE 2025"
+    assert ws.cell(40, 1).value == "CREANCE AU 31-10-26" and ws.cell(41, 1).value == "CREANCE AU 30-09-26"
+    assert ws.cell(40, 4).value == "n/d"                        # creance non calculee (Sage non interroge)
+
+
+def test_creance_fin_de_mois_depuis_sage(base, user, sage):
+    r = ec.calculer_creance(base, user, sage, "BERTOUA", 2026, 10)
+    assert r["statut"] == "OK" and r["montant"] == sum(sage.soldes_a_date(date(2026, 10, 31)).values())
+    assert ec.tableau_mois(base, "BERTOUA", 2026, 10)["creance_fin"] == r["montant"]
+
+
+def test_creance_non_disponible_sans_sage_ni_soldes_d_ouverture(db, user, sage):
+    sage.disponible = False
+    assert ec.calculer_creance(db, user, sage, "BERTOUA", 2026, 10)["statut"] == "NON_DISPONIBLE"
+
+
+def test_import_d_un_etat_chiffre_d_affaire_existant(db, user, tmp_path):
+    """Classeur au modele GTC (une feuille par mois) : charge comme historique, lignes saisies controlees."""
+    from openpyxl import Workbook
+    wb = Workbook()
+    wb.remove(wb.active)
+    for nom, mois, jours, saisi_m1, creances in (
+            ("JANVIER", 1, [(2, 1000, 400, 300), (3, 500, 100, 200)], None,
+             [("CREANCE AU 31/12/24", 5000), ("CREANCE AU 31/01/25", 6000)]),
+            ("FEVRIER", 2, [(1, 800, 300, 100)], ("Total janvier 2025", 1500, 500, 1000, 400, 900),
+             [("CREANCE AU 28-02-25", 6500), ("CREANCE AU 31-01-25", 6100)])):
+        ws = wb.create_sheet(nom)
+        ws.append([f"ETAT CHIFFRE D'AFFAIRE MOIS {nom} 2025"])
+        ws.append(["DATES", "CHIFFRE D'AFFAIRE"])
+        ws.append([None, "TOTAL", "COMPTANT", "CREDIT", "RECOUVREMENT", "TOTAL RECETTE"])
+        for j, tot, cpt, rec in jours:
+            ws.append([__import__("datetime").datetime(2025, mois, j), tot, cpt, tot - cpt, rec, cpt + rec])
+        ws.append(["TOTAL"])
+        if saisi_m1:
+            ws.append(list(saisi_m1))
+        for lib, v in creances:
+            ws.append([lib, None, None, v])
+    wb.save(tmp_path / "etat.xlsx")
+    r = ec.charger_etat_modele(db, user, tmp_path / "etat.xlsx", "AGENCE X")
+    assert r["jours"] == 3 and r["mois"] == [(2025, 1), (2025, 2)]
+    t = ec.tableau_mois(db, "AGENCE X", 2025, 2)
+    assert t["total_m1"]["total_ventes"] == 1500 and t["creance_debut"] == 6000 and t["creance_fin"] == 6500
+    motifs = " ".join(c[2] for c in r["controles"])
+    assert "6100" in motifs and "ecart 100" in motifs                    # creance au 31/01 saisie deux fois differemment
+    assert "recouvrements" in motifs                                       # Total janvier saisi : recouvrement faux
 
 
 def test_references_saisies_dans_recap(base, user, cfg, tmp_path):
@@ -101,5 +151,23 @@ def test_references_saisies_dans_recap(base, user, cfg, tmp_path):
     refs = ec.enregistrer_references_recap(base, "BERTOUA", 2026, 10, tmp_path / "rc.xlsx", "comptant+recouvrement")
     assert refs["N-1_SAISI_RECAP"]["recette"] == 2500 + 900
     t = ec.tableau_mois(base, "BERTOUA", 2026, 10)
-    assert t["source_n1"] == "saisi dans RECAP" and t["total_n1"]["total_ventes"] == 4900
+    assert t["source_n1"] == "saisi" and t["total_n1"]["total_ventes"] == 4900
     assert t["m1_saisi_recap"]["vente_credit"] == 5000
+
+
+def test_creances_non_mises_a_jour_detectees(db, user, tmp_path):
+    """Cas reel (etat 2025, feuille OCTOBRE) : lignes CREANCE recopiees du mois precedent."""
+    from datetime import datetime
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "OCTOBRE"
+    ws.append(["ETAT CHIFFRE D'AFFAIRE MOIS OCTOBRE 2025"])
+    ws.append(["DATES", "CHIFFRE D'AFFAIRE"])
+    ws.append([None, "TOTAL", "COMPTANT", "CREDIT", "RECOUVREMENT", "TOTAL RECETTE"])
+    ws.append([datetime(2025, 10, 1), 1000, 400, 600, 300, 700])
+    ws.append(["CREANCE AU 30-09-25", None, None, 281419325])
+    ws.append(["CREANCE AU 31-08-25", None, None, 272460025])
+    wb.save(tmp_path / "oct.xlsx")
+    r = ec.charger_etat_modele(db, user, tmp_path / "oct.xlsx", "AGENCE X")
+    assert any("31-10-25 absente" in c[2] for c in r["controles"])

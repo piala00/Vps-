@@ -24,6 +24,31 @@ RECAP »), **ÉCART N-(N-1)**.
 > `RECOUVREMENTS + VENTE COMPTANT`. Le paramètre `etat_comparatif.recette` permet de revenir à la formule du modèle
 > (`"acompte+recouvrement"`).
 
+## Modèle « ETAT CHIFFRE D'AFFAIRE » (feuilles mensuelles de l'export)
+Chaque mois est exporté au format exact de l'état fourni par la comptabilité (exemples 2025) :
+- titre `ETAT CHIFFRE D'AFFAIRE MOIS <MOIS> <ANNEE>` (A1:G1), en-têtes `DATES` / `CHIFFRE D'AFFAIRE` ;
+- colonnes `TOTAL`, `COMPTANT`, `CREDIT`, `RECOUVREMENT`, `TOTAL RECETTE` ;
+- une ligne par jour du mois (jours sans CR à zéro) ; formules Excel vivantes : `CREDIT = TOTAL - COMPTANT`,
+  `TOTAL RECETTE = COMPTANT + RECOUVREMENT`, `TOTAL = SOMME` ;
+- lignes de pied : `TOTAL`, `Total <mois-1>`, `VARIATION`, `Total <mois> <année-1>`, `VARIATION`,
+  `CREANCE AU <fin du mois>`, `CREANCE AU <fin du mois précédent>`, `VARIATION`.
+
+Le Total M-1 et le Total N-1 sont **calculés** à partir des mois chargés ; à défaut, le N-1 saisi (RECAP ou état
+importé) est repris avec la mention « (saisi) ». Les **créances** sont calculées : somme des soldes Sage en fin de
+mois (lecture seule), sinon somme des fiches clients si tous les soldes d'ouverture sont connus, sinon `n/d`
+(jamais de chiffre inventé).
+
+## Import d'un état chiffre d'affaires existant
+Bouton « Importer un état chiffre d'affaires existant… » (module État comparatif). Contrôles automatiques :
+- libellé de créance incohérent avec le mois (ex. « CREANCE AU 01-01-25 » en février) ;
+- même créance saisie avec deux montants différents sur deux feuilles ;
+- `Total M-1` saisi différent du `TOTAL` de la feuille du mois précédent ;
+- créances **non mises à jour** (libellés et montants du mois précédent recopiés).
+
+Sur les deux exemples 2025 fournis : 5 erreurs détectées (libellé de février, créance au 31-03-25 différente de
+300 020, « Total AOUT 2025 » et recouvrement négatif en septembre, créances d'octobre non mises à jour avec un écart
+de −1 126 200).
+
 ## Rapprochement quotidien des ventes avec Sage
 **Le total des ventes du CR d'un jour doit être égal aux ventes comptabilisées dans Sage ce jour-là** (factures
 comptant + factures à crédit, avoirs déduits, après la mise à jour comptable). Sinon, il y a une erreur dans le CR ou
