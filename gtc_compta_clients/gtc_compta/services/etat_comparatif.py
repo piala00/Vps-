@@ -271,10 +271,12 @@ def exporter_excel(db, agence: str, mois_liste: list[tuple[int, int]], dest, soc
                 elif isinstance(c.value, date):
                     c.number_format = "DD/MM/YYYY"
 
-    tableaux = {}
+    tableaux, feuilles = {}, {}
     for annee, mois in sorted(mois_liste):
         t = tableaux[(annee, mois)] = tableau_mois(db, agence, annee, mois)
-        feuille_modele(wb, t, annee, mois)
+        fm = feuille_modele(wb, t, annee, mois)
+        import calendar
+        feuilles[(annee, mois)] = (fm.title, 4 + calendar.monthrange(annee, mois)[1])
 
     ws = wb.create_sheet("RAPPROCHEMENT VENTES SAGE")
     ws.append(["Total des ventes du CR / ventes comptabilisees dans Sage le meme jour (factures comptant + credit, "
@@ -316,6 +318,10 @@ def exporter_excel(db, agence: str, mois_liste: list[tuple[int, int]], dest, soc
     montants(ws, 2)
     for col, larg in zip("ABCDEFG", (16, 60, 17, 17, 17, 17, 17)):
         ws.column_dimensions[col].width = larg
+    # Derniere feuille : etat comparatif de chaque annee (une ligne par mois), comparaison avec le mois precedent.
+    for an in sorted({a for a, _m in mois_liste}):
+        ref = max(m for a, m in mois_liste if a == an)
+        feuille_comparatif_annuel(wb, tableau_annuel(db, agence, an, ref), feuilles)
     wb.save(dest)
     return str(dest)
 
@@ -450,6 +456,161 @@ def feuille_modele(wb, t: dict, annee: int, mois: int):
     for col, larg in zip("ABCDEF", (33.6, 25.4, 23, 23, 23, 25.4)):
         ws.column_dimensions[col].width = larg
     ws.freeze_panes = "B4"
+    return ws
+
+
+# -- Etat comparatif annuel (derniere feuille) : une ligne par mois -------------------------------------
+def _mois_prec(annee: int, mois: int) -> tuple[int, int]:
+    return (annee, mois - 1) if mois > 1 else (annee - 1, 12)
+
+
+def totaux_mois(db, agence: str, annee: int, mois: int) -> dict | None:
+    """Totaux d'un mois (TOTAL, COMPTANT, CREDIT, RECOUVREMENT, TOTAL RECETTE) calcules sur les journees chargees ;
+    None si aucune journee du mois n'est chargee."""
+    rows = jours_du_mois(db, agence, annee, mois)
+    if not rows:
+        return None
+    t = _totaux(rows)
+    t["nb_jours"] = len(rows)
+    return t
+
+
+def tableau_annuel(db, agence: str, annee: int, mois_reference: int | None = None) -> dict:
+    """Etat comparatif de l'annee : une ligne par mois (janvier a decembre), memes colonnes que l'etat mensuel,
+    TOTAL de l'annee, puis comparaison du mois de reference (par defaut le dernier mois charge) avec le mois
+    precedent, et avec le meme mois de l'annee precedente seulement si ces chiffres existent."""
+    mois = [{"mois": m, "libelle": NOMS_MOIS[m - 1], "totaux": totaux_mois(db, agence, annee, m)}
+            for m in range(1, 13)]
+    charges = [x for x in mois if x["totaux"]]
+    total = ({c: sum(x["totaux"][c] for x in charges) for c in COLONNES_ETAT} if charges else None)
+    ref = mois_reference or (charges[-1]["mois"] if charges else None)
+    comp = None
+    if ref and mois[ref - 1]["totaux"]:
+        cur = mois[ref - 1]["totaux"]
+        pa, pm = _mois_prec(annee, ref)
+        prec = totaux_mois(db, agence, pa, pm)
+        # N-1 : uniquement s'il est calcule sur les rapports de l'annee precedente (un chiffre recopie a la main
+        # dans RECAP n'est pas verifie et n'est pas repris dans l'etat comparatif annuel).
+        n1 = totaux_mois(db, agence, annee - 1, ref)
+        src_n1 = "rapports" if n1 else None
+
+        def ecarts(autre):
+            if not autre:
+                return None, None
+            var = {c: cur[c] - autre[c] for c in COLONNES_ETAT}
+            pct = {c: (var[c] / autre[c] if autre[c] else None) for c in COLONNES_ETAT}
+            return var, pct
+        v_prec, p_prec = ecarts(prec)
+        v_n1, p_n1 = ecarts(n1)
+        comp = {"mois": (annee, ref), "totaux": cur, "precedent": (pa, pm), "totaux_precedent": prec,
+                "variation_precedent": v_prec, "variation_pct_precedent": p_prec,
+                "n1": (annee - 1, ref), "totaux_n1": n1, "source_n1": src_n1,
+                "variation_n1": v_n1, "variation_pct_n1": p_n1}
+    return {"annee": annee, "mois": mois, "total": total, "comparaison": comp}
+
+
+def feuille_comparatif_annuel(wb, ta: dict, feuilles: dict | None = None):
+    """Derniere feuille du classeur : ETAT COMPARATIF <annee>. Une ligne par mois ; chaque ligne reprend par formule
+    la ligne TOTAL de la feuille du mois quand elle est dans le classeur (sinon la valeur calculee).
+    En bas : comparaison du mois de reference avec le mois precedent (et avec N-1 si disponible).
+    feuilles : {(annee, mois): (titre_feuille, ligne_total)}."""
+    from openpyxl.styles import Alignment, Border, Font, Side
+    feuilles = feuilles or {}
+    fmt = '_-* #,##0\\ _€_-;\\-* #,##0\\ _€_-;_-* "-"??\\ _€_-;_-@_-'
+    fin = Side(style="thin")
+    cadre = Border(left=fin, right=fin, top=fin, bottom=fin)
+    police = Font(name="Calibri", size=14)
+    gras = Font(name="Calibri", size=14, bold=True)
+    centre = Alignment(horizontal="center", vertical="center")
+    annee = ta["annee"]
+    ws = wb.create_sheet(f"ETAT COMPARATIF {annee}")
+    ws["A1"] = f"ETAT COMPARATIF ANNEE {annee}"
+    ws["A1"].font = Font(name="Calibri", size=16, bold=True)
+    ws["A1"].alignment = centre
+    ws.merge_cells("A1:F1")
+    ws["A2"], ws["B2"] = "MOIS", "CHIFFRE D'AFFAIRE"
+    ws.merge_cells("A2:A3")
+    ws.merge_cells("B2:F2")
+    for i, lib in enumerate(ENTETE_ETAT[1:], 2):
+        ws.cell(3, i, lib)
+    for r in (2, 3):
+        for c in range(1, 7):
+            cell = ws.cell(r, c)
+            cell.font, cell.alignment, cell.border = gras, centre, cadre
+    ligne_mois = {}
+    for i, x in enumerate(ta["mois"]):
+        r = 4 + i
+        ligne_mois[x["mois"]] = r
+        ws.cell(r, 1, x["libelle"])
+        f = feuilles.get((annee, x["mois"]))
+        for c, (col, cle) in enumerate(zip("BCDEF", COLONNES_ETAT), 2):
+            if f:
+                ws.cell(r, c, f"='{f[0]}'!{col}{f[1]}")
+            elif x["totaux"]:
+                ws.cell(r, c, x["totaux"][cle])
+    l_tot = 16
+    ws.cell(l_tot, 1, "TOTAL")
+    for c, col in enumerate("BCDEF", 2):
+        ws.cell(l_tot, c, f"=SUM({col}4:{col}15)")
+    for row in ws.iter_rows(min_row=4, max_row=l_tot, max_col=6):
+        for cell in row:
+            cell.border = cadre
+            cell.font = gras if cell.row == l_tot or cell.column == 1 else police
+            if cell.column > 1:
+                cell.number_format = fmt
+    comp = ta["comparaison"]
+    r = l_tot + 2
+    if not comp:
+        ws.cell(r, 1, "Aucun mois charge : comparaison impossible.")
+    else:
+        a, m = comp["mois"]
+        pa, pm = comp["precedent"]
+        ws.cell(r, 1, f"COMPARAISON {_libelle_mois(a, m)} / {_libelle_mois(pa, pm)}")
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+        ws.cell(r, 1).font, ws.cell(r, 1).alignment = gras, centre
+        debut = r
+        r += 1
+        l_cur = r
+        ws.cell(r, 1, _libelle_mois(a, m))
+        for c, col in enumerate("BCDEF", 2):
+            ws.cell(r, c, f"={col}{ligne_mois[m]}")
+
+        def bloc(libelle, totaux, ligne_annuelle, r):
+            ws.cell(r, 1, libelle)
+            for c, (col, cle) in enumerate(zip("BCDEF", COLONNES_ETAT), 2):
+                if ligne_annuelle:
+                    ws.cell(r, c, f"={col}{ligne_annuelle}")
+                elif totaux:
+                    ws.cell(r, c, totaux[cle])
+                else:
+                    ws.cell(r, c, "n/d")
+            ws.cell(r + 1, 1, "VARIATION")
+            ws.cell(r + 2, 1, "VARIATION %")
+            for c, col in enumerate("BCDEF", 2):
+                if totaux:
+                    ws.cell(r + 1, c, f"={col}{l_cur}-{col}{r}")
+                    ws.cell(r + 2, c, f'=IF({col}{r}=0,"",{col}{r + 1}/{col}{r})').number_format = "0.0%"
+            return r + 3
+        r = bloc(_libelle_mois(pa, pm), comp["totaux_precedent"], ligne_mois[pm] if pa == a else None, r + 1)
+        if comp["totaux_n1"]:
+            r = bloc(_libelle_mois(*comp["n1"]) + (" (saisi)" if comp["source_n1"] == "saisi" else ""),
+                     comp["totaux_n1"], None, r)
+        for row in ws.iter_rows(min_row=debut + 1, max_row=r - 1, max_col=6):
+            for cell in row:
+                cell.border = cadre
+                cell.font = gras if cell.column == 1 else police
+                if cell.column > 1 and cell.number_format != "0.0%":
+                    cell.number_format = fmt
+        if not comp["totaux_n1"]:
+            ws.cell(r, 1, f"{_libelle_mois(*comp['n1'])} : donnees non disponibles, comparaison avec le meme mois "
+                          "de l'annee precedente non faite.").font = Font(name="Calibri", size=11, italic=True)
+    for col, larg in zip("ABCDEF", (33.6, 25.4, 23, 23, 23, 25.4)):
+        ws.column_dimensions[col].width = larg
+    ws.freeze_panes = "B4"
+    ws.page_setup.orientation = "portrait"
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_setup.fitToWidth, ws.page_setup.fitToHeight = 1, 1
     return ws
 
 

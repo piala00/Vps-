@@ -53,7 +53,9 @@ def main():
                 iid = next(i for i, r in p.t._data.items() if r["ct_num"] == "CL003")
                 p.t.tv.selection_set(iid)
             elif key == "etat":
-                pass
+                p.onglets.set("Etat comparatif annuel")
+                shot(f"{i:02d}_etat_annuel")
+                p.onglets.set("Etat comparatif")
             elif key == "solvabilite":
                 p.bc.insert(0, "BCCB0101")
                 p.controler()

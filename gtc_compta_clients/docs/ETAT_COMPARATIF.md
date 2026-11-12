@@ -38,6 +38,19 @@ importé) est repris avec la mention « (saisi) ». Les **créances** sont calcu
 mois (lecture seule), sinon somme des fiches clients si tous les soldes d'ouverture sont connus, sinon `n/d`
 (jamais de chiffre inventé).
 
+## Dernière feuille : ETAT COMPARATIF de l'année
+La dernière feuille du classeur (`ETAT COMPARATIF <année>`) récapitule l'année : **une ligne par mois** (JANVIER →
+DÉCEMBRE), avec les mêmes colonnes TOTAL, COMPTANT, CREDIT, RECOUVREMENT et TOTAL RECETTE. Chaque ligne reprend
+**par formule** la ligne TOTAL de la feuille du mois (ex. `='OCTOBRE 2026'!B35`), puis vient le TOTAL de l'année.
+
+En bas, la **comparaison du dernier mois avec le mois précédent** : les deux lignes de totaux, puis VARIATION
+(montant) et VARIATION % pour chaque colonne. La comparaison avec le même mois de l'année précédente n'est
+ajoutée que si les rapports de cette année-là sont chargés. Sinon, la mention « données non disponibles » est
+affichée. Un chiffre recopié à la main dans RECAP n'est pas repris.
+
+Dans l'application : onglet « Etat comparatif annuel » du module État comparatif (comparaison du mois sélectionné
+avec le mois précédent).
+
 ## Import d'un état chiffre d'affaires existant
 Bouton « Importer un état chiffre d'affaires existant… » (module État comparatif). Contrôles automatiques :
 - libellé de créance incohérent avec le mois (ex. « CREANCE AU 01-01-25 » en février) ;

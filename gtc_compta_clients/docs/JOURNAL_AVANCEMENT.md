@@ -175,3 +175,8 @@ sur les données réelles de GTC**.
 - Import d'un état existant avec contrôles : libellés, créances incohérentes ou non mises à jour, Total M-1 faux.
   5 erreurs relevées sur les deux exemples 2025.
 - 135 tests réussis.
+
+## Cycle : état comparatif annuel (dernière feuille)
+- Feuille `ETAT COMPARATIF <année>` en dernière position : une ligne par mois, TOTAL de l'année, comparaison du
+  dernier mois avec le mois précédent (VARIATION et VARIATION %). N-1 seulement s'il est calculé sur des rapports.
+- Onglet « Etat comparatif annuel » dans l'application. 136 tests réussis.

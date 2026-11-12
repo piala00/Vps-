@@ -80,7 +80,8 @@ def test_tableau_du_mois_et_export_excel(base, user, cfg, tmp_path):
     assert t["evolution"]["recouvrements"] == t["total_m"]["recouvrements"] - t["total_m1"]["recouvrements"]
     dest = ec.exporter_excel(base, "BERTOUA", [(2026, 9), (2026, 10)], tmp_path / "etat.xlsx", "GTC")
     wb = load_workbook(dest)
-    assert wb.sheetnames == ["SEPTEMBRE 2026", "OCTOBRE 2026", "RAPPROCHEMENT VENTES SAGE", "CONTROLES"]
+    assert wb.sheetnames == ["SEPTEMBRE 2026", "OCTOBRE 2026", "RAPPROCHEMENT VENTES SAGE", "CONTROLES",
+                             "ETAT COMPARATIF 2026"]                 # l'etat comparatif annuel est la derniere feuille
     ws = wb["OCTOBRE 2026"]
     # Modele GTC « ETAT CHIFFRE D'AFFAIRE »
     assert ws["A1"].value == "ETAT CHIFFRE D'AFFAIRE MOIS OCTOBRE 2026"
@@ -171,3 +172,33 @@ def test_creances_non_mises_a_jour_detectees(db, user, tmp_path):
     wb.save(tmp_path / "oct.xlsx")
     r = ec.charger_etat_modele(db, user, tmp_path / "oct.xlsx", "AGENCE X")
     assert any("31-10-25 absente" in c[2] for c in r["controles"])
+
+
+def test_etat_comparatif_annuel_une_ligne_par_mois(base, user, cfg, tmp_path):
+    """Derniere feuille : une ligne par mois (janvier a decembre), memes colonnes, comparaison avec le mois
+    precedent ; pas de comparaison N-1 sans les rapports de l'annee precedente."""
+    for f, mois in (("RC_SEPT_2026_ANONYMISE.xlsx", 9), ("RC_OCT_2026_ANONYMISE.xlsx", 10)):
+        ec.charger_rapport_mensuel(base, user, FX / f, cfg["rapport"], "BERTOUA", mois, 2026)
+    ta = ec.tableau_annuel(base, "BERTOUA", 2026)
+    assert [x["libelle"] for x in ta["mois"]][0] == "JANVIER" and len(ta["mois"]) == 12
+    sept, octo = ec.tableau_mois(base, "BERTOUA", 2026, 9)["total_m"], ec.tableau_mois(base, "BERTOUA", 2026, 10)["total_m"]
+    assert ta["mois"][9]["totaux"]["total_ventes"] == octo["total_ventes"] and ta["mois"][0]["totaux"] is None
+    assert ta["total"]["recette"] == sept["recette"] + octo["recette"]
+    c = ta["comparaison"]
+    assert c["mois"] == (2026, 10) and c["precedent"] == (2026, 9)
+    assert c["variation_precedent"]["recouvrements"] == octo["recouvrements"] - sept["recouvrements"]
+    assert c["totaux_n1"] is None                                  # N-1 non disponible : non compare
+    assert ec.tableau_annuel(base, "BERTOUA", 2026, 9)["comparaison"]["totaux_precedent"] is None  # aout non charge
+
+    dest = ec.exporter_excel(base, "BERTOUA", [(2026, 9), (2026, 10)], tmp_path / "etat.xlsx", "GTC")
+    ws = load_workbook(dest)["ETAT COMPARATIF 2026"]
+    assert ws["A1"].value == "ETAT COMPARATIF ANNEE 2026" and ws["A2"].value == "MOIS"
+    assert [ws.cell(3, c).value for c in range(2, 7)] == ["TOTAL", "COMPTANT", "CREDIT", "RECOUVREMENT", "TOTAL RECETTE"]
+    assert [ws.cell(r, 1).value for r in range(4, 16)][::11] == ["JANVIER", "DECEMBRE"]
+    assert ws["B13"].value == "='OCTOBRE 2026'!B35" and ws["F12"].value == "='SEPTEMBRE 2026'!F34"
+    assert ws["A16"].value == "TOTAL" and ws["B16"].value == "=SUM(B4:B15)"
+    assert ws["A18"].value == "COMPARAISON OCTOBRE 2026 / SEPTEMBRE 2026"
+    assert (ws["A19"].value, ws["A20"].value, ws["A21"].value, ws["A22"].value) == \
+        ("OCTOBRE 2026", "SEPTEMBRE 2026", "VARIATION", "VARIATION %")
+    assert ws["E21"].value == "=E19-E20"
+    assert "non disponibles" in ws["A23"].value

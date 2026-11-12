@@ -1279,6 +1279,7 @@ class EtatComparatif(Page):
                actif=self.user.peut("importer"), motif="Reserve aux roles autorises (importer)").pack(side="left", padx=6)
         onglets = ctk.CTkTabview(self)
         onglets.pack(fill="both", expand=True, padx=14, pady=4)
+        self.onglets = onglets
         o1 = onglets.add("Etat comparatif")
         self.t = Table(o1, [("d", "DATES", 190, "w"), ("tv", "TOTAL", 160, "e"), ("vc", "COMPTANT", 160, "e"),
                             ("vk", "CREDIT", 160, "e"), ("rc", "RECOUVREMENT", 160, "e"),
@@ -1286,6 +1287,14 @@ class EtatComparatif(Page):
         self.t.pack(fill="both", expand=True)
         ctk.CTkLabel(o1, text="Modele ETAT CHIFFRE D'AFFAIRE : CREDIT = TOTAL - COMPTANT ; TOTAL RECETTE = COMPTANT + "
                               "RECOUVREMENT. Les lignes Total M-1, N-1 et CREANCE sont calculees (jamais saisies).",
+                     text_color="#555").pack(anchor="w")
+        o3 = onglets.add("Etat comparatif annuel")
+        self.ta = Table(o3, [("d", "MOIS", 330, "w"), ("tv", "TOTAL", 150, "e"), ("vc", "COMPTANT", 140, "e"),
+                             ("vk", "CREDIT", 150, "e"), ("rc", "RECOUVREMENT", 150, "e"),
+                             ("re", "TOTAL RECETTE", 150, "e")], height=16)
+        self.ta.pack(fill="both", expand=True)
+        ctk.CTkLabel(o3, text="Une ligne par mois (janvier a decembre). En bas : comparaison du mois selectionne avec le "
+                              "mois precedent (et avec le meme mois de l'annee precedente si ses rapports sont charges).",
                      text_color="#555").pack(anchor="w")
         o2 = onglets.add("Rapprochement des ventes avec Sage")
         self.ts = Table(o2, [("d", "Date", 100, "w"), ("tv", "Total ventes CR", 150, "e"), ("vs", "Ventes Sage", 150, "e"),
@@ -1312,7 +1321,9 @@ class EtatComparatif(Page):
         m = self._mois_courant()
         if not m:
             self.t.remplir([], lambda r: r)
+            self.ta.remplir([], lambda r: r)
             return
+        self.charger_annuel(*m)
         t = self.ec.tableau_mois(self.db, self.cfg["agence"], *m)
         cols = self.ec.COLONNES_ETAT
         lignes = [dict(r) for r in t["jours"]]
@@ -1339,6 +1350,36 @@ class EtatComparatif(Page):
                                    fmt_fcfa(r["ecart_sage"], True), r["statut_sage"], fmt_fcfa(r["total_ventes_retenu"])),
                         tag=lambda r: {"CONCORDANT": "VALIDE", "ECART": "ECART_A_ANALYSER",
                                        "SAGE_INDISPONIBLE": "EN_ATTENTE_SAGE"}.get(r["statut_sage"]))
+
+    def charger_annuel(self, annee, mois):
+        ta = self.ec.tableau_annuel(self.db, self.cfg["agence"], annee, mois)
+        cols = self.ec.COLONNES_ETAT
+        vide = {c: None for c in cols}
+        lignes = [{"lib": x["libelle"], "titre": False, **(x["totaux"] or vide)} for x in ta["mois"]]
+        lignes.append({"lib": "TOTAL", "titre": True, **(ta["total"] or vide)})
+        comp = ta["comparaison"]
+        if comp:
+            lib = self.ec._libelle_mois
+            lignes.append({"lib": f"{lib(*comp['mois'])} / {lib(*comp['precedent'])}", "titre": True, **vide})
+            lignes.append({"lib": lib(*comp["mois"]), "titre": True, **comp["totaux"]})
+            for nom, tot, var, pct in ((lib(*comp["precedent"]), "totaux_precedent", "variation_precedent",
+                                        "variation_pct_precedent"),
+                                       (lib(*comp["n1"]), "totaux_n1", "variation_n1", "variation_pct_n1")):
+                if not comp[tot]:
+                    lignes.append({"lib": f"{nom} : non charge" if tot == "totaux_precedent"
+                                   else f"{nom} : non disponible", "titre": True, **vide})
+                    continue
+                lignes.append({"lib": nom, "titre": True, **comp[tot]})
+                lignes.append({"lib": "VARIATION", "titre": True, **comp[var]})
+                lignes.append({"lib": "VARIATION %", "titre": True, "pct": True, **comp[pct]})
+
+        def val(r, c):
+            v = r[c]
+            if v is None:
+                return ""
+            return f"{v * 100:.1f} %" if r.get("pct") else fmt_fcfa(v)
+        self.ta.remplir(lignes, lambda r: tuple([r["lib"]] + [val(r, c) for c in cols]),
+                        tag=lambda r: "RAPPROCHE" if r["titre"] else None)
 
     def detail(self, r):
         self.lbl.delete("1.0", "end")
